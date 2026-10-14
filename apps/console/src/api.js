@@ -16,7 +16,16 @@ export async function api(path, body, options = {}) {
   return data;
 }
 const messages = {
-  demo_rate_limit: "公開試用の上限に達しました。ウォレットでログインするか、時間をおいてお試しください。",
+  activation_confirming:
+    "登録の確定を待っています。しばらくして「登録を再開」から続けてください。",
+  permission_draft_expired:
+    "署名の有効時間が過ぎました。画面を開き直すと、成功済みの登録から再開できます。",
+  permission_stopped_during_activation:
+    "この登録の途中で権限が停止されました。画面を開き直して、新しい条件を承認してください。",
+  policy_transaction_required:
+    "送信済みの登録を確認できませんでした。最初に登録したブラウザで再開してください。",
+  demo_rate_limit:
+    "公開試用の上限に達しました。ウォレットでログインするか、時間をおいてお試しください。",
   unauthorized: "ウォレットでログインしてください。",
   wallet_account_changed:
     "ウォレットのアカウントが変わりました。もう一度接続してください。",
@@ -41,7 +50,12 @@ const messages = {
     "他のAIの委任期限を確認してから更新してください。",
 };
 export function explain(error) {
-  if (error?.code === 4001 || /user rejected|user denied|request rejected by user/i.test(error?.message ?? ""))
+  if (
+    error?.code === 4001 ||
+    /user rejected|user denied|request rejected by user/i.test(
+      error?.message ?? "",
+    )
+  )
     return "ウォレットでの操作をキャンセルしました。";
   return (
     messages[error?.message] ??

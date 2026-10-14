@@ -16,6 +16,7 @@ const m=JSON.parse(await readFile(new URL('.local/local-chain.json',root),'utf8'
 const rpc='http://127.0.0.1:18812';
 const client=createPublicClient({chain:foundry,transport:http(rpc)});
 assert.equal(await client.getChainId(),31337);assert.match(await client.request({method:'web3_clientVersion'}),/anvil/i);
+const snapshot=await client.request({method:'evm_snapshot'});
 const owner=privateKeyToAccount(generatePrivateKey()),relayer=privateKeyToAccount(generatePrivateKey()),agent=privateKeyToAccount(generatePrivateKey());
 await client.request({method:'anvil_setBalance',params:[relayer.address,toHex(parseEther('10'))]});
 const wallet=createWalletClient({account:relayer,chain:foundry,transport:http(rpc)});
@@ -52,22 +53,41 @@ try{
  const bad=await agent.signTypedData(terms.typedData.policy);
  await request(base+'/transactions',{policy:bad,permission:await owner.signTypedData(terms.typedData.permission)},401);
  const signatures={policy:await owner.signTypedData(terms.typedData.policy),permission:await owner.signTypedData(terms.typedData.permission)};
- const {json:transactions}=await request(base+'/transactions',signatures);
+ let {json:transactions}=await request(base+'/transactions',signatures);
  assert.equal((await request('/api/owner/me')).json.connections[0].status,'pending');
  const hashes=[];
- for(const call of transactions.calls){const hash=await wallet.sendTransaction(call);assert.equal((await client.waitForTransactionReceipt({hash})).status,'success');hashes.push(hash);}
+ const first=await wallet.sendTransaction(transactions.calls[0]);assert.equal((await client.waitForTransactionReceipt({hash:first})).status,'success');hashes.push(first);
+ await request(base+'/progress',{policy:first});
+ assert.equal((await request(`/api/owner/permissions/connections/${connection.id}/draft`)).json.draft.hashes.policy,first);
+ await client.request({method:'anvil_mine',params:['0x5']});
+ await request(base+'/progress',{policy:first});
+ const partial=(await request('/api/owner/me')).json;
+ assert.equal(partial.connections[0].status,'pending');assert.equal(partial.policy.activation_tx,first);
+ // Close/reopen after the ten-minute signing deadline. The first confirmed
+ // transaction remains unchanged, and only the missing permission is signed.
+ await client.request({method:'evm_increaseTime',params:[660]});await client.request({method:'anvil_mine',params:['0x1']});
+ const {json:renewed}=await request(base+'/renew',{});assert.equal(renewed.policyRegistered,true);
+ const renewedSignature=await owner.signTypedData(renewed.typedData.permission);
+ await request(base+'/transactions',{permission:signatures.permission},401);
+ transactions=(await request(base+'/transactions',{permission:renewedSignature})).json;
+ assert.equal(transactions.calls[0].data,(await request(base)).json.calls[0].data);
+ const second=await wallet.sendTransaction(transactions.calls[1]);assert.equal((await client.waitForTransactionReceipt({hash:second})).status,'success');hashes.push(second);
+ await request(base+'/progress',{permission:second});
+ await request(base+'/progress',{policy:second},422);
  await request(base+'/activate',{policy:hashes[0],permission:hashes[1]},409);
  await client.request({method:'anvil_mine',params:['0x5']});
  await request(base+'/activate',{policy:hashes[0],permission:hashes[1]});
  await request(base+'/activate',{policy:hashes[0],permission:hashes[1]});
  const active=(await request('/api/owner/me')).json;
  assert.equal(active.connections[0].status,'active');assert.equal(active.policy.document.perPeriod,parseEther('5000').toString());
+ assert.equal(active.policy.document.periodStart,partial.policy.document.periodStart);
+ assert.equal((await request(`/api/owner/permissions/connections/${connection.id}/draft`)).json.draft,null);
  const {json:revocation}=await request(`/api/owner/permissions/connections/${connection.id}/revoke/prepare`,{});
  assert.equal((await request('/api/owner/me')).json.connections[0].status,'paused');
  const {json:revokeCall}=await request(`/api/owner/permissions/connections/${connection.id}/revoke/transaction`,{nonce:revocation.typedData.message.nonce,deadline:revocation.typedData.message.deadline,signature:await owner.signTypedData(revocation.typedData)});
  const hash=await wallet.sendTransaction(revokeCall);assert.equal((await client.waitForTransactionReceipt({hash})).status,'success');await client.request({method:'anvil_mine',params:['0x5']});
  await request(`/api/owner/permissions/connections/${connection.id}/revoke/confirm`,{transactionHash:hash});
  assert.equal((await request('/api/owner/me')).json.connections[0].permission_status,'revoked');
- const evidence={scope:'Local Anvil and real PostgreSQL. Actual owner signatures, official MetaMask delegation, policy/permission registration and revocation through the API. No browser-extension or public Amoy claim.',passed:['SIWE owner login','owner-signed restricted delegation','wrong policy signer rejected','no activation from signatures alone','five confirmations required','exact registration calls verified','idempotent activation','immediate API pause','confirmed onchain revocation'],policyTransaction:hashes[0],permissionTransaction:hashes[1],revocationTransaction:hash};
+ const evidence={scope:'Local Anvil and real PostgreSQL. Actual owner signatures, official MetaMask delegation, policy/permission registration and revocation through the API. No browser-extension or public Amoy claim.',passed:['SIWE owner login','owner-signed restricted delegation','wrong policy signer rejected','no activation from signatures alone','five confirmations required','exact registration calls verified','idempotent activation','immediate API pause','confirmed onchain revocation','registration progress survives a reopened session','first confirmed call reconciled without activating AI','expired second call renewed with fresh owner signature','old signature and substituted transaction hash rejected','renewal preserves shared period anchor'],policyTransaction:hashes[0],permissionTransaction:hashes[1],revocationTransaction:hash};
  await writeFile(new URL('docs/evidence/permissions-api.json',root),JSON.stringify(evidence,null,2)+'\n');console.log(JSON.stringify({passed:evidence.passed.length,evidence:'docs/evidence/permissions-api.json'}));
-}finally{await db.end();}
+}finally{await db.end();await client.request({method:'evm_revert',params:[snapshot]});}

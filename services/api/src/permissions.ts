@@ -6,7 +6,7 @@ import {DomainError,minorToAtomic,permissionSchema,digest} from '@yours/domain';
 import {transaction,audit,pauseConnection,type Db,type Tx} from '@yours/storage';
 import {gateDomain,gateTypes,structHash,merchantSetHash,assetLimitsHash,relayerSetHash,grantsHash,agentPermissionDomain,agentPermissionTypes,validateParents,verifyParentSignatures,isExpected7702Code,type Policy,type GrantExpectation} from '@yours/wallet-sdk';
 import {owner,type Env} from './auth.js';
-import {confirmedCall,jsonSafe,tokenAbi,type ChainRuntime} from './chain.js';
+import {confirmedCall,jsonSafe,tokenAbi,type ChainRuntime,type ChainManifest} from './chain.js';
 import type {Config} from './config.js';
 
 const signature=z.string().regex(/^0x[0-9a-fA-F]{130}$/);
@@ -27,12 +27,91 @@ async function draft(db:Pick<Db,'query'>|Tx,id:string,accountId:string,allowExpi
  return row;
 }
 async function saveDraft(db:Db,row:any,document:any){
- const {rowCount}=await db.query('UPDATE permission_drafts SET document=$2 WHERE id=$1 AND document=$3::jsonb AND completed_at IS NULL',[row.id,JSON.stringify(document),JSON.stringify(row.document)]);
+ const {rowCount}=await db.query("UPDATE permission_drafts SET document=$2::jsonb,expires_at=to_timestamp(($2::jsonb->>'deadline')::bigint) WHERE id=$1 AND document=$3::jsonb AND completed_at IS NULL",[row.id,JSON.stringify(document),JSON.stringify(row.document)]);
  if(rowCount!==1)throw new DomainError('permission_draft_changed',409);
+}
+
+// Recording the first confirmed call does not activate the AI. It preserves
+// the exact chain policy and its period anchor if the second call is interrupted.
+async function storeConfirmedPolicy(tx:Tx,row:any,m:ChainManifest,hash:string){
+ const d=row.document;
+ const budget={perOrder:d.policy.autoPerOrderJpyc,perPeriod:d.policy.autoPerPeriodJpyc,periodStart:Number(d.policy.periodStart),periodSeconds:Number(d.policy.periodSeconds),validAfter:Number(d.policy.validAfter),validUntil:Number(d.policy.validUntil),status:'active',chainPolicy:d.policy};
+ const {rowCount}=await tx.query(`INSERT INTO policies(account_id,policy_id,revision,gate_address,token_address,token_decimals,currency,document,activation_tx) VALUES($1,$2,$3,$4,$5,18,'JPY',$6,$7) ON CONFLICT(account_id) DO UPDATE SET revision=excluded.revision,document=excluded.document,activation_tx=excluded.activation_tx,updated_at=now() WHERE policies.revision<=excluded.revision`,[row.account_id,d.policy.policyId,Number(d.policy.version),m.gate.toLowerCase(),m.jpyc.toLowerCase(),JSON.stringify(budget),hash]);
+ if(!rowCount)throw new DomainError('policy_reconciliation_required',409);
+ await tx.query(`INSERT INTO wallet_grants(connection_id,token_address,context,document,valid_after,valid_until) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(connection_id,token_address) DO UPDATE SET context=excluded.context,document=excluded.document,valid_after=excluded.valid_after,valid_until=excluded.valid_until,updated_at=now()`,[row.connection_id,m.jpyc.toLowerCase(),d.context,JSON.stringify({binding:d.binding,expectation:d.expectation}),d.expectation.startTime,d.expectation.expiry]);
 }
 
 export function permissionRoutes(db:Db,config:Config,chain:ChainRuntime){
  const router=new Hono<Env>(),{client,manifest:m,gate,registry}=chain;
+ router.get('/connections/:id/draft',async c=>{
+  const actor=owner(c),id=z.string().uuid().parse(c.req.param('id'));
+  const {rows:[row]}=await db.query('SELECT d.* FROM permission_drafts d JOIN connections c ON c.id=d.connection_id WHERE d.account_id=$1 AND d.connection_id=$2 AND d.completed_at IS NULL AND (d.document->>\'controlRevision\')::integer=c.control_revision AND NOT EXISTS(SELECT 1 FROM permission_drafts newer WHERE newer.connection_id=d.connection_id AND newer.created_at>d.created_at) ORDER BY d.created_at DESC LIMIT 1',[actor.accountId,id]);
+  return c.json({draft:row?{id:row.id,connectionId:row.connection_id,expiresAt:row.expires_at,...row.document}:null});
+ });
+ router.get('/drafts/:id',async c=>{
+  const actor=owner(c),row=await draft(db,z.string().uuid().parse(c.req.param('id')),actor.accountId,true);
+  return c.json({id:row.id,connectionId:row.connection_id,completed:Boolean(row.completed_at),expiresAt:row.expires_at,...row.document});
+ });
+ router.post('/drafts/:id/progress',async c=>{
+  const actor=owner(c),row=await draft(db,z.string().uuid().parse(c.req.param('id')),actor.accountId,true),d=row.document;
+  const hashes=z.object({policy:txHash.optional(),permission:txHash.optional()}).strict().refine(value=>value.policy||value.permission).parse(await c.req.json());
+  if(!d.calls)throw new DomainError('permission_transactions_missing',409);
+  for(const [index,key] of ['policy','permission'].entries()){
+   const hash=hashes[key as keyof typeof hashes];if(!hash)continue;
+   const call=d.calls[index];if(!call)throw new DomainError('permission_transactions_missing',409);
+   const tx=await client.getTransaction({hash:hash as Hex});
+   if(tx.to?.toLowerCase()!==call.to.toLowerCase()||tx.input.toLowerCase()!==call.data.toLowerCase()||tx.chainId!==m.chainId)throw new DomainError('activation_transaction_mismatch',422);
+  }
+  if(!row.completed_at)await saveDraft(db,row,{...d,hashes:{...d.hashes,...hashes}});
+  const policyHash=hashes.policy??d.hashes?.policy;
+  if(policyHash){
+   try{
+    if((await client.getTransactionReceipt({hash:policyHash})).status==='reverted')return c.json({id:row.id,hashes:{...d.hashes,...hashes}});
+    await confirmedCall(chain,policyHash,m.gate,d.calls[0].data);
+    const current=await client.readContract({...gate,functionName:'policy',args:[actor.address as Address]});
+    if(structHash('Policy',current)===structHash('Policy',revive<Policy>('Policy',d.policy))){
+     await transaction(db,async tx=>{
+      await tx.query('SELECT id FROM accounts WHERE id=$1 FOR UPDATE',[actor.accountId]);
+      await storeConfirmedPolicy(tx,row,m,policyHash);
+     });
+    }
+   }catch(error){
+    if(!(error instanceof DomainError&&error.code==='activation_confirming')&&(error as Error).name!=='TransactionReceiptNotFoundError')throw error;
+   }
+  }
+  return c.json({id:row.id,hashes:{...d.hashes,...hashes}});
+ });
+ router.post('/drafts/:id/renew',async c=>{
+  const actor=owner(c),row=await draft(db,z.string().uuid().parse(c.req.param('id')),actor.accountId,true),d=row.document;
+  if(row.completed_at||!d.typedData)throw new DomainError('permission_draft_not_signable',409);
+  const [block,current,nonce,registryNonce,permission]=await Promise.all([
+   client.getBlock(),client.readContract({...gate,functionName:'policy',args:[actor.address as Address]}),
+   client.readContract({...gate,functionName:'ownerNonce',args:[actor.address as Address]}),client.readContract({...registry,functionName:'nonces',args:[actor.address as Address]}),
+   client.readContract({...registry,functionName:'permissions',args:[actor.address as Address,bytes32(row.connection_id)]}),
+  ]);
+  const now=Number(block.timestamp),policyRegistered=current.version===BigInt(d.policy.version)&&structHash('Policy',current)===structHash('Policy',revive<Policy>('Policy',d.policy));
+  const {rows:[connection]}=await db.query('SELECT control_revision FROM connections WHERE id=$1',[row.connection_id]);
+  if(connection.control_revision!==d.controlRevision)throw new DomainError('permission_stopped_during_activation',409);
+  if(Number(d.permission.validUntil)<=now+600)throw new DomainError('permission_expiring',409);
+  if(permission[3]!==BigInt(d.permission.revision)-1n)throw new DomainError('permission_reconciliation_required',409);
+  if(policyRegistered){
+   if(!d.hashes?.policy||!d.calls?.[0])throw new DomainError('policy_transaction_required',409);
+   await confirmedCall(chain,d.hashes.policy,m.gate,d.calls[0].data);
+   await transaction(db,async tx=>{await tx.query('SELECT id FROM accounts WHERE id=$1 FOR UPDATE',[actor.accountId]);await storeConfirmedPolicy(tx,row,m,d.hashes.policy);});
+  }else if(current.version!==BigInt(d.policy.version)-1n||nonce!==BigInt(d.nonce))throw new DomainError('policy_reconciliation_required',409);
+  // Do not replace a call with an unknown mining outcome. The same signed call
+  // can be recovered by hash; a replaced/reverted transaction can be recorded.
+  for(const key of ['policy','permission']){
+   if(key==='policy'&&policyRegistered||!d.hashes?.[key])continue;
+   let receipt;try{receipt=await client.getTransactionReceipt({hash:d.hashes[key]});}catch{throw new DomainError('activation_confirming',409);}
+   if(receipt.status!=='reverted')throw new DomainError('activation_confirming',409);
+  }
+  const deadline=now+600;
+  const typedData={policy:policyRegistered?d.typedData.policy:{...d.typedData.policy,message:{...d.typedData.policy.message,validUntil:String(deadline)}},permission:{...d.typedData.permission,message:{...d.typedData.permission.message,nonce:String(registryNonce),deadline:String(deadline)}}};
+  const document={...d,deadline,registryNonce:String(registryNonce),typedData,policyRegistered,calls:policyRegistered?[d.calls[0],null]:undefined,signatures:policyRegistered?{policy:d.signatures.policy}:undefined,hashes:policyRegistered?{policy:d.hashes.policy}:{}};
+  await saveDraft(db,row,document);
+  return c.json({id:row.id,typedData,policyRegistered});
+ });
  router.get('/wallet',async c=>{
   const actor=owner(c);
   const [code,balance,policy]=await Promise.all([client.getCode({address:actor.address as Address}),client.readContract({address:m.jpyc,abi:tokenAbi,functionName:'balanceOf',args:[actor.address as Address]}),client.readContract({...gate,functionName:'policy',args:[actor.address as Address]})]);
@@ -97,15 +176,17 @@ export function permissionRoutes(db:Db,config:Config,chain:ChainRuntime){
  });
  router.post('/drafts/:id/transactions',async c=>{
   const actor=owner(c),id=z.string().uuid().parse(c.req.param('id'));
-  const signatures=z.object({policy:signature,permission:signature}).strict().parse(await c.req.json());
+  const supplied=z.object({policy:signature.optional(),permission:signature}).strict().parse(await c.req.json());
   const row=await draft(db,id,actor.accountId),d=row.document;
   if(!d.typedData||row.completed_at)throw new DomainError('permission_draft_not_signable',409);
-  if(d.calls){if(digest(d.signatures)!==digest(signatures))throw new DomainError('permission_draft_already_signed',409);return c.json({id,chainId:m.chainId,calls:d.calls});}
-  for(const type of ['policy','permission'] as const){
+  const signatures={policy:supplied.policy??(d.policyRegistered?d.signatures.policy:undefined),permission:supplied.permission};
+  if(!signatures.policy)throw new DomainError('owner_signature_required',422);
+  if(d.calls?.[1]){if(digest(d.signatures)!==digest(signatures))throw new DomainError('permission_draft_already_signed',409);return c.json({id,chainId:m.chainId,calls:d.calls});}
+  for(const type of (d.policyRegistered?['permission']:['policy','permission']) as Array<'policy'|'permission'>){
    if(!await client.verifyTypedData({...d.typedData[type],address:actor.address as Address,signature:signatures[type] as Hex}))throw new DomainError('owner_signature_invalid',401);
   }
   const policy=revive<Policy>('Policy',d.policy),grants=d.grants.map((g:any)=>revive<any>('GrantBinding',g));
-  const calls=[{to:m.gate,data:encodeFunctionData({abi:gate.abi,functionName:d.kind,args:[policy,d.merchants,[],grants,[m.addresses.relayer],BigInt(d.nonce),BigInt(d.deadline),signatures.policy as Hex]})},
+  const calls=[d.policyRegistered?d.calls[0]:{to:m.gate,data:encodeFunctionData({abi:gate.abi,functionName:d.kind,args:[policy,d.merchants,[],grants,[m.addresses.relayer],BigInt(d.nonce),BigInt(d.deadline),signatures.policy as Hex]})},
    {to:m.registry,data:encodeFunctionData({abi:registry.abi,functionName:'configure',args:[asPermission(d.registryPermission),d.registryMerchants,BigInt(d.registryNonce),BigInt(d.deadline),signatures.permission as Hex]})}];
   await saveDraft(db,row,{...d,signatures,calls});
   return c.json({id,chainId:m.chainId,calls});
@@ -128,10 +209,8 @@ export function permissionRoutes(db:Db,config:Config,chain:ChainRuntime){
    const {rows:[connection]}=await tx.query('SELECT control_revision FROM connections WHERE id=$1',[row.connection_id]);
    if(connection.control_revision!==d.controlRevision)throw new DomainError('permission_stopped_during_activation',409);
    if(digest(latest.document)!==digest(d))throw new DomainError('permission_draft_changed',409);
-   const budget={perOrder:d.policy.autoPerOrderJpyc,perPeriod:d.policy.autoPerPeriodJpyc,periodStart:Number(d.policy.periodStart),periodSeconds:Number(d.policy.periodSeconds),validAfter:Number(d.policy.validAfter),validUntil:Number(d.policy.validUntil),status:'active',chainPolicy:d.policy};
-   await tx.query(`INSERT INTO policies(account_id,policy_id,revision,gate_address,token_address,token_decimals,currency,document,activation_tx) VALUES($1,$2,$3,$4,$5,18,'JPY',$6,$7) ON CONFLICT(account_id) DO UPDATE SET revision=excluded.revision,document=excluded.document,activation_tx=excluded.activation_tx,updated_at=now()`,[actor.accountId,d.policy.policyId,Number(d.policy.version),m.gate.toLowerCase(),m.jpyc.toLowerCase(),JSON.stringify(budget),hashes.policy]);
+   await storeConfirmedPolicy(tx,row,m,hashes.policy);
    await tx.query(`INSERT INTO permissions(connection_id,revision,document,owner_signature,activation_tx,status) VALUES($1,$2,$3,$4,$5,'active') ON CONFLICT(connection_id) DO UPDATE SET revision=excluded.revision,document=excluded.document,owner_signature=excluded.owner_signature,activation_tx=excluded.activation_tx,status='active',updated_at=now()`,[row.connection_id,d.permission.revision,JSON.stringify(d.permission),d.signatures.permission,hashes.permission]);
-   await tx.query(`INSERT INTO wallet_grants(connection_id,token_address,context,document,valid_after,valid_until) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(connection_id,token_address) DO UPDATE SET context=excluded.context,document=excluded.document,valid_after=excluded.valid_after,valid_until=excluded.valid_until,updated_at=now()`,[row.connection_id,m.jpyc.toLowerCase(),d.context,JSON.stringify({binding:d.binding,expectation:d.expectation}),d.expectation.startTime,d.expectation.expiry]);
    await tx.query("UPDATE connections SET status='active' WHERE id=$1",[row.connection_id]);
    await tx.query('UPDATE permission_drafts SET completed_at=now() WHERE id=$1',[id]);
    await audit(tx,actor.accountId,'owner:'+actor.accountId,'permission.activated',row.connection_id,{policyTransaction:hashes.policy,permissionTransaction:hashes.permission});

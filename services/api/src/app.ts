@@ -26,6 +26,12 @@ export function createApp(db:Db,config:Config,signer:P256Signer,chain?:ChainRunt
  app.use('*',bodyLimit({maxSize:262144,onError:c=>c.json({error:'body_too_large'},413)}));
  app.use('*',secureHeaders({crossOriginEmbedderPolicy:false}));
  app.use('*',async(c,next)=>{const id=randomUUID();c.header('X-Request-Id',id);c.header('Cache-Control','no-store');await next();});
+ app.use('*',async(c,next)=>{
+  if(config.NODE_ENV==='production'&&c.req.method==='GET'&&c.req.header('Accept')?.includes('text/html')&&c.req.header('Host')!==new URL(config.PUBLIC_ORIGIN).host){
+   return c.redirect(config.PUBLIC_ORIGIN+c.req.path+new URL(c.req.url).search,308);
+  }
+  await next();
+ });
  const failure=(c:any,code:string,status:number,details?:unknown)=>{
   if(c.req.path.startsWith('/ucp/')){
    const result={ucp:{version:UCP_VERSION,status:'error'},messages:[{type:'error',code,content:code,content_type:'plain',severity:status===401||status===403?'requires_buyer_input':status===409||status===412?'recoverable':'unrecoverable'}]};
@@ -44,7 +50,7 @@ export function createApp(db:Db,config:Config,signer:P256Signer,chain?:ChainRunt
  app.route('/',webhookRoutes(db,config,signer));
  app.get('/health',c=>c.json({ok:true,service:'yours-api'}));
  app.get('/ready',async c=>{await db.query('SELECT 1');return c.json({ok:true});});
- app.get('/api/config',c=>c.json({name:'yours',chainId:config.CHAIN_ID,network:config.CHAIN_ID===80002?'Polygon Amoy':'Local test chain',ucpVersion:UCP_VERSION,merchant:{id:config.MERCHANT_ID,name:config.MERCHANT_NAME},paymentsConfigured:Boolean(chain&&config.MANDATES_URL&&config.GATE_ADDRESS&&config.JPYC_ADDRESS&&config.MERCHANT_PAY_TO),gate:config.GATE_ADDRESS,token:config.JPYC_ADDRESS,geminiConfigured:Boolean(config.AGENT_URL)}));
+ app.get('/api/config',c=>c.json({name:'yours',origin:config.PUBLIC_ORIGIN,chainId:config.CHAIN_ID,network:config.CHAIN_ID===80002?'Polygon Amoy':'Local test chain',ucpVersion:UCP_VERSION,merchant:{id:config.MERCHANT_ID,name:config.MERCHANT_NAME},paymentsConfigured:Boolean(chain&&config.MANDATES_URL&&config.GATE_ADDRESS&&config.JPYC_ADDRESS&&config.MERCHANT_PAY_TO),gate:config.GATE_ADDRESS,token:config.JPYC_ADDRESS,geminiConfigured:Boolean(config.AGENT_URL)}));
  for(const path of ['/.well-known/ucp','/profiles/platform'])app.get(path,c=>{
   const document=profile(config.PUBLIC_ORIGIN,'platform',[signer.publicJwk],{network:'eip155:'+config.CHAIN_ID,asset:config.JPYC_ADDRESS,gate:config.GATE_ADDRESS});
   c.header('Cache-Control','public, max-age=300');c.header('ETag','"'+sha256(JSON.stringify(document))+'"');return c.json(document);
@@ -61,7 +67,7 @@ export function createApp(db:Db,config:Config,signer:P256Signer,chain?:ChainRunt
  if(chain)app.route('/api/owner/permissions',permissionRoutes(db,config,chain));
  app.get('/api/owner/me',async c=>{
   const actor=owner(c);
-  const {rows:connections}=await db.query('SELECT c.id,c.name,c.provider,c.agent_address,c.status,c.created_at,p.document AS permission,p.status AS permission_status FROM connections c LEFT JOIN permissions p ON p.connection_id=c.id WHERE c.account_id=$1 ORDER BY c.created_at',[actor.accountId]);
+  const {rows:connections}=await db.query('SELECT c.id,c.name,c.provider,c.agent_address,c.status,c.created_at,(SELECT CASE WHEN d.completed_at IS NULL AND (d.document->>\'controlRevision\')::integer=c.control_revision THEN d.id ELSE NULL END FROM permission_drafts d WHERE d.connection_id=c.id ORDER BY d.created_at DESC LIMIT 1) AS pending_draft,p.document AS permission,p.status AS permission_status FROM connections c LEFT JOIN permissions p ON p.connection_id=c.id WHERE c.account_id=$1 ORDER BY c.created_at',[actor.accountId]);
   const {rows:[policy]}=await db.query('SELECT document,gate_address,token_address,currency,activation_tx FROM policies WHERE account_id=$1',[actor.accountId]);
   const {rows:intents}=await db.query('SELECT id,connection_id,merchant_id,currency,amount_minor,amount_atomic,state,reasons,transaction_hash,created_at FROM intents WHERE account_id=$1 ORDER BY created_at DESC LIMIT 50',[actor.accountId]);
   const usage=policy?await transaction(db,tx=>budgetUsage(tx,actor.accountId,connections[0]?.id??'00000000-0000-0000-0000-000000000000',periodIndex(policy.document,Math.floor(Date.now()/1000)))):null;

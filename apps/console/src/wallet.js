@@ -97,117 +97,183 @@ export async function registerPermission({
   const { wallet, publicClient } = clients(provider, config, address);
   progress("委任する条件を確認しています");
   const state = await api("/api/owner/permissions/wallet");
-  const draft = await api(
-      `/api/owner/permissions/connections/${connection.id}/prepare`,
-      settings,
-    ),
-    e = {
-      ...draft.expectation,
-      expiry: BigInt(draft.expectation.expiry),
-      startTime: BigInt(draft.expectation.startTime),
-    };
-  let context;
-  progress("ウォレットで購入権限を承認してください");
-  if (state.smartAccountReady) {
-    const nonce = await publicClient.readContract({
-      address: e.enforcers.nonce,
-      abi: [
-        {
-          type: "function",
-          name: "currentNonce",
-          stateMutability: "view",
-          inputs: [
-            { name: "manager", type: "address" },
-            { name: "delegator", type: "address" },
-          ],
-          outputs: [{ type: "uint256" }],
-        },
-      ],
-      functionName: "currentNonce",
-      args: [e.manager, address],
-    });
-    const parent = {
-      delegate: e.agent,
-      delegator: address,
-      authority: toHex(maxUint256, { size: 32 }),
-      salt: toHex(crypto.getRandomValues(new Uint8Array(32))),
-      signature: "0x",
-      caveats: [
-        {
-          enforcer: e.enforcers.periodic,
-          terms: encodePacked(
-            ["address", "uint256", "uint256", "uint256"],
-            [e.token, maxUint256, maxUint256, e.startTime],
-          ),
-          args: "0x",
-        },
-        { enforcer: e.enforcers.redeemer, terms: e.gate, args: "0x" },
-        {
-          enforcer: e.enforcers.timestamp,
-          terms: encodePacked(["uint128", "uint128"], [0n, e.expiry]),
-          args: "0x",
-        },
-        {
-          enforcer: e.enforcers.value,
-          terms: toHex(0n, { size: 32 }),
-          args: "0x",
-        },
-        {
-          enforcer: e.enforcers.nonce,
-          terms: toHex(nonce, { size: 32 }),
-          args: "0x",
-        },
-      ],
-    };
-    parent.signature = await typed(
-      provider,
-      address,
-      config.chainId,
-      delegationTypedData(config.chainId, e.manager, parent),
-    );
-    context = encodeDelegations([parent]);
-  } else {
-    const result = await requestGatePermissions(provider, [e]);
-    context = result.responses[0].context;
-  }
-  const base = "/api/owner/permissions/drafts/" + draft.id;
-  const terms = await api(base + "/parents", { context });
-  progress("上限と共有予算の署名を確認してください");
-  const policy = await typed(
-      provider,
-      address,
-      config.chainId,
-      terms.typedData.policy,
-    ),
-    permission = await typed(
-      provider,
-      address,
-      config.chainId,
-      terms.typedData.permission,
-    );
-  const transactions = await api(base + "/transactions", {
-    policy,
-    permission,
-  });
-  const hashes = [];
-  for (const [i, call] of transactions.calls.entries()) {
-    progress(`権限の登録 ${i + 1}/2 — ウォレットで取引を承認してください`);
-    await ensure(provider, config.chainId, address);
-    const hash = await wallet.sendTransaction(call);
-    hashes.push(hash);
-    sessionStorage.setItem(
-      "yours.permission-draft",
-      serialize({ id: draft.id, owner: address, hashes }),
-    );
-    progress(`権限の登録 ${i + 1}/2 — チェーン上の確定を待っています`);
+  let draft = (
+    await api(`/api/owner/permissions/connections/${connection.id}/draft`)
+  ).draft;
+  const storageKey = `yours.permission.${config.chainId}.${address.toLowerCase()}.${connection.id}`;
+  let saved;
+  try {
+    saved = JSON.parse(localStorage.getItem(storageKey) ?? "null");
+  } catch {}
+  let hashes = {
+    ...(draft?.hashes ?? {}),
+    ...(saved && draft && saved.id === draft.id ? saved.hashes : {}),
+  };
+  const persist = () =>
+    localStorage.setItem(storageKey, serialize({ id: draft.id, hashes }));
+  const wait = async (key, hash) => {
+    progress("送信済みの登録を確認しています");
     const receipt = await publicClient.waitForTransactionReceipt({
       hash,
       confirmations: 5,
+      timeout: 180000,
+      onReplaced: ({ transaction }) => {
+        hashes[key] = transaction.hash;
+        persist();
+      },
     });
-    if (receipt.status !== "success") throw new Error("transaction_reverted");
+    if (receipt.status !== "success") return false;
+    hashes[key] = receipt.transactionHash;
+    persist();
+    await api(`/api/owner/permissions/drafts/${draft.id}/progress`, hashes);
+    return true;
+  };
+  if (draft) {
+    for (const key of ["policy", "permission"]) {
+      if (hashes[key] && !(await wait(key, hashes[key]))) {
+        // Let the server verify the reverted call before issuing fresh consent.
+        await api(`/api/owner/permissions/drafts/${draft.id}/progress`, hashes);
+        delete hashes[key];
+        persist();
+      }
+    }
+    if (hashes.policy && hashes.permission) {
+      await api(`/api/owner/permissions/drafts/${draft.id}/activate`, hashes);
+      localStorage.removeItem(storageKey);
+      return;
+    }
   }
-  await api(base + "/activate", { policy: hashes[0], permission: hashes[1] });
-  sessionStorage.removeItem("yours.permission-draft");
+  if (
+    !draft ||
+    (!draft.context && Number(draft.deadline) <= Date.now() / 1000 + 120) ||
+    Number(draft.permission.validUntil) <= Date.now() / 1000 + 600
+  ) {
+    // Any confirmed first call has been reconciled above. A fresh draft keeps
+    // the same policy ID, shared usage and period anchor.
+    draft = await api(
+      `/api/owner/permissions/connections/${connection.id}/prepare`,
+      settings,
+    );
+    hashes = {};
+    persist();
+  }
+  const e = {
+    ...draft.expectation,
+    expiry: BigInt(draft.expectation.expiry),
+    startTime: BigInt(draft.expectation.startTime),
+  };
+  let context = draft.context;
+  if (!context) {
+    progress("ウォレットで購入権限を承認してください");
+    if (state.smartAccountReady) {
+      const nonce = await publicClient.readContract({
+        address: e.enforcers.nonce,
+        abi: [
+          {
+            type: "function",
+            name: "currentNonce",
+            stateMutability: "view",
+            inputs: [
+              { name: "manager", type: "address" },
+              { name: "delegator", type: "address" },
+            ],
+            outputs: [{ type: "uint256" }],
+          },
+        ],
+        functionName: "currentNonce",
+        args: [e.manager, address],
+      });
+      const parent = {
+        delegate: e.agent,
+        delegator: address,
+        authority: toHex(maxUint256, { size: 32 }),
+        salt: toHex(crypto.getRandomValues(new Uint8Array(32))),
+        signature: "0x",
+        caveats: [
+          {
+            enforcer: e.enforcers.periodic,
+            terms: encodePacked(
+              ["address", "uint256", "uint256", "uint256"],
+              [e.token, maxUint256, maxUint256, e.startTime],
+            ),
+            args: "0x",
+          },
+          { enforcer: e.enforcers.redeemer, terms: e.gate, args: "0x" },
+          {
+            enforcer: e.enforcers.timestamp,
+            terms: encodePacked(["uint128", "uint128"], [0n, e.expiry]),
+            args: "0x",
+          },
+          {
+            enforcer: e.enforcers.value,
+            terms: toHex(0n, { size: 32 }),
+            args: "0x",
+          },
+          {
+            enforcer: e.enforcers.nonce,
+            terms: toHex(nonce, { size: 32 }),
+            args: "0x",
+          },
+        ],
+      };
+      parent.signature = await typed(
+        provider,
+        address,
+        config.chainId,
+        delegationTypedData(config.chainId, e.manager, parent),
+      );
+      context = encodeDelegations([parent]);
+    } else {
+      const result = await requestGatePermissions(provider, [e]);
+      context = result.responses[0].context;
+    }
+  }
+  const base = "/api/owner/permissions/drafts/" + draft.id;
+  let terms = draft.typedData
+    ? { typedData: draft.typedData, policyRegistered: draft.policyRegistered }
+    : await api(base + "/parents", { context });
+  if (
+    (draft.deadline && Number(draft.deadline) <= Date.now() / 1000 + 120) ||
+    (draft.hashes?.permission && !hashes.permission) ||
+    (draft.hashes?.policy && !hashes.policy)
+  ) {
+    terms = await api(base + "/renew", {});
+    draft = await api(base);
+  }
+  let transactions = draft.calls?.[1] ? { calls: draft.calls } : null;
+  if (!transactions) {
+    progress("上限と共有予算の署名を確認してください");
+    const policy = terms.policyRegistered
+        ? undefined
+        : await typed(
+            provider,
+            address,
+            config.chainId,
+            terms.typedData.policy,
+          ),
+      permission = await typed(
+        provider,
+        address,
+        config.chainId,
+        terms.typedData.permission,
+      );
+    transactions = await api(base + "/transactions", { policy, permission });
+  }
+  persist();
+  for (const [i, call] of transactions.calls.entries()) {
+    const key = i === 0 ? "policy" : "permission";
+    if (hashes[key]) continue;
+    progress(`権限の登録 ${i + 1}/2 — ウォレットで取引を承認してください`);
+    await ensure(provider, config.chainId, address);
+    hashes[key] = await wallet.sendTransaction(call);
+    persist();
+    // The browser journal survives tab closure even before RPC propagation.
+    await api(base + "/progress", hashes).catch(() => {});
+    if (!(await wait(key, hashes[key])))
+      throw new Error("transaction_reverted");
+  }
+  await api(base + "/activate", hashes);
+  localStorage.removeItem(storageKey);
 }
 export async function revokePermission({
   provider,

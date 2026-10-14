@@ -1,0 +1,22 @@
+{
+  "scope": "Headless Chrome with a disposable EIP-1193 test provider. Real owner EIP-712 signatures, real HTTP API/PostgreSQL and official MetaMask contracts on local Anvil. No wallet-extension or public Amoy claim.",
+  "passed": [
+    "browser SIWE login",
+    "actual policy transaction succeeds",
+    "second wallet transaction intentionally canceled",
+    "reloaded page restores the same permission conditions",
+    "only the missing registry transaction is sent",
+    "five confirmations activate the AI",
+    "no JavaScript errors"
+  ],
+  "transactions": [
+    {
+      "to": "0x0da595379b22d7567d84fba888b805f6cb7c3799",
+      "hash": "0x5b46e97796021c38ebf5e2cadfa9e4c47cc6edee55da3d5032bced53d5cbb39e"
+    },
+    {
+      "to": "0xE5B4996689f9F0B4236e2E7946685E5Ffa12d184",
+      "hash": "0xbe93e9adfd52f323151ed4adad851dc801e8b0bea129d5c0ede5d806372a919e"
+    }
+  ]
+}

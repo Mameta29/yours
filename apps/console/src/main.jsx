@@ -137,7 +137,7 @@ function App() {
       { query: "", pagination: { limit: 12 } },
       {
         headers: {
-          "UCP-Agent": 'profile="' + location.origin + '/.well-known/ucp"',
+          "UCP-Agent": 'profile="' + config.origin + '/.well-known/ucp"',
         },
       },
     )
@@ -292,7 +292,10 @@ function App() {
           className="text-button"
           onClick={() => setModal({ kind: "permission", connection: c })}
         >
-          権限を{c.permission ? "編集" : "設定"} <ArrowRight size={14} />
+          {c.pending_draft
+            ? "登録を再開"
+            : "権限を" + (c.permission ? "編集" : "設定")}{" "}
+          <ArrowRight size={14} />
         </button>
         {c.status === "active" && (
           <button
@@ -371,7 +374,9 @@ function App() {
       </aside>
       <div className="workspace">
         <header className="topbar">
-          <div className="mobile-brand"><Logo/></div>
+          <div className="mobile-brand">
+            <Logo />
+          </div>
           <div className="breadcrumb">
             ワークスペース <ChevronRight size={13} />
             <span>
@@ -1057,6 +1062,8 @@ function ModalContent({
     [type, setType] = useState("gemini"),
     [agentAddress, setAgentAddress] = useState(""),
     [jwk, setJwk] = useState(""),
+    [permissionDraft, setPermissionDraft] = useState(null),
+    [draftLoading, setDraftLoading] = useState(modal.kind === "permission"),
     [checked, setChecked] = useState(false),
     [quantity, setQuantity] = useState(1),
     [settings, setSettings] = useState({
@@ -1075,6 +1082,25 @@ function ModalContent({
       days: 7,
     });
   const address = data?.account.address;
+  useEffect(() => {
+    if (modal.kind !== "permission") return;
+    let alive = true;
+    api(`/api/owner/permissions/connections/${modal.connection.id}/draft`)
+      .then(({ draft }) => {
+        if (!alive) return;
+        setPermissionDraft(draft);
+        if (draft?.input) setSettings(draft.input);
+      })
+      .catch((error) => {
+        if (alive) setNotice({ error: true, text: explain(error) });
+      })
+      .finally(() => {
+        if (alive) setDraftLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [modal.kind, modal.connection?.id]);
   if (modal.kind === "wallet")
     return (
       <>
@@ -1115,7 +1141,7 @@ function ModalContent({
             ログアウト
           </button>
         )}
-        <p className="small muted">ネットワーク：Polygon Amoy / 80002</p>
+        <p className="small muted">ネットワーク：{config.network} / {config.chainId}</p>
       </>
     );
   if (modal.kind === "add")
@@ -1249,6 +1275,11 @@ function ModalContent({
         </span>
         <h2 id="modal-title">{modal.connection.name}に任せる範囲</h2>
         <p>支出は本人のウォレットから行われます。</p>
+        {permissionDraft && (
+          <p className="notice">
+            前回確認した条件で登録を再開します。成功済みの取引は再送しません。
+          </p>
+        )}
         <div className="form-grid">
           {[
             ["perOrder", "このAI：1回の上限"],
@@ -1262,6 +1293,7 @@ function ModalContent({
                 <span>¥</span>
                 <input
                   type="number"
+                  disabled={draftLoading || !!permissionDraft}
                   min="0"
                   max="10000000"
                   required
@@ -1284,6 +1316,7 @@ function ModalContent({
         <label>
           期限
           <select
+            disabled={draftLoading || !!permissionDraft}
             value={settings.days}
             onChange={(e) =>
               setSettings({ ...settings, days: Number(e.target.value) })
@@ -1312,8 +1345,12 @@ function ModalContent({
           />
           この条件で購入を任せることを確認しました
         </label>
-        <button className="button primary full" disabled={!checked || !!busy}>
-          ウォレットで承認する <ArrowRight size={16} />
+        <button
+          className="button primary full"
+          disabled={!checked || !!busy || draftLoading}
+        >
+          {permissionDraft ? "残りの登録を進める" : "ウォレットで承認する"}{" "}
+          <ArrowRight size={16} />
         </button>
       </form>
     );

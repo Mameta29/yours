@@ -5,12 +5,16 @@ import {kmsP256Signer,localP256Signer} from '@yours/signing';
 import {readConfig} from './config.js';
 import {createApp} from './app.js';
 import {loadChain} from './chain.js';
+import {DomainError} from '@yours/domain';
 const config=readConfig();
 const db=createDb(config.DATABASE_URL);
 const signer=config.UCP_SIGNING_KEY?await kmsP256Signer(config.UCP_SIGNING_KEY,'ucp-merchant'):await localP256Signer(config.LOCAL_KEY_DIR+'/merchant.pem','ucp-merchant');
 const app=createApp(db,config,signer,await loadChain(config));
 app.use('/*',serveStatic({root:'apps/console/dist'}));
-app.get('*',serveStatic({path:'apps/console/dist/index.html'}));
+app.get('*',async(c,next)=>{
+ if(/^\/(api|ucp|internal)(\/|$)/.test(c.req.path))throw new DomainError('not_found',404);
+ return serveStatic({path:'apps/console/dist/index.html'})(c,next);
+});
 const server=serve({fetch:app.fetch,port:config.PORT,hostname:'0.0.0.0'});
 const shutdown=()=>{server.close(()=>{void db.end().then(()=>process.exit(0));});setTimeout(()=>process.exit(1),10000).unref();};
 process.on('SIGTERM',shutdown);process.on('SIGINT',shutdown);
