@@ -36,8 +36,10 @@ Polygon Amoyにyours専用Gate `0x42eec579df8fb1f87ae3bddbb90c6a4a9f790504` とR
 - Solidity: AI接続別の権限と共有予算を同一transactionで強制。36テスト（fuzzを含む）通過、EIP-170サイズ制限内。公式MetaMask DelegationManager・EIP-7702とのローカル統合12件通過（`docs/evidence/local-chain.json`）。公開Amoy配備済み。
 - Domain: 単位の厳密変換、期限・共有予算・AI別予算をfail-closedで判定。7テスト通過。
 - PostgreSQL: owner署名認証、idempotency、outbox、予算予約、署名済みtransactionを送信前に保存するjournal。実PostgreSQLで6件の同時実行・復旧試験通過。
-- UCP: stable 2026-08-25のschemaを固定。discovery、商品検索、cart、配送・署名付きcheckout、在庫予約を実装。UCPパッケージ5件・API8件のテスト通過。complete、実決済、注文確定、外部EC adapterは実装中。
+- UCP: stable 2026-08-25のschemaを固定。discovery、商品検索、cart、配送・署名付きcheckout、在庫予約、AP2付きcomplete、決済後のorderを実装。UCPパッケージ5件・API8件のテスト通過。外部EC adapter、webhookは実装中。
 - KMS: 非export鍵のEVM/P-256署名adapter、CRC・署名復元検証。ローカル暗号試験2件通過。Cloud HSMの実EVM/P-256署名を検証済み（`docs/evidence/cloud-kms.json`）。
 - AP2: 固定した公式v0.2 SDKでopen→closed mandate、制約・署名検証、receiptを実装。実署名・公式SDK・本人の新しいEIP-712同意とprivate issuerの17件通過。Cloud Run配備、利用回数の決済連動は継続中。上流仕様との差異は`docs/design/INTEROPERABILITY.md`。
 
-まだ新しい公開サービス・公開chain実決済は確認していない。Gemini/Vertex AI、管理画面、Cloud Run配備、運用復旧の結合検証を続ける。
+`PAYMENT_PIPELINE=1 node packages/wallet-sdk/scripts/local-integration.mjs`で、本人署名→AP2 private HTTP→UCP complete→x402 HTTP 402/支払署名→実ERC-7710送金→order/署名付きreceiptの24項目を検証。送信応答消失から同一hashで復旧、金額改変拒否、期間超過の本人一件同意も含む。証拠は`docs/evidence/payment-pipeline.json`。これはAnvilと試験tokenでの結合検証。
+
+Cloud Run API・mandates・workerを非公開で配備し、起動正常を確認。image tagは`payments-20261014`、Cloud Buildは`a2d45f96-1362-4458-8fdc-2636b3ec4b14`。このimageはx402 HTTPフローと一件同意の追加前。外部HTTPSの疎通、追加分の再配備を継続中。Gemini/Vertex AI、管理画面、公開Amoy実購入はまだ確認していない。

@@ -2,8 +2,8 @@
   "scope": "Local Anvil only. Real EIP-7702, official MetaMask Manager/account/enforcers, real signatures. Test tokens/router and test risk/human signers. No public Amoy transfer or browser wallet proof.",
   "frameworkCommit": "bff4b08f8006ad94322a6e3da8d90f274e20325d",
   "chainId": 31337,
-  "gate": "0x744c7cebfdfedbca044191edda0b7201237047c8",
-  "registry": "0xEfeEc6b1eEe49bBDaaf0A1c2E8c492197fbc4041",
+  "gate": "0x1b95cde6e2141263e03feb263c1b287b3a1efcbe",
+  "registry": "0x05Baa5e81BE834BEEe608352e3744cD9485bd328",
   "passed": [
     "gasless owner and agent",
     "official signed delegations accepted",
@@ -18,6 +18,6 @@
     "direct Manager bypass rejected",
     "revocation cannot be overridden"
   ],
-  "normalTransaction": "0x01332bf39a0b0c912ec3b2153e4ed72fe0bf2d6dbe1f913bd44270953973ef19",
-  "approvedTransaction": "0x22b15163eb5abd8b111fa74212f657f25666c0aa0620e1e5bf605ffb60d50950"
+  "normalTransaction": "0x32e4962c3ffccb281cc08b577bf72e183e68adc938138393c5d5f2f5db8bd137",
+  "approvedTransaction": "0x504b89feb111cb8fb4fb9f968f9afae24499ef221c48d9416e938a935f48766b"
 }

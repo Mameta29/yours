@@ -12,13 +12,13 @@ import {readConfig} from '../dist/config.js';
 import {chainRuntime} from '../dist/chain.js';
 import {executePayment} from '../../worker/dist/settlement.js';
 
-export async function paymentIntegration({root,client,wallet,accounts,manifest,jpyc}){
+export async function paymentIntegration({root,client,wallet,accounts,manifest,jpyc,humanKey}){
  const db=createDb('postgresql://localhost/yours_test');await migrate(db);
  const owner=privateKeyToAccount(generatePrivateKey()),payTo='0x0000000000000000000000000000000000000200';
  const keydir=root+'.local/payment-e2e-'+randomUUID();await mkdir(keydir,{recursive:true,mode:0o700});
  const pair=generateKeyPairSync('ec',{namedCurve:'prime256v1'});
  const signer={kid:'ucp-merchant',publicJwk:{...pair.publicKey.export({format:'jwk'}),kid:'ucp-merchant',alg:'ES256',use:'sig'},sign:async bytes=>new Uint8Array(sign('sha256',bytes,{key:pair.privateKey,dsaEncoding:'ieee-p1363'}))};
- const authority=spawn('uv',['run','uvicorn','yours_mandates.service:from_environment','--factory','--host','127.0.0.1','--port','18813','--no-access-log'],{cwd:root+'services/mandates',env:{...process.env,UV_CACHE_DIR:root+'.local/uv-cache',DATABASE_URL:'postgresql://localhost/yours_test',CHAIN_ID:'31337',GATE_ADDRESS:manifest.gate,PUBLIC_ORIGIN:'http://localhost:8080',MERCHANT_PUBLIC_JWK:JSON.stringify(signer.publicJwk),LOCAL_KEY_DIR:keydir,ENVIRONMENT:'test'},stdio:['ignore','ignore','pipe']});
+ const authority=spawn('uv',['run','uvicorn','yours_mandates.service:from_environment','--factory','--host','127.0.0.1','--port','18813','--no-access-log'],{cwd:root+'services/mandates',env:{...process.env,UV_CACHE_DIR:root+'.local/uv-cache',DATABASE_URL:'postgresql://localhost/yours_test',CHAIN_ID:'31337',GATE_ADDRESS:manifest.gate,PUBLIC_ORIGIN:'http://localhost:8080',MERCHANT_PUBLIC_JWK:JSON.stringify(signer.publicJwk),LOCAL_KEY_DIR:keydir,LOCAL_HUMAN_PRIVATE_KEY:humanKey,ENVIRONMENT:'test'},stdio:['ignore','ignore','pipe']});
  let stderr='';authority.stderr.on('data',chunk=>{stderr=(stderr+chunk.toString()).slice(-2000);});
  const config=readConfig({NODE_ENV:'test',DATABASE_URL:'postgresql://localhost/yours_test',PUBLIC_ORIGIN:'http://localhost:8080',RPC_URL:'http://127.0.0.1:18812',CHAIN_ID:'31337',MERCHANT_PAY_TO:payTo,JPYC_ADDRESS:manifest.jpyc,GATE_ADDRESS:manifest.gate,AGENT_ADDRESS:accounts.agent.address,MANDATES_URL:'http://127.0.0.1:18813'});
  const app=createApp(db,config,signer,chainRuntime(config,manifest));let cookie='',token='';
@@ -75,6 +75,7 @@ export async function paymentIntegration({root,client,wallet,accounts,manifest,j
   const altered=structuredClone(authorization);altered.accepted.amount='1';
   await request('/api/agent/payments/'+intentId,{}, {asAgent:true,status:422,headers:{'PAYMENT-SIGNATURE':Buffer.from(JSON.stringify(altered)).toString('base64')}});
   await request('/api/agent/payments/'+intentId,{}, {asAgent:true,status:202,headers:{'PAYMENT-SIGNATURE':Buffer.from(JSON.stringify(authorization)).toString('base64')}});
+  runtime.endorseIntent=id=>privatePost('/v1/endorse-order',{intent_id:id});
   const submitted=await executePayment(db,intentId,runtime);assert.equal(submitted.state,'submitted');
   const journal=(await db.query('SELECT * FROM signed_transactions WHERE intent_id=$1',[intentId])).rows[0];assert.ok(journal.raw_transaction);assert.equal(journal.transaction_hash,submitted.transactionHash);
   const confirming=await executePayment(db,intentId,runtime);assert.equal(confirming.state,'confirming');
@@ -92,6 +93,28 @@ export async function paymentIntegration({root,client,wallet,accounts,manifest,j
   assert.equal(JSON.parse(Buffer.from(paid.response.headers.get('PAYMENT-RESPONSE'),'base64').toString()).transaction,settled.transactionHash);
   const passed=['owner SIWE and real signed wallet delegation','fresh owner task consent issues AP2','signed UCP checkout and real AP2 presentation','atomic mandate consumption and budget reservation','idempotent complete','raw transaction persisted before broadcast','lost broadcast response recovered by same hash','five confirmations before order creation','idempotent chain reconciliation','inventory decremented exactly once','merchant receives 600 test JPYC','AI token balance stays zero','official UCP order schema','signed AP2 payment and checkout receipts'];
   passed.push('x402 HTTP 402 requirements','no transaction before payment acceptance','altered x402 amount rejected','real ERC-7710 PAYMENT-SIGNATURE accepted','PAYMENT-RESPONSE only after settlement');
+  const {json:secondTask}=await request('/api/owner/tasks/prepare',{connectionId:connection.id,merchantId:'yours-lab',items:[{id:productId,quantity:1}],maxAmount:650},{status:201});
+  const {json:secondMandate}=await request('/api/owner/tasks/'+secondTask.id+'/approve',{signature:await owner.signTypedData(secondTask.typedData)});
+  const {json:secondCheckout}=await request('/ucp/checkout-sessions',{line_items:[{item:{id:productId},quantity:1}]},{asAgent:true,status:201,headers:{'Idempotency-Key':randomUUID()}});
+  const {json:secondPresentation}=await request('/api/agent/present',{mandateId:secondMandate.id,checkoutId:secondCheckout.id},{asAgent:true});
+  const secondBody={payment:{instruments:[{id:secondPresentation.instrumentId,handler_id:'yours-stablecoin',type:'stablecoin',selected:true,credential:{type:'yours_ap2',mandate_id:secondMandate.id}}]},ap2:secondPresentation.mandates};
+  const {json:held}=await request('/ucp/checkout-sessions/'+secondCheckout.id+'/complete',secondBody,{asAgent:true,status:202,headers:{'Idempotency-Key':randomUUID(),'If-Match':'"1"'}});
+  const secondId=held.yours.intent_id;assert.equal(held.yours.payment_status,'approval_required');
+  assert.equal((await executePayment(db,secondId,runtime)).state,'approval_required');
+  assert.equal((await db.query('SELECT count(*)::int AS n FROM signed_transactions WHERE intent_id=$1',[secondId])).rows[0].n,0);
+  const {json:approval}=await request('/api/owner/approvals/'+secondId+'/prepare',{}, {status:201});
+  assert.equal(approval.typedData.message.overrideMask,2);
+  await request('/api/owner/approvals/'+approval.id+'/approve',{signature:await accounts.agent.signTypedData(approval.typedData)},{status:401});
+  const ownerSignature=await owner.signTypedData(approval.typedData);
+  await request('/api/owner/approvals/'+approval.id+'/approve',{signature:ownerSignature});
+  const secondAuthorization=(await request('/api/agent/payments/'+secondId+'/authorization',undefined,{asAgent:true})).json.paymentPayload;
+  await request('/api/agent/payments/'+secondId,{}, {asAgent:true,status:202,headers:{'PAYMENT-SIGNATURE':Buffer.from(JSON.stringify(secondAuthorization)).toString('base64')}});
+  assert.equal((await executePayment(db,secondId,runtime)).state,'submitted');await client.request({method:'anvil_mine',params:['0x5']});
+  const secondSettled=await executePayment(db,secondId,runtime);assert.equal(secondSettled.state,'confirmed');
+  const totals=(await db.query("SELECT sum(amount_minor)::text AS amount FROM intents WHERE account_id=$1 AND state='confirmed'",[login.json.id])).rows[0];assert.equal(totals.amount,'1200');
+  assert.equal((await client.readContract({...jpyc,functionName:'balanceOf',args:[payTo]}))-merchantBefore,parseEther('1200'));
+  await request('/api/owner/approvals/'+approval.id+'/approve',{signature:ownerSignature},{status:403});
+  passed.push('agent period-budget excess waits without broadcasting','wrong wallet cannot approve an exception','fresh owner proof permits exactly one 600 JPYC exception','shared usage includes approved excess','used exception cannot be authorized again');
   await writeFile(root+'docs/evidence/payment-pipeline.json',JSON.stringify({scope:'Local Anvil, official MetaMask contracts, test ERC20 and real PostgreSQL/AP2 HTTP authority. Production worker logic with random in-memory signing keys. No browser wallet or public Amoy purchase claim.',passed,transactionHash:settled.transactionHash,gate:manifest.gate},null,2)+'\n');
   console.log(JSON.stringify({passed:passed.length,evidence:'docs/evidence/payment-pipeline.json'}));
  }finally{authority.kill('SIGTERM');await db.end();await rm(keydir,{recursive:true,force:true});}

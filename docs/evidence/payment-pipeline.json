@@ -19,8 +19,13 @@
     "no transaction before payment acceptance",
     "altered x402 amount rejected",
     "real ERC-7710 PAYMENT-SIGNATURE accepted",
-    "PAYMENT-RESPONSE only after settlement"
+    "PAYMENT-RESPONSE only after settlement",
+    "agent period-budget excess waits without broadcasting",
+    "wrong wallet cannot approve an exception",
+    "fresh owner proof permits exactly one 600 JPYC exception",
+    "shared usage includes approved excess",
+    "used exception cannot be authorized again"
   ],
-  "transactionHash": "0x00f744113877bd80ca9246a721c186b654c2b4dc6b252163af5190dc56cfea58",
-  "gate": "0x744c7cebfdfedbca044191edda0b7201237047c8"
+  "transactionHash": "0x49cd41f5bf43c47fe93ced7912a29622782d273c52e9ada66c1897900c236cef",
+  "gate": "0x1b95cde6e2141263e03feb263c1b287b3a1efcbe"
 }

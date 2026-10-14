@@ -35,7 +35,7 @@ async function privatePost(path:string,body:unknown){
  const response=await fetch(authority.origin+path,{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(body),redirect:'error',signal:AbortSignal.timeout(20000)});
  if(!response.ok)throw new DomainError('authority_rejected',response.status);return await response.json() as any;
 }
-const runtime:SettlementRuntime={client,chainId:80002,gate:manifest.gate,manager:manifest.manager,token:manifest.jpyc,enforcers:manifest.enforcers,merchantId:required('MERCHANT_ID'),payTo:getAddress(required('MERCHANT_PAY_TO')),origin:required('PUBLIC_ORIGIN'),signers,verifyIntent:id=>privatePost('/v1/verify-execution',{intent_id:id})};
+const runtime:SettlementRuntime={client,chainId:80002,gate:manifest.gate,manager:manifest.manager,token:manifest.jpyc,enforcers:manifest.enforcers,merchantId:required('MERCHANT_ID'),payTo:getAddress(required('MERCHANT_PAY_TO')),origin:required('PUBLIC_ORIGIN'),signers,verifyIntent:id=>privatePost('/v1/verify-execution',{intent_id:id}),endorseIntent:id=>privatePost('/v1/endorse-order',{intent_id:id})};
 const app=new Hono();
 app.use('*',bodyLimit({maxSize:4096}));
 app.get('/healthz',c=>c.json({ok:true,service:'yours-worker'}));

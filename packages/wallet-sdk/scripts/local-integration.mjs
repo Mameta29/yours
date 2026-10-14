@@ -131,5 +131,5 @@ console.log(JSON.stringify({ passed: evidence.passed.length, evidence: 'docs/evi
 if(process.env.PAYMENT_PIPELINE==='1'){
  const {paymentIntegration}=await import('../../../services/api/scripts/payment-integration.mjs');
  const manifest=JSON.parse(await readFile(root+'.local/local-chain.json','utf8'));
- await paymentIntegration({root,client,wallet,accounts,manifest,jpyc});
+ await paymentIntegration({root,client,wallet,accounts,manifest,jpyc,humanKey:keys.humanSigner});
 }

@@ -16,7 +16,7 @@ export async function internalPost<T>(config:Config,origin:string|undefined,path
  }else if(!['localhost','127.0.0.1'].includes(url.hostname))throw new Error('local_internal_service_required');
  const response=await fetch(url.origin+path,{method:'POST',headers,body:JSON.stringify(body),redirect:'error',signal:AbortSignal.timeout(20000)});
  if(!response.ok){
-  const status=response.status===403?403:response.status===409?409:response.status===422?422:502;
+  const status=response.status===401?401:response.status===403?403:response.status===409?409:response.status===422?422:502;
   throw new DomainError('authority_service_rejected',status);
  }
  return await response.json() as T;
