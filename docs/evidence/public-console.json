@@ -1,9 +1,10 @@
 {
-  "checkedAt": "2026-10-14T09:56:28.039910+00:00",
+  "checkedAt": "2026-10-14T10:25:39.915435+00:00",
   "origin": "https://yours-api-110852561536.asia-northeast1.run.app",
   "scope": "Public Cloud Run console read-only checks. Actual MetaMask signatures and public Amoy purchase are separate.",
   "checks": [
     "deployed HTML references the locally verified build assets",
+    "all deployed JavaScript and CSS including lazy wallet imports match the verified local build",
     "real catalog renders",
     "wallet selection opens and closes",
     "1440px and 390px screenshots",
@@ -11,16 +12,23 @@
     "no JavaScript errors"
   ],
   "chunks": [
-    "/assets/index-aat8_wxU.js",
+    "/assets/index-BVa1YRc6.js",
     "/assets/react-C2KYkj3z.js",
-    "/assets/wallet-Cv6Uvc1p.js",
+    "/assets/wallet-CvcQlT1y.js",
     "/assets/index-6OUXtx4g.css"
   ],
-  "source": "fc5b488",
-  "imageTag": "wallet-rpc-20261014",
+  "source": "10812cf",
+  "imageTag": "wallet-calldata-20261014",
   "catalog": {
     "products": 7,
     "externalProducts": 4,
     "externalMerchants": 2
+  },
+  "assetSha256": {
+    "/assets/index-6OUXtx4g.css": "fcb28cd9316c1009f7ce7e9595481b718a36796b38aa576cf7c8f550a9182d1b",
+    "/assets/index-BVa1YRc6.js": "d8bcb81f7b0ca2923873d4801e41d6915b0d72ed4717f4208427a100bf839d6e",
+    "/assets/react-C2KYkj3z.js": "cddf8aa418deea97471d51c7cdddcc5a5afeab92ae49ee272d87f0784ff75bc1",
+    "/assets/wallet-C39N0bvJ.js": "023e5c43fbc9ebecb41fa0cd94e4bcb89170b6ce60e6d2defcbc0b1f8babcb64",
+    "/assets/wallet-CvcQlT1y.js": "32d8a4cd012878eec7e96a1fe4f8261d449f0221e5dca369320860307dfc4af3"
   }
 }

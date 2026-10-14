@@ -50,7 +50,7 @@ Polygon Amoyにyours専用Gate `0x42eec579df8fb1f87ae3bddbb90c6a4a9f790504` とR
 
 | service | revision | image tag | source |
 | --- | --- | --- | --- |
-| API / Console | `yours-api-00008-jdl` | `wallet-rpc-20261014` | `fc5b488` |
+| API / Console | `yours-api-00009-s7l` | `wallet-calldata-20261014` | `10812cf` |
 | worker | `yours-worker-00006-z4v` | `commerce-20261014` | `c785810` |
 | mandates | `yours-mandates-00006-cjn` | `commerce-20261014` | `c785810` |
 | Gemini agent | `yours-agent-00006-98c` | `catalog-20261014` | `55b074d` |
@@ -67,7 +67,7 @@ Google ADK → Vertex AI `gemini-3.8-flash` → 実Cloud SQL catalogの検索が
 
 再読み込み後の「登録を再開」でwalletへ再接続すると、登録画面が閉じる不具合も修正。旧版で同じ停止を再現した。修正版は接続済みの同じ本人・networkを復元し、再接続が必要な場合は入力した条件を保って元の画面へ戻す。接続キャンセル・別walletへの切り替え・条件の再確認を上記18項目に含めている。source `22bbaea`のGitHub CI [38540356112](https://github.com/Mameta29/yours/actions/runs/38540356112)も全項目成功。
 
-MetaMaskの確認画面が開かず通信エラーになる報告に対し、隠れていたRPCの処理名・番号・理由を表示する修正を追加。`data.originalError`と`cause`の内側のエラーを区別し、署名・要求payloadは表示しない。Cloud Build `bb44fbc4-87b8-4ab4-86a8-8a1c57c2af0e`で反映し、source `fc5b488`の[CI 38545264723](https://github.com/Mameta29/yours/actions/runs/38545264723)、公開画面、4サービスの確認が成功。これは診断表示の修正であり、本人の停止原因と登録成功は引き続き確認中。
+MetaMaskの確認画面が開かず通信エラーになる報告に対し、隠れていたRPCの処理名・番号・理由を表示する修正を追加。`data.originalError`と`cause`の内側のエラーを区別し、署名・要求payloadは表示しない。Cloud Build `bb44fbc4-87b8-4ab4-86a8-8a1c57c2af0e`で反映し、source `fc5b488`の[CI 38545264723](https://github.com/Mameta29/yours/actions/runs/38545264723)、公開画面、4サービスの確認が成功。その後の本人の報告から、`wallet_sendCalls`に含めた`data: "0x"`がMetaMaskの入力検証で拒否されることを特定。データなしの2件の呼び出しは`data`を省略する形に修正した。公式配布の`SendCallsStruct`で旧要求の拒否・新要求の受理を照合し（[証拠](evidence/metamask-send-calls-schema.json)）、SDK68テストとブラウザ18項目が成功。Cloud Build `e11dcea2-40ab-41b3-a590-da5e2d433c52`で公開環境へ反映し、source `10812cf`の[CI 38548876925](https://github.com/Mameta29/yours/actions/runs/38548876925)も全項目成功。公開サービス4件・1440px/390px表示・全JS/CSSの配信hashを確認。本人の実MetaMaskでの登録完了はまだ未確認。
 
 UCP RFC 9421署名、API keyとplatform profileの結び付け、DNSを固定したprofile取得、order webhookのoutbox・inbox・重複排除・非同期auditを実装・配備。非公開workerへの1分間隔のScheduler `yours-outbox`を設定済み。
 

@@ -6,7 +6,7 @@
 
 「ウォレットで承認する」を押すと、必要な場合だけEIP-5792の `wallet_getCapabilities` と `wallet_sendCalls` を使ってMetaMaskの設定・確認画面を開く。MetaMaskの設定メニューを探す操作は不要。本人による確認は必要であり、登録全体の署名・transactionを1回の承認に統合したものではない。
 
-- `ready` / `supported` を確認し、`atomicRequired: true` で0 POL・空calldataの自分宛て2件だけを要求する。token送金・approveは含まない。network feeは本人walletが負担する。
+- `ready` / `supported` を確認し、`atomicRequired: true` で0 POL・calldataなしの自分宛て2件だけを要求する。`data`は省略する。MetaMaskの`optional(StrictHexStruct)`は明示的な`data: "0x"`をRPC -32602で拒否するため、空文字列を送らない。token送金・approveは含まない。network feeは本人walletが負担する。
 - 別のsmart-account実装が設定済みなら変更しない。実装が未設定のEOAか、manifestで固定したMetaMask実装だけを扱う。
 - batch IDをbrowser内へ即座に保存する。再読込後は同じIDを照合し、通信切断やtimeoutを新規送信の根拠にしない。
 - walletの成功表示だけで通過させず、独立したRPCから5 confirmations・canonical block hash・そのblockと現在の7702 implementationを照合する。
@@ -24,3 +24,5 @@ SDKの設定・RPCエラー分類の20項目と、実Chrome→HTTP API→Postgre
 仕様の根拠: [MetaMaskのbatch transactionと対応network](https://docs.metamask.io/metamask-connect/evm/guides/send-transactions/batch-transactions/)、[EIP-5792](https://eips.ethereum.org/EIPS/eip-5792)。
 
 MetaMaskのRPC失敗は一律の通信エラーにまとめず、接続権限不足・要求形式・不明なbatch ID・確認待ちを区別する。「エラーの詳細」で処理名、RPC番号、長さ制限・hex/URL/credential除去済みの理由だけを表示する。要求payloadや署名をログへ送信しない。元の失敗理由にかかわらず、batch照合エラーだけで保存済みIDを消したり新しい取引を自動送信したりしない。
+
+公開環境で報告された`wallet_sendCalls / RPC -32602 / calls.0.data`は、この明示的な空calldataが原因だった。`@metamask/eip-5792-middleware@3.0.3`の配布済み`SendCallsStruct`でも旧SDKの要求が同じ理由で拒否され、修正版の要求が通ることを[検証](../evidence/metamask-send-calls-schema.json)した。SDK試験providerにも当該境界の制約を入れ、旧コードが失敗することを確認してから修正。ブラウザ試験は省略された`data`を空bytesとして実EIP-7702取引へ変換し、登録・再開の18項目が成功。実MetaMaskでの本人の公開Amoy登録完了は別途確認する。
