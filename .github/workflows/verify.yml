@@ -1,0 +1,73 @@
+name: Verify yours
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: yours_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d yours_test"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      TEST_DATABASE_URL: postgresql://localhost/yours_test
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          version: 10.7.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22.14.0
+          cache: pnpm
+      - uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1
+        with:
+          version: v1.3.2
+      - uses: astral-sh/setup-uv@d0d8abe699bfb85fec6de9f7adb5ae17292296ff # v6
+        with:
+          version: 0.11.9
+          python-version: '3.12'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build && pnpm typecheck && pnpm test
+      - name: Official AP2 SDK and authority tests
+        working-directory: services/mandates
+        run: uv sync --frozen && uv run pytest -q
+      - name: Pinned official MetaMask contracts
+        run: bash scripts/prepare-framework.sh
+      - name: Start disposable Anvil
+        run: |
+          mkdir -p .local
+          anvil --host 127.0.0.1 --port 18812 --chain-id 31337 --hardfork prague --silent > .local/anvil-ci.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl -fsS -H 'Content-Type: application/json' --data '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}' http://127.0.0.1:18812 > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+      - name: Real payment pipeline and permission lifecycle
+        run: |
+          PAYMENT_PIPELINE=1 node packages/wallet-sdk/scripts/local-integration.mjs
+          node services/api/scripts/permissions-integration.mjs
+      - name: Browser setup and interruption recovery
+        run: |
+          pnpm exec playwright install --with-deps chrome
+          node services/api/scripts/browser-permissions.mjs
