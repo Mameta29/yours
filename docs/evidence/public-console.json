@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-10-14T10:25:39.915435+00:00",
+  "checkedAt": "2026-10-14T12:35:06.010435+00:00",
   "origin": "https://yours-api-110852561536.asia-northeast1.run.app",
   "scope": "Public Cloud Run console read-only checks. Actual MetaMask signatures and public Amoy purchase are separate.",
   "checks": [
@@ -12,13 +12,13 @@
     "no JavaScript errors"
   ],
   "chunks": [
-    "/assets/index-BVa1YRc6.js",
+    "/assets/index-FaGpVExR.js",
     "/assets/react-C2KYkj3z.js",
-    "/assets/wallet-CvcQlT1y.js",
+    "/assets/wallet-DUkwcg3T.js",
     "/assets/index-6OUXtx4g.css"
   ],
-  "source": "10812cf",
-  "imageTag": "wallet-calldata-20261014",
+  "source": "c4d7287",
+  "imageTag": "wallet-permissions-20261014",
   "catalog": {
     "products": 7,
     "externalProducts": 4,
@@ -26,9 +26,10 @@
   },
   "assetSha256": {
     "/assets/index-6OUXtx4g.css": "fcb28cd9316c1009f7ce7e9595481b718a36796b38aa576cf7c8f550a9182d1b",
-    "/assets/index-BVa1YRc6.js": "d8bcb81f7b0ca2923873d4801e41d6915b0d72ed4717f4208427a100bf839d6e",
+    "/assets/index-DQzjtZ4Q.js": "359a9f7deb7648943fa0f18bbd03925075c4a869b3b3d24673af5e263295626e",
+    "/assets/index-FaGpVExR.js": "62bbfbea21d34f873c6b399d30d1635a9c98054162bbbfda81bb05a6b8c3904c",
     "/assets/react-C2KYkj3z.js": "cddf8aa418deea97471d51c7cdddcc5a5afeab92ae49ee272d87f0784ff75bc1",
-    "/assets/wallet-C39N0bvJ.js": "023e5c43fbc9ebecb41fa0cd94e4bcb89170b6ce60e6d2defcbc0b1f8babcb64",
-    "/assets/wallet-CvcQlT1y.js": "32d8a4cd012878eec7e96a1fe4f8261d449f0221e5dca369320860307dfc4af3"
+    "/assets/wallet-DUkwcg3T.js": "10bcb8fd1d1e91054d00f8c747e0b4b59ea75296d92af4d390bcbdaed18b1b4d",
+    "/assets/wallet-ORJ8xSOF.js": "57ed84e221acb03204024c3d30201bf0734f3d1a520065b39445d7163245b5b1"
   }
 }

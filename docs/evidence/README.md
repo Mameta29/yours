@@ -31,6 +31,7 @@ scriptはchain ID・Anvil・loopback URL・framework commitを検証し、生成
 | [payment-pipeline.json](payment-pipeline.json) | 68項目。実Anvil・PostgreSQL・AP2 HTTP・外部client・Chrome。外部EC境界はfixture |
 | [permissions-api.json](permissions-api.json) | 権限の登録・停止・失効・復旧14項目 |
 | [metamask-send-calls-schema.json](metamask-send-calls-schema.json) | MetaMask公式runtime structで旧要求の拒否と修正後の受理を確認。拡張UI・公開取引とは区別 |
-| [browser-permissions.json](browser-permissions.json) | EIP-7702登録・中断再開・再接続18項目。Chromeと試験用provider |
+| [metamask-7715-compatibility.json](metamask-7715-compatibility.json) | SDKのERC-7715要求と公式MetaMask allowance builder/decoderの照合6項目。拡張UI・公開登録とは区別 |
+| [browser-permissions.json](browser-permissions.json) | EIP-7702・ERC-7715登録・中断再開・再接続22項目。raw owner委任を拒否する試験用providerとChrome |
 
-公開AmoyのGate配備は[manifest](../../deployments/amoy.json)で確認する。本人の公開購入・実MetaMask拡張での操作は別途確認が必要。
+公開AmoyのGate配備は[manifest](../../deployments/amoy.json)で確認する。本人のスマートアカウント設定取引は成功receiptと現在の実装を照合済み。AI権限登録の完了・公開購入は別途確認が必要。

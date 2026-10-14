@@ -1,5 +1,5 @@
 {
-  "scope": "Headless Chrome with a disposable EIP-1193 test provider. Real EIP-7702 owner upgrade, EIP-712 signatures, real HTTP API/PostgreSQL and official MetaMask contracts on local Anvil. No wallet-extension or public Amoy claim.",
+  "scope": "Headless Chrome with a disposable EIP-1193 test provider that rejects raw owner Delegation signatures. ERC-7715 requests, real EIP-7702 owner upgrade, EIP-712 signatures, real HTTP API/PostgreSQL and official MetaMask contracts on local Anvil. No wallet-extension or public Amoy claim.",
   "passed": [
     "browser SIWE login",
     "ordinary EOA initiates EIP-5792 upgrade from the permission button",
@@ -9,6 +9,10 @@
     "wallet reconnect cancellation preserves the pending form",
     "same-owner reconnect restores edited limits without sending a transaction",
     "reconnected owner explicitly reviews conditions before registration",
+    "ERC-7715 grant keeps the exact token, Gate redeemer and expiry",
+    "no raw owner Delegation signature request",
+    "approved permission survives HTTP failure and reload without another permission request",
+    "policy and registry signatures include the explicit EIP712Domain",
     "different-wallet login discards the previous owner action without sending",
     "reload passively restores an authorized account without new login signatures",
     "actual policy transaction succeeds",
@@ -20,15 +24,15 @@
     "account change closes the pending form and logs out without sending",
     "no JavaScript errors"
   ],
-  "upgradeTransaction": "0x2de25e63c1f99ac023d29770d646c5b09b7a4cd4b9b518c7cc6492b683f4ae4b",
+  "upgradeTransaction": "0x7cdd7d45410b7c637357bbcb92ee23416f50118c0fdc0a63d58b7d229f43ac58",
   "transactions": [
     {
       "to": "0x8c1106124cafc1064666730359b575baaee93f58",
-      "hash": "0xc8a02f1e7446fdba6a309c30284e0f6f7d32a2cf838efb05fa836ee3b1c5bc09"
+      "hash": "0x89c2294eab30425c6ba1201607701faaf7c80f2312dbc23b1f17bdf9da0603b1"
     },
     {
       "to": "0x3241eE5772e7bDf3F0232A20C665D517342aD080",
-      "hash": "0xf68faf7d43dd869e7f75efb0411ef0d39451a3673498fdec65f12f97b7301174"
+      "hash": "0x33593c3baca8c24d6e6b36d250a9d4ffa1f20ccf6d5b8ea33f008a48487dbfbe"
     }
   ]
 }

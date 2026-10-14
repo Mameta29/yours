@@ -1,0 +1,22 @@
+{
+  "checkedAt": "2026-10-14T12:32:10.078Z",
+  "scope": "Offline SDK request and official MetaMask allowance caveat builder/decoder compatibility. Disposable signing account; no extension approval, public transaction or permission activation.",
+  "source": "c4d7287",
+  "upstream": {
+    "smartAccountsKit": "2.0.0",
+    "permissionTypes": "2.0.0",
+    "moduleSha256": "aa7f115b33396cf9287d5941632eff14a3ef0ce8f1e24fed82b016d1dc009b20"
+  },
+  "checks": [
+    "SDK emits wallet_requestExecutionPermissions rather than raw owner Delegation signing",
+    "Amoy manager and five enforcers match pinned deployment",
+    "official allowance caveat builder accepts MaxUint256 and exact start time",
+    "official decoder preserves the token, amount, Gate redeemer and expiry",
+    "independent EIP-712 verification accepts the disposable signature",
+    "yours validates the official caveats without relaxing immutable restrictions"
+  ],
+  "rules": [
+    "expiry",
+    "redeemer"
+  ]
+}
