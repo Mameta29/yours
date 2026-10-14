@@ -1,0 +1,20 @@
+{
+  "checkedAt": "2026-10-14T15:12:57.231Z",
+  "scope": "Read-only public Amoy owner permission activation; no purchase executed.",
+  "chainId": 80002,
+  "source": "c4d7287",
+  "gateActive": true,
+  "registryActive": true,
+  "sharedPerOrderJpyc": "3000",
+  "sharedPerPeriodJpyc": "10000",
+  "perOrderJpyc": "2000",
+  "perPeriodJpyc": "5000",
+  "validUntil": "2026-10-21T15:00:32.000Z",
+  "policyVersion": "1",
+  "permissionRevision": "1",
+  "apiActivation": {
+    "at": "2026-10-14T15:01:32.666732Z",
+    "httpStatus": 200
+  },
+  "userEvidence": "User supplied a MetaMask completion screenshot on 2026-10-15 showing My Gemini active. Owner address, draft ID and signatures are not published."
+}

@@ -34,3 +34,5 @@ MetaMaskのRPC失敗は一律の通信エラーにまとめず、接続権限不
 次の署名工程では旧consoleがownerの`Delegation`をraw署名要求として渡していた。MetaMask 13.48の配布コードと[公式仕様](https://docs.metamask.io/smart-accounts-kit/concepts/advanced-permissions/)は、通常の委任署名とAdvanced Permissionsを区別し、解釈できない外部のowner委任を拒否する。consoleを既存SDKのERC-7715経路へ切り替え、署名拒否を別経路で迂回するfallbackは設けない。[Amoy対応](https://docs.metamask.io/smart-accounts-kit/get-started/supported-networks/)は資料上の対応だけで決めず、接続中のwalletへ照会する。必要な制限を提供しないwalletでは停止する。
 
 公式`@metamask/7715-permission-types@2.0.0`のallowance caveat builder/decoderでも、SDKが送るtoken・MaxUint256・開始時刻・Gate redeemer・期限が互換で、固定したAmoyのManager/enforcerと一致することを[確認](../evidence/metamask-7715-compatibility.json)。上限は従来どおりGate/Registryで強制する。browser試験はraw owner委任を拒否し、通常の条件署名には明示したdomain型を要求する。権限照会・権限要求・条件署名にも、機密値を除いたRPCの処理名・番号・理由を表示する。
+
+2026-10-15、本人の実MetaMask登録完了を[API・公開Amoyで照合](../evidence/public-owner-permission.json)した。画像でもMy Geminiが有効。登録の署名・取引要求は委任1件、条件署名2件、登録transaction2件で、接続・ログイン・MetaMask内の画面遷移は別にある。約10クリックという本人の報告と矛盾しないが、実クリック数は計測していない。初回操作数の削減は今後の改善点。公開購入の確認は引き続き必要。

@@ -1,6 +1,6 @@
 # 実装の継続記録
 
-更新: 2026-10-14。repo: https://github.com/Mameta29/yours
+更新: 2026-10-15。repo: https://github.com/Mameta29/yours
 
 ## 確定した方向
 
@@ -63,13 +63,15 @@ Google ADK → Vertex AI `gemini-3.8-flash` → 実Cloud SQL catalogの検索が
 
 商品数の増加に合わせ、Geminiの検索toolへUCP cursorを追加。全商品を尋ねると6件→1件の2ページを実際に取得し、最後の商品まで7件を回答した（[全件検索](evidence/gemini-paginated-cloud.json)）。続きが残る場合は全件取得したと答えないよう指示している。
 
-管理画面は1440pxと390pxで実ブラウザ検証済み（[公開検証](evidence/public-console.json)）。接続、AI別権限、共有予算、停止、注文専用同意、購入品downloadを実APIへ接続。未設定EOAから「ウォレットで承認する」を押すとMetaMaskの設定確認を開始する。画像で報告された`wallet_upgrade_required`の原因を修正し、設定取引の応答消失・ERC-7715・reload・部分登録復旧を含むローカルChromeの22項目を確認（[設計](design/WALLET-ONBOARDING.md)）。公開Amoyで本人のスマートアカウント設定取引の成功と現在の実装を確認済み。AI権限登録の完了・本人購入は再確認中。
+管理画面は1440pxと390pxで実ブラウザ検証済み（[公開検証](evidence/public-console.json)）。接続、AI別権限、共有予算、停止、注文専用同意、購入品downloadを実APIへ接続。未設定EOAから「ウォレットで承認する」を押すとMetaMaskの設定確認を開始する。画像で報告された`wallet_upgrade_required`の原因を修正し、設定取引の応答消失・ERC-7715・reload・部分登録復旧を含むローカルChromeの22項目を確認（[設計](design/WALLET-ONBOARDING.md)）。公開Amoyで本人のスマートアカウント設定取引の成功と現在の実装を確認済み。実MetaMaskでのAI権限登録完了を確認。本人購入は再確認中。
 
 再読み込み後の「登録を再開」でwalletへ再接続すると、登録画面が閉じる不具合も修正。旧版で同じ停止を再現した。修正版は接続済みの同じ本人・networkを復元し、再接続が必要な場合は入力した条件を保って元の画面へ戻す。接続キャンセル・別walletへの切り替え・条件の再確認を当時の18項目に含めている。source `22bbaea`のGitHub CI [38540356112](https://github.com/Mameta29/yours/actions/runs/38540356112)も全項目成功。
 
 MetaMaskの確認画面が開かず通信エラーになる報告に対し、隠れていたRPCの処理名・番号・理由を表示する修正を追加。`data.originalError`と`cause`の内側のエラーを区別し、署名・要求payloadは表示しない。Cloud Build `bb44fbc4-87b8-4ab4-86a8-8a1c57c2af0e`で反映し、source `fc5b488`の[CI 38545264723](https://github.com/Mameta29/yours/actions/runs/38545264723)、公開画面、4サービスの確認が成功。その後の本人の報告から、`wallet_sendCalls`に含めた`data: "0x"`がMetaMaskの入力検証で拒否されることを特定。データなしの2件の呼び出しは`data`を省略する形に修正した。公式配布の`SendCallsStruct`で旧要求の拒否・新要求の受理を照合し（[証拠](evidence/metamask-send-calls-schema.json)）、SDK68テストとブラウザ18項目が成功。Cloud Build `e11dcea2-40ab-41b3-a590-da5e2d433c52`で公開環境へ反映し、source `10812cf`の[CI 38548876925](https://github.com/Mameta29/yours/actions/runs/38548876925)も全項目成功。公開サービス4件・1440px/390px表示・全JS/CSSの配信hashを確認。本人の実MetaMaskでの登録完了はまだ未確認。
 
-本人の設定取引はAmoyの2 RPCで成功receipt・canonical block・現在の固定7702実装を照合し、APIの`prepare`も201まで進んだ。次の段階では旧consoleがownerの委任を通常の署名として要求しており、MetaMaskの仕様に適合していなかった。SDKのERC-7715権限照会・要求へ切り替え、通常の条件署名にも明示的なEIP712Domainを含めた。権限の署名後にHTTPが失敗しても同じdraftの承認内容で再開する。固定したGate、token、期限、native value禁止の検証は維持。[公式MetaMask allowance builder/decoderとの照合6項目](evidence/metamask-7715-compatibility.json)、SDK73件、ブラウザ22項目が成功。Cloud Build `a69608f8-2e9c-4f43-b722-419a885125dd`で反映し、source `c4d7287`の[CI 38564315751](https://github.com/Mameta29/yours/actions/runs/38564315751)も全項目成功。公開サービス4件、1440px/390px表示、lazy importを含む全6 JS/CSSの配信hashを確認した。本人の実MetaMaskによるAI登録完了・購入成功は引き続き別の確認事項。詳細は[ウォレット設定](design/WALLET-ONBOARDING.md)。
+本人の設定取引はAmoyの2 RPCで成功receipt・canonical block・現在の固定7702実装を照合し、APIの`prepare`も201まで進んだ。次の段階では旧consoleがownerの委任を通常の署名として要求しており、MetaMaskの仕様に適合していなかった。SDKのERC-7715権限照会・要求へ切り替え、通常の条件署名にも明示的なEIP712Domainを含めた。権限の署名後にHTTPが失敗しても同じdraftの承認内容で再開する。固定したGate、token、期限、native value禁止の検証は維持。[公式MetaMask allowance builder/decoderとの照合6項目](evidence/metamask-7715-compatibility.json)、SDK73件、ブラウザ22項目が成功。Cloud Build `a69608f8-2e9c-4f43-b722-419a885125dd`で反映し、source `c4d7287`の[CI 38564315751](https://github.com/Mameta29/yours/actions/runs/38564315751)も全項目成功。公開サービス4件、1440px/390px表示、lazy importを含む全6 JS/CSSの配信hashを確認した。詳細は[ウォレット設定](design/WALLET-ONBOARDING.md)。
+
+2026-10-15 00:01 JST、本人の実MetaMask操作によるAI権限登録が完了。ユーザーの画面報告、Cloud Runの`activate` 200、Amoy上のGate/Registryのactive=trueを照合した。AI別上限2,000/5,000 JPYC、共有上限3,000/10,000 JPYC、期限10/22 00:00 JST、policy/permission revisionはともに1。個人のaddress・draft ID・署名を除いた[登録確認](evidence/public-owner-permission.json)を保存。公開購入は未確認。現行登録は委任許可1件・条件署名2件・登録transaction2件を別々に要求するため、接続・ログインとMetaMask内の画面遷移を含めるとクリック数が多い。ユーザーは約10クリックと報告しており、初回操作数の削減は未実装の改善点。
 
 UCP RFC 9421署名、API keyとplatform profileの結び付け、DNSを固定したprofile取得、order webhookのoutbox・inbox・重複排除・非同期auditを実装・配備。非公開workerへの1分間隔のScheduler `yours-outbox`を設定済み。
 
