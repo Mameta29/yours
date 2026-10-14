@@ -65,9 +65,9 @@ jobs:
           exit 1
       - name: Real payment pipeline and permission lifecycle
         run: |
-          PAYMENT_PIPELINE=1 node packages/wallet-sdk/scripts/local-integration.mjs
+          pnpm exec playwright install --with-deps chrome
+          PAYMENT_PIPELINE=1 BROWSER_PURCHASE=1 node packages/wallet-sdk/scripts/local-integration.mjs
           node services/api/scripts/permissions-integration.mjs
       - name: Browser setup and interruption recovery
         run: |
-          pnpm exec playwright install --with-deps chrome
           node services/api/scripts/browser-permissions.mjs
