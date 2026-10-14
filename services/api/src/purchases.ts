@@ -35,7 +35,7 @@ export function purchaseRoutes(db: Db, config: Config) {
     let row = await owned(c, byOrder);
     if (
       ["authorized", "signing", "submitted"].includes(row.state) ||
-      (row.state === "confirmed" && !row.receipts)
+      (row.state === "confirmed" && (!row.receipts || row.order_document?.yours?.merchant_order?.status === "pending"))
     ) {
       await wakeSettlement(config, row.id);
       row = await owned(c, byOrder);
@@ -51,6 +51,8 @@ export function purchaseRoutes(db: Db, config: Config) {
       expiresAt: row.expires_at,
       createdAt: row.created_at,
       merchantName: row.snapshot.checkout.merchant.name,
+      deliveryKind: row.merchant_id === config.MERCHANT_ID ? "download" : "merchant",
+      merchantOrder: row.order_document?.yours?.merchant_order ?? null,
       items: row.order_document?.line_items ?? row.snapshot.checkout.line_items,
     });
   }

@@ -1,3 +1,4 @@
+import type {EcMerchant} from '@yours/jpyc-ec';
 import {randomBytes,randomUUID} from 'node:crypto';
 import {encodeFunctionData,keccak256,stringToHex,zeroHash,parseEventLogs,type Address,type Hex,type PublicClient,type LocalAccount} from 'viem';
 import {DomainError,digest as snapshotDigest} from '@yours/domain';
@@ -8,7 +9,7 @@ import {paymentPayload,parseEnvelope} from '@yours/wallet-sdk';
 
 export interface SettlementRuntime {
  client:PublicClient;chainId:number;gate:Address;manager:Address;token:Address;enforcers:Enforcers;
- merchantId:string;payTo:Address;origin:string;
+ merchantId:string;payTo:Address;origin:string;ecMerchants?:EcMerchant[];
  signers:Record<'relayer'|'agent'|'merchant'|'risk',LocalAccount>;
  verifyIntent:(id:string)=>Promise<{transaction_id:string;expires_at:number}>;
  endorseIntent?:(id:string)=>Promise<{human:unknown;signature:Hex}>;
@@ -28,17 +29,24 @@ async function prepareEnvelope(db:Db,id:string,r:SettlementRuntime){
  if(verified.expires_at<=now)throw new DomainError('mandate_expired',409);
  const checkout=row.snapshot.checkout,amount=BigInt(row.amount_atomic),policy=row.policy.chainPolicy;
  const hosted=row.provider==='gemini',agent=row.agent_address as Address;
- if(row.merchant_id!==r.merchantId||checkout.yours.pay_to.toLowerCase()!==r.payTo.toLowerCase()||checkout.yours.asset.toLowerCase()!==r.token.toLowerCase()||hosted&&row.agent_address!==r.signers.agent.address.toLowerCase())throw new DomainError('unsupported_payment_binding',422);
+ const external=r.ecMerchants?.find(m=>m.id===row.merchant_id);
+ const payTo=(row.merchant_id===r.merchantId?r.payTo:external?.payTo) as Address|undefined;
+ if(!payTo)throw new DomainError('merchant_not_enrolled',422);
+ if(external){
+  const {rows:[reservation]}=await db.query('SELECT * FROM ec_reservations WHERE checkout_id=$1 AND account_id=$2 AND connection_id=$3',[row.checkout_id,row.account_id,row.connection_id]);
+  if(!reservation?.authorized_at||reservation.quote.expiresAt<=Date.now()||reservation.quote.requirementsHash!==snapshotDigest(reservation.quote.accepted)||checkout.yours.ec?.requirements_hash!==reservation.quote.requirementsHash||reservation.quote.accepted.payTo.toLowerCase()!==payTo.toLowerCase()||BigInt(reservation.quote.accepted.amount)!==amount)throw new DomainError('ec_reservation_binding_mismatch',409);
+ }
+ if(checkout.merchant.id!==row.merchant_id||checkout.yours.pay_to.toLowerCase()!==payTo.toLowerCase()||checkout.yours.asset.toLowerCase()!==r.token.toLowerCase()||hosted&&row.agent_address!==r.signers.agent.address.toLowerCase())throw new DomainError('unsupported_payment_binding',422);
  for(const [role,field] of [['merchant','merchantSigner'],['risk','riskSigner']] as const)if(policy[field].toLowerCase()!==r.signers[role].address.toLowerCase())throw new DomainError('signer_binding_changed',409);
  const expiry=BigInt(Math.min(now+120,verified.expires_at,Math.floor(new Date(row.expires_at).getTime()/1000)));
  const e={...row.grant.expectation,expiry:BigInt(row.grant.expectation.expiry),startTime:BigInt(row.grant.expectation.startTime)};
  const {parents}=validateParents(row.context,e);await verifyParentSignatures(r.client,parents,e);
- const leaf=buildPaymentLeaf(parents,{agent,gate:r.gate,token:r.token,enforcers:r.enforcers},amount,r.payTo,expiry,BigInt('0x'+randomBytes(32).toString('hex')));
+ const leaf=buildPaymentLeaf(parents,{agent,gate:r.gate,token:r.token,enforcers:r.enforcers},amount,payTo,expiry,BigInt('0x'+randomBytes(32).toString('hex')));
  if(hosted)leaf.signature=await r.signers.agent.signTypedData(delegationTypedData(r.chainId,r.manager,leaf));
- const order={orderId:keccak256(stringToHex(id)),revisionId:keccak256(stringToHex(row.revision+':'+row.snapshot_hash)),policyId:policy.policyId,policyVersion:BigInt(row.policy_revision),periodIndex:BigInt(row.period_index),account:row.address,agent,shopIdHash:keccak256(stringToHex(row.merchant_id)),payTo:r.payTo,settlementToken:r.token,settlementAmount:amount,basketCommitment:basketCommitment(checkout,('0x'+randomBytes(32).toString('hex')) as Hex),fundingHash:structHash('Funding',emptyFunding),requirementsHash:requirementsHash(r.chainId,r.gate,{settlementToken:r.token,payTo:r.payTo,settlementAmount:amount}),validUntil:expiry};
+ const order={orderId:keccak256(stringToHex(id)),revisionId:keccak256(stringToHex(row.revision+':'+row.snapshot_hash)),policyId:policy.policyId,policyVersion:BigInt(row.policy_revision),periodIndex:BigInt(row.period_index),account:row.address,agent,shopIdHash:keccak256(stringToHex(row.merchant_id)),payTo,settlementToken:r.token,settlementAmount:amount,basketCommitment:basketCommitment(checkout,('0x'+randomBytes(32).toString('hex')) as Hex),fundingHash:structHash('Funding',emptyFunding),requirementsHash:requirementsHash(r.chainId,r.gate,{settlementToken:r.token,payTo,settlementAmount:amount}),validUntil:expiry};
  const domain=gateDomain(r.chainId,r.gate),orderHash=digest(domain,'PurchaseOrder',order);
  const intent={orderHash,paymentLeafHash:hashDelegation(leaf),fundingLeafHash:zeroHash,validUntil:expiry},intentHash=digest(domain,'ExecutionIntent',intent);
- const risk={intentHash,riskDigest:evidenceDigest({snapshotHash:row.snapshot_hash,ap2Transaction:verified.transaction_id,policyVersion:row.policy_revision,merchant:row.merchant_id,payTo:r.payTo,token:r.token,rules:'verified-ap2-and-enrolled-merchant-v1'}),rulesHash:policy.riskRulesHash,reasonMask:0,checkedAt:BigInt(now),validUntil:BigInt(Math.min(now+60,Number(expiry)))};
+ const risk={intentHash,riskDigest:evidenceDigest({snapshotHash:row.snapshot_hash,ap2Transaction:verified.transaction_id,policyVersion:row.policy_revision,merchant:row.merchant_id,payTo,token:r.token,rules:'verified-ap2-and-enrolled-merchant-v1'}),rulesHash:policy.riskRulesHash,reasonMask:0,checkedAt:BigInt(now),validUntil:BigInt(Math.min(now+60,Number(expiry)))};
  const signatures={merchant:await r.signers.merchant.signTypedData({domain,types:gateTypes,primaryType:'PurchaseOrder',message:order}),agent:hosted?await r.signers.agent.signTypedData({domain,types:gateTypes,primaryType:'ExecutionIntent',message:intent}):'0x' as Hex,risk:await r.signers.risk.signTypedData({domain,types:gateTypes,primaryType:'RiskStamp',message:risk}),price:'0x' as Hex,human:'0x' as Hex};
  const envelope:ExecutionEnvelope={order,funding:emptyFunding,intent,paymentContext:encodeDelegations([leaf,...parents]),fundingContext:'0x',risk,price:emptyPrice,human:emptyApproval,signatures,route:'0x'};
  return envelope;
@@ -113,7 +121,7 @@ export async function executePayment(db:Db,id:string,r:SettlementRuntime){
   const expected=journal.unsigned_payload.envelope;
   const events=parseEventLogs({abi:yoursPurchaseGateAbi,eventName:'PurchasePaid',logs:receipt.logs.filter(l=>l.address.toLowerCase()===r.gate.toLowerCase()),strict:true});
   const event=events[0]?.args;
-  if(events.length!==1||!event||event.orderId!==expected.order.orderId||event.orderHash!==expected.intent.orderHash||event.account.toLowerCase()!==expected.order.account.toLowerCase()||event.payTo.toLowerCase()!==r.payTo.toLowerCase()||event.settlementAmount!==BigInt(expected.order.settlementAmount))throw new DomainError('payment_event_mismatch',409);
+  if(events.length!==1||!event||event.orderId!==expected.order.orderId||event.orderHash!==expected.intent.orderHash||event.account.toLowerCase()!==expected.order.account.toLowerCase()||event.payTo.toLowerCase()!==expected.order.payTo.toLowerCase()||event.settlementAmount!==BigInt(expected.order.settlementAmount))throw new DomainError('payment_event_mismatch',409);
  }
  await recordChainReceipt(db,journal.id,{transactionHash:hash,blockNumber:receipt.blockNumber.toString(),blockHash:receipt.blockHash,status:receipt.status,gasUsed:receipt.gasUsed.toString()},receipt.status==='success',async(tx,intent)=>{
   if(receipt.status==='success')await createOrder(tx,intent,r);
@@ -125,11 +133,13 @@ async function createOrder(tx:Tx,intent:any,r:SettlementRuntime){
  const {rows:[session]}=await tx.query('SELECT * FROM merchant_sessions WHERE id=$1 FOR UPDATE',[intent.checkout_id]);
  if(!session||session.actor!=='agent:'+intent.connection_id||session.status!=='complete_in_progress')throw new DomainError('settlement_session_mismatch',409);
  const doc=intent.snapshot.checkout,id=randomUUID();
+ const external=intent.merchant_id!==r.merchantId;
+ if(external&&!r.ecMerchants?.some(m=>m.id===intent.merchant_id))throw new DomainError('merchant_not_enrolled',422);
  const {rows:holds}=await tx.query('SELECT * FROM inventory_reservations WHERE session_id=$1 AND released_at IS NULL ORDER BY product_id',[session.id]);
- if(holds.length!==doc.line_items.length)throw new DomainError('inventory_reservation_missing',409);
+ if(!external&&holds.length!==doc.line_items.length)throw new DomainError('inventory_reservation_missing',409);
  for(const hold of holds){const {rowCount}=await tx.query('UPDATE merchant_products SET stock=stock-$3 WHERE merchant_id=$1 AND id=$2 AND stock>=$3',[hold.merchant_id,hold.product_id,hold.quantity]);if(rowCount!==1)throw new DomainError('inventory_reconciliation_required',409);}
  await tx.query('UPDATE inventory_reservations SET released_at=now() WHERE session_id=$1',[session.id]);
- const order={ucp:{version:UCP_VERSION,capabilities:{'dev.ucp.shopping.order':[{version:UCP_VERSION}]}},id,checkout_id:session.id,permalink_url:r.origin+'/orders/'+id,line_items:doc.line_items.map((line:any)=>({...line,quantity:{original:line.quantity,total:line.quantity,fulfilled:0},status:'processing'})),fulfillment:{expectations:[],events:[]},currency:doc.currency,totals:doc.totals,yours:{network:'eip155:'+r.chainId,transaction_hash:intent.transaction_hash,intent_id:intent.id}};
+ const order={ucp:{version:UCP_VERSION,capabilities:{'dev.ucp.shopping.order':[{version:UCP_VERSION}]}},id,checkout_id:session.id,permalink_url:r.origin+'/orders/'+id,line_items:doc.line_items.map((line:any)=>({...line,quantity:{original:line.quantity,total:line.quantity,fulfilled:0},status:'processing'})),fulfillment:{expectations:[],events:[]},currency:doc.currency,totals:doc.totals,yours:{network:'eip155:'+r.chainId,transaction_hash:intent.transaction_hash,intent_id:intent.id,...(external?{merchant_order:{status:'pending'}}:{})}};
  validateSchema('shopping/order.json',order);
  await tx.query('INSERT INTO merchant_orders(id,session_id,document,transaction_hash) VALUES($1,$2,$3,$4)',[id,session.id,JSON.stringify(order),intent.transaction_hash]);
  const checkout={...session.document,status:'completed',order:{id,permalink_url:order.permalink_url},yours:{...session.document.yours,revision:session.revision+1,payment_status:'confirmed',transaction_hash:intent.transaction_hash}};
@@ -137,6 +147,7 @@ async function createOrder(tx:Tx,intent:any,r:SettlementRuntime){
  await tx.query("UPDATE merchant_sessions SET status='completed',revision=revision+1,document=$2,updated_at=now() WHERE id=$1",[session.id,JSON.stringify(checkout)]);
  await enqueue(tx,'order.webhook','order-created:'+id,{intentId:intent.id,eventId:'order-created:'+id,occurredAt:Math.floor(Date.now()/1000),platformProfile:session.platform_profile,document:order});
  await enqueue(tx,'order.receipts','receipts:'+intent.id,{intentId:intent.id});
+ if(external)await enqueue(tx,'ec.settle','ec-settle:'+intent.id,{intentId:intent.id});
  await audit(tx,intent.account_id,'worker','order.created',id,{intentId:intent.id,transactionHash:intent.transaction_hash});
 }
 async function releaseSession(tx:Tx,intent:any){

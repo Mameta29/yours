@@ -11,6 +11,8 @@ import {KmsEvmSigner} from '@yours/signing';
 import {createDb,claimWork,finishWork} from '@yours/storage';
 import {DomainError} from '@yours/domain';
 import {executePayment,type SettlementRuntime} from './settlement.js';
+import {parseMerchants} from '@yours/jpyc-ec';
+import {settleEcOrder} from './ec-settlement.js';
 
 const required=(key:string)=>{const value=process.env[key];if(!value)throw new Error('Missing '+key);return value;};
 const db=createDb(required('DATABASE_URL'));
@@ -38,6 +40,7 @@ async function privatePost(path:string,body:unknown,origin=authority.origin){
  if(!response.ok)throw new DomainError('authority_rejected',response.status);return await response.json() as any;
 }
 const runtime:SettlementRuntime={client,chainId:80002,gate:manifest.gate,manager:manifest.manager,token:manifest.jpyc,enforcers:manifest.enforcers,merchantId:required('MERCHANT_ID'),payTo:getAddress(required('MERCHANT_PAY_TO')),origin:required('PUBLIC_ORIGIN'),signers,verifyIntent:id=>privatePost('/v1/verify-execution',{intent_id:id}),endorseIntent:id=>privatePost('/v1/endorse-order',{intent_id:id})};
+runtime.ecMerchants=parseMerchants(process.env.EC_MERCHANTS_JSON);
 const app=new Hono();
 app.use('*',bodyLimit({maxSize:4096}));
 app.get('/health',c=>c.json({ok:true,service:'yours-worker'}));
@@ -46,12 +49,14 @@ app.post('/run',async c=>{
  const {intentId}=z.object({intentId:z.string().uuid().optional()}).strict().parse(await c.req.json());
  let processed=0,pending=0;
  for(let i=0;i<8;i++){
-  const item=await claimWork(db,['payment.execute','order.receipts','order.webhook','order.webhook.received'],180,intentId);if(!item)break;
+  const item=await claimWork(db,['payment.execute','order.receipts','order.webhook','order.webhook.received','ec.settle'],180,intentId);if(!item)break;
   try{
    const id=String(item.payload.intentId);
    if(item.topic==='payment.execute'){
     const result=await executePayment(db,id,runtime);
     if(['submitted','confirming','approval_required','payment_required','agent_signature_required'].includes(result.state)){await finishWork(db,item,'awaiting_'+result.state);pending++;continue;}
+   }else if(item.topic==='ec.settle'){
+    await settleEcOrder(db,id,{merchants:runtime.ecMerchants!,chainId:runtime.chainId,token:runtime.token});
    }else if(item.topic==='order.webhook.received'){
     await processOrderWebhook(db,String(item.payload.source),String(item.payload.eventId));
    }else if(item.topic==='order.webhook'){
