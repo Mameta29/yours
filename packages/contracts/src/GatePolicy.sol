@@ -4,9 +4,7 @@ pragma solidity ^0.8.28;
 import {IPurchaseGateV1 as I} from "./IPurchaseGateV1.sol";
 import {GateHash} from "./GateHash.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
-import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import {PurchaseValidatorV1} from "./PurchaseValidatorV1.sol";
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 abstract contract GatePolicy is I, EIP712, ReentrancyGuard {
@@ -41,10 +39,7 @@ abstract contract GatePolicy is I, EIP712, ReentrancyGuard {
     function domainDigest(bytes32 structHash) external view returns (bytes32) { return _hashTypedDataV4(structHash); }
 
     function _signature(address signer, bytes32 structHash, bytes memory signature, bytes32 role) internal view {
-        bytes32 digest = _hashTypedDataV4(structHash);
-        (address recovered, ECDSA.RecoverError error,) = ECDSA.tryRecover(digest, signature);
-        // A 7702 EOA still owns its signing key; ERC-1271 is supported for the pinned account.
-        if (signer == address(0) || !((error == ECDSA.RecoverError.NoError && recovered == signer) || SignatureChecker.isValidERC1271SignatureNow(signer, digest, signature))) revert InvalidSignature(role);
+        validator.checkSignature(signer, _hashTypedDataV4(structHash), signature, role);
     }
     function _deadline(uint64 until) internal view { if (until <= block.timestamp) revert DeadlineExpired(); }
     function _account(address account) internal view {

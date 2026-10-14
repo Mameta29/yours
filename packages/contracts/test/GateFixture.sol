@@ -86,7 +86,7 @@ abstract contract GateFixture {
         jpyc = new MockToken(); usdc = new MockToken();
         for (uint256 j; j < 7; j++) enforcers[j] = address(new MockCode());
         MockFactory factory = new MockFactory(); router = new MockRouter(address(factory));
-        gate = new PurchaseGateV1(address(new MockManager()), address(jpyc), address(usdc), implementation, address(router), address(factory), enforcers);
+        gate = _deployGate(address(new MockManager()), implementation, address(factory));
         p = I.Policy(owner, bytes32(uint256(1)), 1, uint64(block.timestamp), uint64(block.timestamp+86400), uint64(block.timestamp), 3600,
             1500e18, 10000e18, 0, 0, keccak256("risk-v1"), keccak256("binding"), 0, 300, 255, vm.addr(M_KEY), vm.addr(R_KEY), vm.addr(H_KEY), vm.addr(P_KEY));
         shops.push(I.Merchant(keccak256("shop"), merchant));
@@ -98,6 +98,9 @@ abstract contract GateFixture {
         grants.push(_grant(first)); grants.push(_grant(second));
         _register(false);
         jpyc.mint(owner, 100000e18); usdc.mint(owner, 100_000_000);
+    }
+    function _deployGate(address manager, address implementation, address factory) internal virtual returns (PurchaseGateV1) {
+        return new PurchaseGateV1(manager, address(jpyc), address(usdc), implementation, address(router), factory, enforcers);
     }
     function _sign(uint256 key, bytes32 structHash) internal returns (bytes memory) {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(key, gate.domainDigest(structHash)); return abi.encodePacked(r, s, v);

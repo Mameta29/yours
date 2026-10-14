@@ -35,7 +35,7 @@ contract PurchaseGateV1 is GatePolicy {
         bool hasHuman = sig.human.length > 0;
         _human(policy_, h, r, intentHash, sig.human, hasHuman);
         uint256 jpycAfter = spentJpyc[o.account][o.policyId][o.periodIndex] + o.settlementAmount;
-        uint32 reasons = r.reasonMask;
+        uint32 reasons = r.reasonMask | _consumeAgentBudget(o, h, hasHuman);
         if (o.settlementAmount > policy_.autoPerOrderJpyc) reasons |= 1;
         if (jpycAfter > policy_.autoPerPeriodJpyc) reasons |= 2;
         if (!merchants[o.account][o.policyVersion][keccak256(abi.encode(Merchant(o.shopIdHash, o.payTo)))]) reasons |= 4;
@@ -68,6 +68,10 @@ contract PurchaseGateV1 is GatePolicy {
         emit PurchasePaid(o.account, o.orderId, i.orderHash, o.policyId, o.policyVersion, o.periodIndex, o.payTo, o.settlementAmount, f.token, actualInput, h.approvalId, reasons, r.riskDigest);
         return PurchaseResult(i.orderHash, actualInput, reasons, jpycAfter, inputAfter);
     }
+
+    /// @dev Extension point runs inside the purchase's atomic transaction. A later
+    /// transfer failure reverts the agent ledger as well as the shared ledger.
+    function _consumeAgentBudget(PurchaseOrder calldata, HumanApproval calldata, bool) internal virtual returns (uint32) { return 0; }
 
     function _validateOrder(Policy storage p, PurchaseOrder calldata o, Funding calldata f, ExecutionIntent calldata i, Signatures calldata s) private view {
         if (!active[o.account] || p.policyId != o.policyId || block.timestamp < p.validAfter || block.timestamp >= p.validUntil) revert PolicyInactive();

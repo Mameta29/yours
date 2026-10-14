@@ -3,6 +3,8 @@ pragma solidity ^0.8.28;
 import {IPurchaseGateV1 as I} from "./IPurchaseGateV1.sol";
 import {GateHash} from "./GateHash.sol";
 import {DelegationCodec as D} from "./DelegationCodec.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 
 /// @dev Immutable, stateless validation companion, called with STATICCALL.
 /// Splitting bytecode keeps the purchase entrypoint under the EIP-170 size limit.
@@ -19,6 +21,11 @@ contract PurchaseValidatorV1 {
             for (uint256 k; k < j; k++) if (e[j] == e[k]) revert I.UnsupportedConfiguration();
         }
         enforcers = e;
+    }
+    function checkSignature(address signer, bytes32 digest, bytes calldata signature, bytes32 role) external view {
+        // A 7702 EOA still owns its signing key. Contract accounts may use ERC-1271.
+        (address recovered, ECDSA.RecoverError error,) = ECDSA.tryRecover(digest, signature);
+        if (signer == address(0) || !((error == ECDSA.RecoverError.NoError && recovered == signer) || SignatureChecker.isValidERC1271SignatureNow(signer, digest, signature))) revert I.InvalidSignature(role);
     }
     function configuration(I.Policy calldata p, I.Merchant[] calldata shops, I.AssetLimit[] calldata assets, I.GrantBinding[] calldata grants, address[] calldata senders) external view returns (bytes32) {
         if (p.policyId == bytes32(0) || p.identityBindingId == bytes32(0) || p.riskRulesHash == bytes32(0) || p.periodSeconds == 0 || p.periodStart > p.validAfter || p.validAfter >= p.validUntil || p.validUntil <= block.timestamp || p.humanOverrideMask > 255 || p.autoMaxPremiumBps > 10000 || shops.length > 64 || assets.length > 1 || grants.length == 0 || grants.length > 16 || senders.length == 0 || senders.length > 8) revert I.UnsupportedConfiguration();
