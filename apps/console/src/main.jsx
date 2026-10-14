@@ -156,6 +156,15 @@ function App() {
       .catch(() => {});
   }, [data?.account.id, data?.policy?.activation_tx]);
   useEffect(() => {
+    if (data) return;
+    setTasks([]);
+    setAudit([]);
+    setWallet(null);
+    setRuns((old) =>
+      old.filter((run) => run.result?.readOnly && !run.created_at),
+    );
+  }, [data?.account.id]);
+  useEffect(() => {
     if (!provider) return;
     const changed = () => {
       setData(null);
@@ -316,6 +325,26 @@ function App() {
             onClick={() => setModal({ kind: "revoke", connection: c })}
           >
             取り消す
+          </button>
+        )}
+        {c.provider === "external" && c.status !== "revoked" && (
+          <button
+            className="text-button"
+            disabled={!!busy}
+            onClick={() =>
+              action("接続tokenを更新しています", async () => {
+                const result = await api(
+                  `/api/owner/connections/${c.id}/token`,
+                  {},
+                );
+                setModal({
+                  kind: "token",
+                  connection: { ...c, agentToken: result.agentToken },
+                });
+              })
+            }
+          >
+            接続情報を再発行
           </button>
         )}
       </div>
@@ -572,7 +601,7 @@ function App() {
                           key={p.id}
                           className="product"
                           onClick={() =>
-                            data && chosen
+                            data && active.length
                               ? setModal({ kind: "purchase", product: p })
                               : setNotice({
                                   text: "先にウォレットを接続し、AIの権限を設定してください。",
@@ -600,6 +629,109 @@ function App() {
                       </div>
                     )}
                   </section>
+                  {tasks.some(
+                    (t) =>
+                      !t.intent_id &&
+                      !t.revoked_at &&
+                      new Date(t.expires_at).getTime() > Date.now(),
+                  ) && (
+                    <section>
+                      <div className="section-heading">
+                        <h2>承認済みの依頼</h2>
+                      </div>
+                      <div className="approved-tasks">
+                        {tasks
+                          .filter(
+                            (t) =>
+                              !t.intent_id &&
+                              !t.revoked_at &&
+                              new Date(t.expires_at).getTime() > Date.now(),
+                          )
+                          .map((t) => {
+                            const agent = connections.find(
+                              (c) => c.id === t.connection_id,
+                            );
+                            return (
+                              <article className="approved-task" key={t.id}>
+                                <div>
+                                  <strong>
+                                    {t.task.items
+                                      .map((i) => i.title)
+                                      .join("、")}
+                                  </strong>
+                                  <p className="small muted">
+                                    {agent?.name} · 上限 ¥
+                                    {yen(t.task.max_amount)} ·{" "}
+                                    {new Date(t.expires_at).toLocaleTimeString(
+                                      "ja-JP",
+                                      { hour: "2-digit", minute: "2-digit" },
+                                    )}
+                                    まで
+                                  </p>
+                                </div>
+                                <div className="card-actions">
+                                  {agent?.provider === "gemini" ? (
+                                    <button
+                                      className="text-button"
+                                      disabled={
+                                        !!busy || agent.status !== "active"
+                                      }
+                                      onClick={() =>
+                                        action(
+                                          "Geminiが依頼を確認しています",
+                                          () =>
+                                            api("/api/owner/runs", {
+                                              requestId: crypto.randomUUID(),
+                                              connectionId: agent.id,
+                                              mandateId: t.id,
+                                              message: `承認した依頼 ${t.id} を実行してください。`,
+                                            }),
+                                        )
+                                      }
+                                    >
+                                      AIで実行 <ArrowRight size={14} />
+                                    </button>
+                                  ) : (
+                                    <button
+                                      className="text-button"
+                                      onClick={() =>
+                                        action(
+                                          "依頼IDをコピーしています",
+                                          async () => {
+                                            await navigator.clipboard.writeText(
+                                              t.id,
+                                            );
+                                            setNotice({
+                                              text: "依頼IDをコピーしました。接続した外部AIから実行できます。",
+                                            });
+                                          },
+                                        )
+                                      }
+                                    >
+                                      依頼IDをコピー <Copy size={14} />
+                                    </button>
+                                  )}
+                                  <button
+                                    className="text-button danger"
+                                    disabled={!!busy}
+                                    onClick={() =>
+                                      action("依頼を取り消しています", () =>
+                                        api(
+                                          `/api/owner/tasks/${t.id}/revoke`,
+                                          {},
+                                        ),
+                                      )
+                                    }
+                                  >
+                                    依頼を取り消す
+                                  </button>
+                                </div>
+                              </article>
+                            );
+                          })}
+                      </div>
+                    </section>
+                  )}
                   <section>
                     <div className="section-heading">
                       <h2>最近の購入</h2>
@@ -626,17 +758,19 @@ function App() {
                       <span className="small muted">Gemini · Google Cloud</span>
                     </div>
                   </div>
-                  {active.length > 1 && (
+                  {active.filter((c) => c.provider === "gemini").length > 1 && (
                     <select
                       aria-label="会話するAI"
                       value={chosen?.id ?? ""}
                       onChange={(e) => setSelected(e.target.value)}
                     >
-                      {active.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
+                      {active
+                        .filter((c) => c.provider === "gemini")
+                        .map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
                     </select>
                   )}
                   <div className="chat-messages">
@@ -1066,6 +1200,7 @@ function ModalContent({
     [draftLoading, setDraftLoading] = useState(modal.kind === "permission"),
     [checked, setChecked] = useState(false),
     [quantity, setQuantity] = useState(1),
+    [purchaseConnection, setPurchaseConnection] = useState(chosen?.id ?? ""),
     [settings, setSettings] = useState({
       perOrder: modal.connection?.permission
         ? fromAtomic(modal.connection.permission.perOrder)
@@ -1141,7 +1276,9 @@ function ModalContent({
             ログアウト
           </button>
         )}
-        <p className="small muted">ネットワーク：{config.network} / {config.chainId}</p>
+        <p className="small muted">
+          ネットワーク：{config.network} / {config.chainId}
+        </p>
       </>
     );
   if (modal.kind === "add")
@@ -1275,6 +1412,9 @@ function ModalContent({
         </span>
         <h2 id="modal-title">{modal.connection.name}に任せる範囲</h2>
         <p>支出は本人のウォレットから行われます。</p>
+        <p className="small muted">
+          初回のウォレット設定も、このボタンから始められます。表示されるMetaMaskの確認画面で承認してください。
+        </p>
         {permissionDraft && (
           <p className="notice">
             前回確認した条件で登録を再開します。成功済みの取引は再送しません。
@@ -1357,6 +1497,12 @@ function ModalContent({
   if (modal.kind === "purchase") {
     const p = modal.product,
       amount = p.price_range.min.amount * quantity;
+    const available = data.connections.filter(
+      (c) =>
+        c.status === "active" && c.permission?.validUntil > Date.now() / 1000,
+    );
+    const buyer =
+      available.find((c) => c.id === purchaseConnection) ?? available[0];
     return (
       <form
         onSubmit={(e) => {
@@ -1364,7 +1510,7 @@ function ModalContent({
           if (!needProvider()) return;
           action("この購入への同意を準備しています", async () => {
             const task = await api("/api/owner/tasks/prepare", {
-              connectionId: chosen.id,
+              connectionId: buyer.id,
               merchantId: config.merchant.id,
               items: [{ id: p.id, quantity }],
               maxAmount: amount,
@@ -1381,9 +1527,15 @@ function ModalContent({
               { signature },
             );
             setModal(null);
+            if (buyer.provider !== "gemini") {
+              setNotice({
+                text: `${buyer.name}への依頼を承認しました。依頼ID: ${approved.id}。接続したAIから実行できます。`,
+              });
+              return;
+            }
             await api("/api/owner/runs", {
               requestId: crypto.randomUUID(),
-              connectionId: chosen.id,
+              connectionId: buyer.id,
               mandateId: approved.id,
               message:
                 "承認した依頼 " +
@@ -1401,10 +1553,21 @@ function ModalContent({
         <div className="purchase-summary">
           <strong>{p.title}</strong>
           <p>{p.description.plain}</p>
-          <span>
-            {config.merchant.name} · {chosen?.name}
-          </span>
+          <span>{config.merchant.name}</span>
         </div>
+        <label>
+          この購入を任せるAI
+          <select
+            value={buyer?.id ?? ""}
+            onChange={(e) => setPurchaseConnection(e.target.value)}
+          >
+            {available.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </label>
         <label>
           数量
           <input
@@ -1424,7 +1587,7 @@ function ModalContent({
         <p className="small muted">
           Amoyのテスト商品です。ウォレットでの署名後、AIが会計と支払いを進めます。
         </p>
-        <button className="button primary full" disabled={!!busy}>
+        <button className="button primary full" disabled={!!busy || !buyer}>
           署名して、この購入を任せる <ArrowRight size={16} />
         </button>
       </form>

@@ -1,7 +1,10 @@
 {
-  "scope": "Headless Chrome with a disposable EIP-1193 test provider. Real owner EIP-712 signatures, real HTTP API/PostgreSQL and official MetaMask contracts on local Anvil. No wallet-extension or public Amoy claim.",
+  "scope": "Headless Chrome with a disposable EIP-1193 test provider. Real EIP-7702 owner upgrade, EIP-712 signatures, real HTTP API/PostgreSQL and official MetaMask contracts on local Anvil. No wallet-extension or public Amoy claim.",
   "passed": [
     "browser SIWE login",
+    "ordinary EOA initiates EIP-5792 upgrade from the permission button",
+    "two zero-value self calls apply the pinned EIP-7702 implementation",
+    "interrupted upgrade status survives reload without a second batch",
     "actual policy transaction succeeds",
     "second wallet transaction intentionally canceled",
     "reloaded page restores the same permission conditions",
@@ -9,14 +12,15 @@
     "five confirmations activate the AI",
     "no JavaScript errors"
   ],
+  "upgradeTransaction": "0xfe1d43b25da400aaf35969c1d36a297dba0cf25ac8bf6f17390a1b402bc16742",
   "transactions": [
     {
-      "to": "0x0da595379b22d7567d84fba888b805f6cb7c3799",
-      "hash": "0x5b46e97796021c38ebf5e2cadfa9e4c47cc6edee55da3d5032bced53d5cbb39e"
+      "to": "0xe43a72b05a6b12830555ba1dfab94117c9861066",
+      "hash": "0xb42935fe9b4087e5576c0281c2cd428f934eea75caa5e2f6f3ab75f94521ace7"
     },
     {
-      "to": "0xE5B4996689f9F0B4236e2E7946685E5Ffa12d184",
-      "hash": "0xbe93e9adfd52f323151ed4adad851dc801e8b0bea129d5c0ede5d806372a919e"
+      "to": "0x2Cb3a7E379e163e72d5BfAa7D123441B6D91790a",
+      "hash": "0x22da3f289d5778d96f3db3cb26a8402d488da57755818bad509fc1a5313a7033"
     }
   ]
 }

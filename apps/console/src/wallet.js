@@ -9,7 +9,7 @@ import {
 } from "viem";
 import { polygonAmoy, foundry } from "viem/chains";
 import {
-  requestGatePermissions,
+  ensureGateSmartAccount,
   encodeDelegations,
   delegationTypedData,
 } from "@yours/wallet-sdk";
@@ -97,6 +97,28 @@ export async function registerPermission({
   const { wallet, publicClient } = clients(provider, config, address);
   progress("委任する条件を確認しています");
   const state = await api("/api/owner/permissions/wallet");
+  const upgradeKey = `yours.upgrade.${config.chainId}.${address.toLowerCase()}.${state.accountImplementation.toLowerCase()}`;
+  let pendingUpgrade;
+  try {
+    pendingUpgrade = JSON.parse(localStorage.getItem(upgradeKey) ?? "null");
+  } catch {}
+  await ensureGateSmartAccount({
+    provider,
+    client: publicClient,
+    chainId: config.chainId,
+    owner: address,
+    implementation: state.accountImplementation,
+    pendingBatchId: pendingUpgrade?.id,
+    onSubmitted: (id) =>
+      localStorage.setItem(upgradeKey, JSON.stringify({ id })),
+    onSettled: () => localStorage.removeItem(upgradeKey),
+    onProgress: (stage) =>
+      progress(
+        stage === "approval"
+          ? "MetaMaskでスマートアカウントへの切り替えを確認してください"
+          : "ウォレットの設定を反映しています。完了後、購入権限の承認へ進みます",
+      ),
+  });
   let draft = (
     await api(`/api/owner/permissions/connections/${connection.id}/draft`)
   ).draft;
@@ -165,68 +187,63 @@ export async function registerPermission({
   let context = draft.context;
   if (!context) {
     progress("ウォレットで購入権限を承認してください");
-    if (state.smartAccountReady) {
-      const nonce = await publicClient.readContract({
-        address: e.enforcers.nonce,
-        abi: [
-          {
-            type: "function",
-            name: "currentNonce",
-            stateMutability: "view",
-            inputs: [
-              { name: "manager", type: "address" },
-              { name: "delegator", type: "address" },
-            ],
-            outputs: [{ type: "uint256" }],
-          },
-        ],
-        functionName: "currentNonce",
-        args: [e.manager, address],
-      });
-      const parent = {
-        delegate: e.agent,
-        delegator: address,
-        authority: toHex(maxUint256, { size: 32 }),
-        salt: toHex(crypto.getRandomValues(new Uint8Array(32))),
-        signature: "0x",
-        caveats: [
-          {
-            enforcer: e.enforcers.periodic,
-            terms: encodePacked(
-              ["address", "uint256", "uint256", "uint256"],
-              [e.token, maxUint256, maxUint256, e.startTime],
-            ),
-            args: "0x",
-          },
-          { enforcer: e.enforcers.redeemer, terms: e.gate, args: "0x" },
-          {
-            enforcer: e.enforcers.timestamp,
-            terms: encodePacked(["uint128", "uint128"], [0n, e.expiry]),
-            args: "0x",
-          },
-          {
-            enforcer: e.enforcers.value,
-            terms: toHex(0n, { size: 32 }),
-            args: "0x",
-          },
-          {
-            enforcer: e.enforcers.nonce,
-            terms: toHex(nonce, { size: 32 }),
-            args: "0x",
-          },
-        ],
-      };
-      parent.signature = await typed(
-        provider,
-        address,
-        config.chainId,
-        delegationTypedData(config.chainId, e.manager, parent),
-      );
-      context = encodeDelegations([parent]);
-    } else {
-      const result = await requestGatePermissions(provider, [e]);
-      context = result.responses[0].context;
-    }
+    const nonce = await publicClient.readContract({
+      address: e.enforcers.nonce,
+      abi: [
+        {
+          type: "function",
+          name: "currentNonce",
+          stateMutability: "view",
+          inputs: [
+            { name: "manager", type: "address" },
+            { name: "delegator", type: "address" },
+          ],
+          outputs: [{ type: "uint256" }],
+        },
+      ],
+      functionName: "currentNonce",
+      args: [e.manager, address],
+    });
+    const parent = {
+      delegate: e.agent,
+      delegator: address,
+      authority: toHex(maxUint256, { size: 32 }),
+      salt: toHex(crypto.getRandomValues(new Uint8Array(32))),
+      signature: "0x",
+      caveats: [
+        {
+          enforcer: e.enforcers.periodic,
+          terms: encodePacked(
+            ["address", "uint256", "uint256", "uint256"],
+            [e.token, maxUint256, maxUint256, e.startTime],
+          ),
+          args: "0x",
+        },
+        { enforcer: e.enforcers.redeemer, terms: e.gate, args: "0x" },
+        {
+          enforcer: e.enforcers.timestamp,
+          terms: encodePacked(["uint128", "uint128"], [0n, e.expiry]),
+          args: "0x",
+        },
+        {
+          enforcer: e.enforcers.value,
+          terms: toHex(0n, { size: 32 }),
+          args: "0x",
+        },
+        {
+          enforcer: e.enforcers.nonce,
+          terms: toHex(nonce, { size: 32 }),
+          args: "0x",
+        },
+      ],
+    };
+    parent.signature = await typed(
+      provider,
+      address,
+      config.chainId,
+      delegationTypedData(config.chainId, e.manager, parent),
+    );
+    context = encodeDelegations([parent]);
   }
   const base = "/api/owner/permissions/drafts/" + draft.id;
   let terms = draft.typedData

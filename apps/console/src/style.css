@@ -1674,5 +1674,28 @@ footer a:hover {
   }
 }
 
-.mobile-brand {display:none}
-@media(max-width:730px){.mobile-brand{display:block}.breadcrumb{display:none}}
+.mobile-brand {
+  display: none;
+}
+@media (max-width: 730px) {
+  .mobile-brand {
+    display: block;
+  }
+  .breadcrumb {
+    display: none;
+  }
+}
+.approved-tasks {
+  display: grid;
+  gap: 12px;
+}
+.approved-task {
+  border: 1px solid var(--border, #dde3d9);
+  border-radius: 16px;
+  padding: 20px;
+  background: white;
+}
+.approved-task .card-actions {
+  margin-top: 12px;
+  flex-wrap: wrap;
+}

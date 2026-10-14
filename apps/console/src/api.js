@@ -32,7 +32,23 @@ const messages = {
   wallet_chain_mismatch: "Polygon Amoyへ切り替えてください。",
   wallet_permission_unsupported:
     "このウォレットではAmoyの委任権限に対応していません。対応するMetaMask拡張、または設定済みのスマートアカウントを使ってください。",
-  wallet_upgrade_required: "このウォレットのスマートアカウント設定が必要です。",
+  wallet_upgrade_required:
+    "ウォレットの設定を確認できませんでした。もう一度登録を進めてください。",
+  wallet_rejected: "ウォレットでの操作をキャンセルしました。",
+  wallet_permission_pending:
+    "MetaMaskに確認待ちの画面があります。そちらで承認またはキャンセルしてください。",
+  wallet_upgrade_unsupported:
+    "このウォレットはAmoyでのアプリからの設定に対応していません。最新版のMetaMask拡張でお試しください。",
+  wallet_implementation_mismatch:
+    "このアカウントには別のスマートアカウント設定があります。既存の設定を確認するか、別のアカウントで接続してください。",
+  wallet_upgrade_confirming:
+    "設定の反映を待っています。時間をおいて同じボタンから再開できます。",
+  wallet_upgrade_request_failed:
+    "ウォレットとの通信を確認できませんでした。MetaMaskの状態を確認し、同じボタンから再開してください。",
+  wallet_upgrade_not_applied:
+    "取引は完了しましたが、必要なウォレット設定を確認できませんでした。MetaMaskのスマートアカウント設定をご確認ください。",
+  wallet_upgrade_failed:
+    "ウォレットの設定取引が完了しませんでした。MetaMaskで結果を確認してから、もう一度お試しください。",
   agent_already_connected:
     "このAIは登録済みです。カードから権限を設定できます。",
   order_proof_preparing:
