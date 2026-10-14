@@ -5,7 +5,7 @@ RUN corepack enable && corepack prepare pnpm@10.7.1 --activate
 WORKDIR /app
 COPY . .
 RUN pnpm install --frozen-lockfile --store-dir /pnpm/store
-RUN pnpm --filter @yours/api... build
+RUN pnpm --filter @yours/api... --filter @yours/worker... build
 
 FROM node:22.14.0-bookworm-slim
 ENV NODE_ENV=production

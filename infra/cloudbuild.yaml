@@ -1,8 +1,11 @@
 steps:
   - name: gcr.io/cloud-builders/docker
     args: ['build', '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/yours/api:${_TAG}', '.']
+  - name: gcr.io/cloud-builders/docker
+    args: ['build', '-f', 'services/mandates/Dockerfile', '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/yours/mandates:${_TAG}', '.']
 images:
   - '${_REGION}-docker.pkg.dev/$PROJECT_ID/yours/api:${_TAG}'
+  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/yours/mandates:${_TAG}'
 options:
   logging: CLOUD_LOGGING_ONLY
 substitutions:
