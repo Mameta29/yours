@@ -38,7 +38,7 @@ async function privatePost(path:string,body:unknown){
 const runtime:SettlementRuntime={client,chainId:80002,gate:manifest.gate,manager:manifest.manager,token:manifest.jpyc,enforcers:manifest.enforcers,merchantId:required('MERCHANT_ID'),payTo:getAddress(required('MERCHANT_PAY_TO')),origin:required('PUBLIC_ORIGIN'),signers,verifyIntent:id=>privatePost('/v1/verify-execution',{intent_id:id}),endorseIntent:id=>privatePost('/v1/endorse-order',{intent_id:id})};
 const app=new Hono();
 app.use('*',bodyLimit({maxSize:4096}));
-app.get('/healthz',c=>c.json({ok:true,service:'yours-worker'}));
+app.get('/health',c=>c.json({ok:true,service:'yours-worker'}));
 // This service has no allUsers invoker binding. Only the scheduler can call it.
 app.post('/run',async c=>{
  let processed=0,pending=0;

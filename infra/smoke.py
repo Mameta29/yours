@@ -11,20 +11,20 @@ results=[]
 for service in ('api','mandates','worker'):
     origin=f'https://yours-{service}-110852561536.asia-northeast1.run.app'
     try:
-        urllib.request.urlopen(origin+'/healthz',timeout=60)
+        urllib.request.urlopen(origin+'/health',timeout=60)
         private=False
     except urllib.error.HTTPError as error:
         private=error.code in (401,403)
-    request=urllib.request.Request(origin+'/healthz',headers={'Authorization':'Bearer '+token})
+    request=urllib.request.Request(origin+'/health',headers={'Authorization':'Bearer '+token})
     with urllib.request.urlopen(request,timeout=90) as response:
         health=json.load(response)
     assert health['ok'] and private
     result={'service':service,'url':origin,'private':private,'health':health}
     if service=='api':
-        for path in ('/readyz','/.well-known/ucp'):
+        for path in ('/ready','/.well-known/ucp'):
             with urllib.request.urlopen(urllib.request.Request(origin+path,headers={'Authorization':'Bearer '+token}),timeout=90) as response:
                 data=json.load(response)
-            if path=='/readyz':
+            if path=='/ready':
                 assert data['ok']
                 result['databaseReady']=True
             else:

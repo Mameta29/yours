@@ -30,7 +30,7 @@ export async function paymentIntegration({root,client,wallet,accounts,manifest,j
  async function privatePost(path,body){const res=await fetch(config.MANDATES_URL+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const value=await res.json();assert.equal(res.status,200,JSON.stringify(value));return value;}
  try{
   for(let i=0;i<100;i++){
-   try{if((await fetch(config.MANDATES_URL+'/healthz')).ok)break;}catch{}
+   try{if((await fetch(config.MANDATES_URL+'/health')).ok)break;}catch{}
    if(authority.exitCode!==null)throw new Error('AP2 process failed: '+stderr);
    if(i===99)throw new Error('AP2 process start timeout');await new Promise(resolve=>setTimeout(resolve,100));
   }

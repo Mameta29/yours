@@ -28,8 +28,8 @@ export function createApp(db:Db,config:Config,signer:P256Signer,chain?:ChainRunt
   console.error(JSON.stringify({severity:'ERROR',event:'request_failed',requestId:c.res.headers.get('X-Request-Id'),error:error instanceof Error?error.name:'unknown'}));
   return c.json({error:'internal_error'},500);
  });
- app.get('/healthz',c=>c.json({ok:true,service:'yours-api'}));
- app.get('/readyz',async c=>{await db.query('SELECT 1');return c.json({ok:true});});
+ app.get('/health',c=>c.json({ok:true,service:'yours-api'}));
+ app.get('/ready',async c=>{await db.query('SELECT 1');return c.json({ok:true});});
  app.get('/api/config',c=>c.json({name:'yours',chainId:config.CHAIN_ID,network:config.CHAIN_ID===80002?'Polygon Amoy':'Local test chain',ucpVersion:UCP_VERSION,merchant:{id:config.MERCHANT_ID,name:config.MERCHANT_NAME},paymentsConfigured:Boolean(chain&&config.MANDATES_URL&&config.GATE_ADDRESS&&config.JPYC_ADDRESS&&config.MERCHANT_PAY_TO),gate:config.GATE_ADDRESS,token:config.JPYC_ADDRESS,geminiConfigured:Boolean(config.AGENT_URL)}));
  app.get('/.well-known/ucp',c=>c.json(profile(config.PUBLIC_ORIGIN,'platform',[signer.publicJwk],{network:'eip155:'+config.CHAIN_ID,asset:config.JPYC_ADDRESS,gate:config.GATE_ADDRESS})));
  app.route('/api/auth',authRoutes(db,config));

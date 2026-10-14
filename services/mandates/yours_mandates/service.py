@@ -106,7 +106,7 @@ def create_app(runtime: Runtime):
         from fastapi.responses import JSONResponse
         return JSONResponse(status_code=422, content={"detail": "mandate_or_consent_invalid"})
 
-    @app.get("/healthz")
+    @app.get("/health")
     def health():
         return {"ok": True, "service": "yours-mandates"}
 
