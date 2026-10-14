@@ -71,18 +71,23 @@ def issue(task: Task, holder_jwk: dict, issuer: Signer, now: int | None = None) 
     return {"open_checkout": open_checkout, "open_payment": issue_open(payment.model_dump(exclude_none=True, mode="json"), issuer)}
 
 
-def present(opens: dict, checkout_jwt: str, checkout: dict, holder: Signer, instrument_id: str, audience: str, nonce: str, now: int | None = None) -> dict:
+def present(opens: dict, checkout_jwt: str, checkout: dict, holder: Signer, instrument_id: str, audience: str, nonce: str, now: int | None = None, expires_at: int | None = None) -> dict:
     now = now or int(time.time())
     total = [row["amount"] for row in checkout["totals"] if row["type"] == "total"]
     if len(total) != 1 or checkout["status"] != "ready_for_complete":
         raise ValueError("Checkout is not ready")
+    # The service supplies the stored owner's expiry. Verification additionally
+    # checks every signed mandate and computes the chain's earliest expiry.
+    expiry = min(now + 600, expires_at or now + 600)
+    if expiry <= now:
+        raise ValueError("Mandate expired")
     reference = hash_b64(checkout_jwt)
-    closed_checkout = CheckoutMandate(checkout_jwt=checkout_jwt, checkout_hash=reference, iat=now, exp=now + 120)
+    closed_checkout = CheckoutMandate(checkout_jwt=checkout_jwt, checkout_hash=reference, iat=now, exp=expiry)
     closed_payment = PaymentMandate.model_validate({
         "transaction_id": reference, "payee": checkout["merchant"],
         "payment_amount": {"currency": checkout["currency"], "amount": total[0]},
         "payment_instrument": {"id": instrument_id, "type": "stablecoin"},
-        "iat": now, "exp": now + 120,
+        "iat": now, "exp": expiry,
     })
     return {
         "checkout_mandate": present_closed(opens["open_checkout"], closed_checkout.model_dump(exclude_none=True, mode="json"), holder, audience, nonce, now),

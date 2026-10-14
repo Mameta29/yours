@@ -77,3 +77,14 @@ def test_one_task_cannot_be_spent_twice(flow):
     *_, args = flow
     with pytest.raises(ValueError, match="occurrence|recurrence|limit|maximum"):
         verify(*args, usage={"total_uses": 1, "total_amount": 1000})
+
+
+def test_presentation_expiry_cannot_extend_owner_mandate(flow):
+    issuer, holder, merchant, _, checkout, args = flow
+    now = int(time.time())
+    task = Task("tea", "Tea store", "JPY", 1500, [{"id":"tea-1","title":"Tea","quantity":2}], "wallet-1", now + 45)
+    opens = issue(task, holder.public_jwk(), issuer, now)
+    args[0] = present(opens, args[1], checkout, holder, "wallet-1", args[4], args[5], now, expires_at=task.expires_at)
+    assert verify(*args)["expires_at"] == task.expires_at
+    with pytest.raises(ValueError, match="expired"):
+        present(opens, args[1], checkout, holder, "wallet-1", args[4], args[5], task.expires_at, expires_at=task.expires_at)

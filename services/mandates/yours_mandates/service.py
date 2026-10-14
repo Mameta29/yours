@@ -156,7 +156,7 @@ def create_app(runtime: Runtime):
             mandate, checkout, usage = load_checkout(db, request)
             if mandate["provider"] != "gemini":
                 error("external_agent_must_sign_its_own_presentation", 403)
-            tokens = present(mandate, request.checkout_jwt, checkout, runtime.holder, mandate["task"]["instrument_id"], checkout["yours"]["audience"], checkout["yours"]["nonce"])
+            tokens = present(mandate, request.checkout_jwt, checkout, runtime.holder, mandate["task"]["instrument_id"], checkout["yours"]["audience"], checkout["yours"]["nonce"], expires_at=int(mandate["expires_at"].timestamp()))
             # An authenticated caller still cannot ask the holder to accept an
             # altered/out-of-scope merchant checkout. Verify before returning.
             verify(tokens, request.checkout_jwt, runtime.issuer.public_jwk(), runtime.merchant_jwk, checkout["yours"]["audience"], checkout["yours"]["nonce"], mandate["task"]["instrument_id"], usage)
