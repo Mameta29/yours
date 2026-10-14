@@ -1,0 +1,17 @@
+[project]
+name = "yours-mandates"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+  "ap2 @ git+https://github.com/google-agentic-commerce/AP2.git@e1ea56db72a6385bce3e5c1112b3a56ce60acb43",
+  "fastapi>=0.115,<1",
+  "uvicorn>=0.34,<1",
+  "google-cloud-kms>=3.7,<4",
+  "eth-account>=0.13,<0.14",
+  "psycopg[binary,pool]>=3.2,<4",
+]
+[dependency-groups]
+dev = ["pytest>=9,<10","httpx>=0.28,<1"]
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
