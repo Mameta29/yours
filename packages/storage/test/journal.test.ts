@@ -1,8 +1,11 @@
 import {beforeAll,afterAll,it,expect} from 'vitest';
 import {randomUUID,randomBytes} from 'node:crypto';
+import {generatePrivateKey,privateKeyToAccount} from 'viem/accounts';
+import {keccak256,type Address} from 'viem';
 import {createDb,migrate,claimTransaction,saveSignedTransaction,markBroadcast,recordChainReceipt} from '../src/index.js';
 const db=createDb(process.env.TEST_DATABASE_URL??'postgresql://localhost/yours_test');
-const account=randomUUID(),connection=randomUUID(),intent=randomUUID(),signer='0x'+randomBytes(20).toString('hex');
+const wallet=privateKeyToAccount(generatePrivateKey());
+const account=randomUUID(),connection=randomUUID(),intent=randomUUID(),signer=wallet.address;
 beforeAll(async()=>{
  await migrate(db);
  await db.query('INSERT INTO accounts(id,address,chain_id) VALUES($1,$2,80002)',[account,'0x'+randomBytes(20).toString('hex')]);
@@ -10,15 +13,20 @@ beforeAll(async()=>{
  await db.query("INSERT INTO intents(id,account_id,connection_id,merchant_id,checkout_id,revision,currency,amount_minor,amount_atomic,period_index,state,snapshot,snapshot_hash,expires_at) VALUES($1,$2,$3,'test',$4,'1','JPY',1,1,0,'authorized','{}','test',now()+interval '1 hour')",[intent,account,connection,randomUUID()]);
 });afterAll(()=>db.end());
 it('persists one nonce and one winning signed payload across a signing crash',async()=>{
- const input={intentId:intent,chainId:80002,signer,pendingNonce:7,unsigned:{to:signer,data:'0x1234'}};
+ const unsigned={type:'eip1559' as const,to:signer as Address,data:'0x1234' as const,gas:50000n,value:0n,maxFeePerGas:30000000000n,maxPriorityFeePerGas:1000000000n};
+ const raw=await wallet.signTransaction({...unsigned,nonce:7,chainId:80002}),hash=keccak256(raw);
+ const input={intentId:intent,chainId:80002,signer,pendingNonce:7,unsigned:JSON.parse(JSON.stringify(unsigned,(_key,value)=>typeof value==='bigint'?value.toString():value))};
  const first=await claimTransaction(db,input);expect(first.nonce).toBe('7');
  await expect(claimTransaction(db,input)).rejects.toThrow('transaction_busy');
  await db.query("UPDATE signed_transactions SET lease_until=now()-interval '1 second' WHERE id=$1",[first.id]);
  const second=await claimTransaction(db,{...input,pendingNonce:99});
  expect(second.nonce).toBe('7');expect(second.id).toBe(first.id);
- await expect(saveSignedTransaction(db,first,'0x1234','0x'+'ab'.repeat(32))).rejects.toThrow('lost_transaction_lease');
- await saveSignedTransaction(db,second,'0x5678','0x'+'cd'.repeat(32));
- const retry=await claimTransaction(db,input);expect(retry.raw_transaction).toBe('0x5678');expect(retry.nonce).toBe('7');
+ await expect(saveSignedTransaction(db,first,raw,hash)).rejects.toThrow('lost_transaction_lease');
+ const changed=await wallet.signTransaction({...unsigned,nonce:7,chainId:80002,value:1n});
+ await expect(saveSignedTransaction(db,second,changed,keccak256(changed))).rejects.toThrow('signed_transaction_mismatch');
+ await expect(saveSignedTransaction(db,second,raw,keccak256(changed))).rejects.toThrow('invalid_signed_transaction');
+ await saveSignedTransaction(db,second,raw,hash);
+ const retry=await claimTransaction(db,input);expect(retry.raw_transaction).toBe(raw);expect(retry.nonce).toBe('7');
  await markBroadcast(db,retry.id);await markBroadcast(db,retry.id);
  const receipt={transactionHash:retry.transaction_hash,blockNumber:'10',blockHash:'0x'+'ef'.repeat(32)};
  await recordChainReceipt(db,retry.id,receipt,true);

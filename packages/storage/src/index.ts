@@ -4,7 +4,7 @@ import {DomainError,digest} from '@yours/domain';
 export type Db = pg.Pool;
 export type Tx = pg.PoolClient;
 export function createDb(url:string):Db {
- return new pg.Pool({connectionString:url,max:10,connectionTimeoutMillis:5000,idleTimeoutMillis:30000,
+ return new pg.Pool({connectionString:url,max:4,connectionTimeoutMillis:5000,idleTimeoutMillis:30000,
   application_name:'yours',options:'-c statement_timeout=15000 -c idle_in_transaction_session_timeout=15000'});
 }
 export async function transaction<T>(db:Db,fn:(tx:Tx)=>Promise<T>):Promise<T>{
@@ -15,7 +15,8 @@ export async function transaction<T>(db:Db,fn:(tx:Tx)=>Promise<T>):Promise<T>{
 export async function audit(tx:Tx,accountId:string|null,actor:string,action:string,resourceId:string,data:unknown={}){
  await tx.query('INSERT INTO audit_events(account_id,actor,action,resource_id,data) VALUES($1,$2,$3,$4,$5)',[accountId,actor,action,resourceId,JSON.stringify(data)]);
 }
-/** The callback must perform database operations only. External work uses the outbox. */
+/** No external side effects in this transaction. Bounded signing of a response
+ * is allowed; payments and delivery always use the outbox after commit. */
 export async function idempotent<T>(db:Db,scope:string,key:string,request:unknown,fn:(tx:Tx)=>Promise<{status:number;body:T}>):Promise<{status:number;body:T}>{
  if(!/^[A-Za-z0-9._:-]{8,128}$/.test(key)) throw new DomainError('invalid_idempotency_key');
  return transaction(db,async tx=>{
