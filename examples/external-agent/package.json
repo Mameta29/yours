@@ -1,0 +1,1 @@
+{"name":"@yours/external-agent-example","version":"0.1.0","private":true,"type":"module","scripts":{"init":"node client.mjs init","tasks":"node client.mjs tasks","run":"node client.mjs run"},"dependencies":{"@yours/wallet-sdk":"workspace:*","@yours/ucp":"workspace:*","viem":"2.56.9"}}

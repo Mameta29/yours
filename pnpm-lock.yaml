@@ -49,6 +49,18 @@ importers:
         specifier: ^7.3.0
         version: 7.3.7(@types/node@22.20.5)(tsx@4.23.15)
 
+  examples/external-agent:
+    dependencies:
+      '@yours/ucp':
+        specifier: workspace:*
+        version: link:../../packages/ucp
+      '@yours/wallet-sdk':
+        specifier: workspace:*
+        version: link:../../packages/wallet-sdk
+      viem:
+        specifier: 2.56.9
+        version: 2.56.9(typescript@5.9.3)(zod@3.25.76)
+
   packages/contracts:
     devDependencies:
       '@openzeppelin/contracts':
