@@ -1,0 +1,16 @@
+import {serve} from '@hono/node-server';
+import {serveStatic} from '@hono/node-server/serve-static';
+import {createDb} from '@yours/storage';
+import {kmsP256Signer,localP256Signer} from '@yours/signing';
+import {readConfig} from './config.js';
+import {createApp} from './app.js';
+const config=readConfig();
+const db=createDb(config.DATABASE_URL);
+const signer=config.UCP_SIGNING_KEY?await kmsP256Signer(config.UCP_SIGNING_KEY,'yours-ucp-1'):await localP256Signer(config.LOCAL_KEY_DIR+'/merchant.pem','yours-ucp-1');
+const app=createApp(db,config,signer);
+app.use('/*',serveStatic({root:'apps/console/dist'}));
+app.get('*',serveStatic({path:'apps/console/dist/index.html'}));
+const server=serve({fetch:app.fetch,port:config.PORT,hostname:'0.0.0.0'});
+const shutdown=()=>{server.close(()=>{void db.end().then(()=>process.exit(0));});setTimeout(()=>process.exit(1),10000).unref();};
+process.on('SIGTERM',shutdown);process.on('SIGINT',shutdown);
+console.log(JSON.stringify({severity:'INFO',event:'listening',port:config.PORT}));

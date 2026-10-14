@@ -58,3 +58,4 @@ export async function acceptWebhook(db:Db,source:string,eventId:string,payload:u
  });
 }
 export * from './migrations.js';
+export * from './authority.js';
