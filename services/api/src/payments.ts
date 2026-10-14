@@ -1,3 +1,4 @@
+import {merchantFor} from './merchants.js';
 import {Hono} from 'hono';
 import {z} from 'zod';
 import {DomainError,digest} from '@yours/domain';
@@ -40,9 +41,14 @@ export function paymentRoutes(router:Hono<any>,db:Db,config:Config,signer:P256Si
    if(instrument.id!==mandate.task.instrument_id||verified.payment.payment_instrument.id!==instrument.id)throw new DomainError('instrument_mismatch',422);
    if((await tx.query('SELECT 1 FROM mandate_consumptions WHERE mandate_id=$1',[mandateId])).rowCount)throw new DomainError('mandate_already_used',409);
    const doc=current.document,total=doc.totals.find((t:any)=>t.type==='total')?.amount;
-   if(doc.merchant.id!==config.MERCHANT_ID||doc.yours.pay_to.toLowerCase()!==config.MERCHANT_PAY_TO!.toLowerCase()||doc.yours.asset.toLowerCase()!==config.JPYC_ADDRESS!.toLowerCase()||verified.payment.payment_amount.amount!==total||verified.payment.payment_amount.currency!==doc.currency)throw new DomainError('settlement_binding_mismatch',422);
+   const merchant=merchantFor(config,current.merchant_id);
+   if(doc.merchant.id!==merchant.id||doc.yours.pay_to.toLowerCase()!==merchant.payTo.toLowerCase()||doc.yours.asset.toLowerCase()!==config.JPYC_ADDRESS!.toLowerCase()||verified.payment.payment_amount.amount!==total||verified.payment.payment_amount.currency!==doc.currency)throw new DomainError('settlement_binding_mismatch',422);
+   if(merchant.adapter==='jpyc-ec'){
+    const {rows:[reservation]}=await tx.query('SELECT * FROM ec_reservations WHERE checkout_id=$1 AND account_id=$2 AND connection_id=$3',[id,actor.accountId,actor.connectionId]);
+    if(!reservation?.authorized_at||reservation.quote.expiresAt<=Date.now()||mandate.task.checkout_id!==id||doc.yours.ec?.requirements_hash!==reservation.quote.requirementsHash)throw new DomainError('ec_reservation_binding_mismatch',409);
+   }
    const expires=Math.min(verified.expires_at,Math.floor(new Date(current.expires_at).getTime()/1000),Math.floor(new Date(mandate.expires_at).getTime()/1000));
-   const intent=await preparePurchaseTx(tx,actor.connectionId,{merchantId:config.MERCHANT_ID,checkoutId:id,revision:String(current.revision),currency:doc.currency,amountMinor:total,payTo:config.MERCHANT_PAY_TO! as `0x${string}`,expiresAt:expires,snapshot:{checkout:doc,checkoutJwt:jwt,mandates:body.ap2,mandateId,instrumentId:instrument.id}});
+   const intent=await preparePurchaseTx(tx,actor.connectionId,{merchantId:merchant.id,checkoutId:id,revision:String(current.revision),currency:doc.currency,amountMinor:total,payTo:merchant.payTo as `0x${string}`,expiresAt:expires,snapshot:{checkout:doc,checkoutJwt:jwt,mandates:body.ap2,mandateId,instrumentId:instrument.id}});
    await tx.query('INSERT INTO mandate_consumptions(mandate_id,intent_id,checkout_id,amount_minor,verified) VALUES($1,$2,$3,$4,$5)',[mandateId,intent.id,id,total,JSON.stringify(verified)]);
    // Keep stock held until settlement is resolved, even past checkout expiry.
    const document={...doc,status:'complete_in_progress',yours:{...doc.yours,revision:current.revision+1,intent_id:intent.id,payment_status:intent.state}};

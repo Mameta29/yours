@@ -101,3 +101,28 @@ def test_presentation_is_bound_to_stored_checkout_and_issued_mandates(setup):
     changed = {**request, "checkout_jwt": sign_jwt(checkout, setup["merchant"], "JWT")}
     assert setup["client"].post("/v1/present", json=changed).status_code == 422
     assert setup["client"].post("/v1/receipts", json={"intent_id": str(uuid.uuid4())}).status_code == 409
+
+
+def test_reserved_ec_task_requires_matching_authorized_reservation(setup):
+    checkout_id, reservation_id = uuid.uuid4(), uuid.uuid4()
+    commitment = "ab" * 32
+    task = {**setup["task"], "checkout_id": str(checkout_id), "requirements_hash": commitment}
+    checkout = {"id": str(checkout_id), "merchant": {"id": task["merchant_id"]},
+                "yours": {"pay_to": GATE, "ec": {"reservation_id": "res_" + "c" * 32, "requirements_hash": commitment}}}
+    quote = {"reservationId": "res_" + "c" * 32, "expiresAt": int(time.time() * 1000) + 600000,
+             "requirementsHash": commitment, "amountMinor": 1000, "accepted": {"payTo": GATE}}
+    with setup["pool"].connection() as db:
+        db.execute("UPDATE task_consents SET task=%s,task_hash=%s WHERE id=%s", (Jsonb(task), task_hash(task), setup["consent"]))
+        db.execute("INSERT INTO merchant_sessions(id,merchant_id,kind,actor,platform_profile,ap2_required,status,document,expires_at) VALUES(%s,%s,'checkout',%s,'https://merchant.example/.well-known/ucp',true,'ready_for_complete',%s,now()+interval '10 minutes')", (checkout_id, task["merchant_id"], "agent:" + str(setup["connection"]), Jsonb(checkout)))
+        db.execute("INSERT INTO ec_reservations(id,account_id,connection_id,merchant_id,request_hash,consent_id,checkout_id,quote) VALUES(%s,%s,%s,%s,'test',%s,%s,%s)", (reservation_id, setup["owner"], setup["connection"], task["merchant_id"], setup["consent"], checkout_id, Jsonb(quote)))
+    setup["data"]["message"]["taskHash"] = "0x" + task_hash(task)
+    signature = "0x" + Account.sign_message(encode_typed_data(full_message=setup["data"]), setup["wallet"].key).signature.hex()
+    assert issue(setup, signature).status_code == 403
+    with setup["pool"].connection() as db:
+        quote["requirementsHash"] = "cd" * 32
+        db.execute("UPDATE ec_reservations SET authorized_at=now(),signature_hash='verified-in-fixture',quote=%s WHERE id=%s", (Jsonb(quote), reservation_id))
+    assert issue(setup, signature).status_code == 422
+    with setup["pool"].connection() as db:
+        quote["requirementsHash"] = commitment
+        db.execute("UPDATE ec_reservations SET quote=%s WHERE id=%s", (Jsonb(quote), reservation_id))
+    assert issue(setup, signature).status_code == 200

@@ -93,8 +93,25 @@ def load_checkout(db, request: CheckoutRequest):
     expected = {key: value for key, value in checkout["document"].items() if key != "ap2"}
     if payload != expected:
         error("checkout_jwt_mismatch")
+    verify_ec_binding(db, mandate["task"], checkout["document"], mandate["account_id"], mandate["connection_id"])
     usage = db.execute("SELECT count(*)::int AS total_uses,coalesce(sum(amount_minor),0)::bigint AS total_amount FROM mandate_consumptions WHERE mandate_id=%s", (request.mandate_id,)).fetchone()
     return mandate, checkout["document"], usage
+
+
+def verify_ec_binding(db, task, checkout, account_id, connection_id):
+    """The legacy owner's reservation proof is separate from AP2 consent."""
+    reserved = task.get("checkout_id")
+    external = checkout.get("yours", {}).get("ec")
+    if not reserved and not external:
+        return
+    if not reserved or reserved != checkout["id"] or not external:
+        error("ec_checkout_mismatch")
+    row = db.execute("SELECT * FROM ec_reservations WHERE checkout_id=%s AND account_id=%s AND connection_id=%s", (reserved, account_id, connection_id)).fetchone()
+    if not row or not row["authorized_at"] or row["quote"]["expiresAt"] <= time.time() * 1000:
+        error("ec_owner_authorization_required", 403)
+    quote = row["quote"]
+    if task.get("requirements_hash") != quote["requirementsHash"] or external.get("reservation_id") != quote["reservationId"] or external.get("requirements_hash") != quote["requirementsHash"] or checkout["merchant"]["id"] != row["merchant_id"] or checkout["yours"]["pay_to"].lower() != quote["accepted"]["payTo"].lower() or task["max_amount"] != quote["amountMinor"]:
+        error("ec_reservation_binding_mismatch")
 
 
 def create_app(runtime: Runtime):
@@ -131,6 +148,11 @@ def create_app(runtime: Runtime):
                 error("permission_inactive", 403)
             verify_consent(row, request.signature, runtime.chain_id, runtime.gate, int(time.time()))
             task = Task(**row["task"])
+            if task.checkout_id:
+                reserved = db.execute("SELECT document FROM merchant_sessions WHERE id=%s", (task.checkout_id,)).fetchone()
+                if not reserved:
+                    error("ec_checkout_not_found", 404)
+                verify_ec_binding(db, row["task"], reserved["document"], row["account_id"], row["connection_id"])
             # The signed task is also bound to this owner's specific instrument.
             expected = f"yours:{runtime.chain_id}:{row['address']}:{row['connection_id']}"
             if task.instrument_id != expected:
@@ -182,7 +204,7 @@ def create_app(runtime: Runtime):
     @app.post("/v1/verify-execution")
     def verify_execution_route(request: ReceiptRequest):
         with runtime.db.connection() as db:
-            row = db.execute("SELECT i.*,m.open_checkout,m.open_payment,m.revoked_at,m.expires_at AS mandate_expires,c.status FROM intents i JOIN mandate_consumptions mc ON mc.intent_id=i.id JOIN mandates m ON m.id=mc.mandate_id JOIN connections c ON c.id=i.connection_id WHERE i.id=%s", (request.intent_id,)).fetchone()
+            row = db.execute("SELECT i.*,m.task,m.open_checkout,m.open_payment,m.revoked_at,m.expires_at AS mandate_expires,c.status FROM intents i JOIN mandate_consumptions mc ON mc.intent_id=i.id JOIN mandates m ON m.id=mc.mandate_id JOIN connections c ON c.id=i.connection_id WHERE i.id=%s", (request.intent_id,)).fetchone()
             if not row or row["state"] not in ("authorized", "approval_required") or row["status"] != "active" or row["revoked_at"] or min(row["expires_at"].timestamp(), row["mandate_expires"].timestamp()) <= time.time():
                 error("execution_not_authorized", 403)
             snapshot = row["snapshot"]
@@ -191,6 +213,7 @@ def create_app(runtime: Runtime):
                 if tokens.get(kind + "_mandate", "").split("~~")[0].rstrip("~") != row["open_" + kind].rstrip("~"):
                     error("mandate_authority_mismatch")
             checkout = snapshot["checkout"]
+            verify_ec_binding(db, row["task"], checkout, row["account_id"], row["connection_id"])
             return verify(tokens, snapshot["checkoutJwt"], runtime.issuer.public_jwk(), runtime.merchant_jwk, checkout["yours"]["audience"], checkout["yours"]["nonce"], snapshot["instrumentId"], {"total_uses": 0, "total_amount": 0})
 
     def approval_target(db, approval_id):

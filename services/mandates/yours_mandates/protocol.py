@@ -25,8 +25,17 @@ class Task:
     items: list[dict]
     instrument_id: str
     expires_at: int
+    checkout_id: str | None = None
+    requirements_hash: str | None = None
 
     def validate(self, now: int):
+        if self.checkout_id is not None:
+            import uuid
+            import re
+            if not self.requirements_hash or not re.fullmatch(r"[0-9a-f]{64}", self.requirements_hash):
+                raise ValueError("Missing reservation commitment")
+            if str(uuid.UUID(self.checkout_id)) != self.checkout_id:
+                raise ValueError("Invalid reserved checkout")
         if self.currency not in ("JPY", "USD") or type(self.max_amount) is not int or not 0 < self.max_amount <= 9007199254740991:
             raise ValueError("Invalid ISO minor-unit budget")
         if not self.merchant_id or not self.merchant_name or not self.instrument_id or not now < self.expires_at <= now + 86400:

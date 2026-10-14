@@ -12,6 +12,7 @@ import type {Config} from './config.js';
 import {authRoutes,authenticate,owner,type Env} from './auth.js';
 import {merchantRoutes} from './merchant.js';
 import {taskRoutes} from './tasks.js';
+import {merchants} from './merchants.js';
 import {permissionRoutes} from './permissions.js';
 import {agentRoutes} from './agents.js';
 import {approvalRoutes} from './approvals.js';
@@ -51,7 +52,7 @@ export function createApp(db:Db,config:Config,signer:P256Signer,chain?:ChainRunt
  app.route('/',webhookRoutes(db,config,signer));
  app.get('/health',c=>c.json({ok:true,service:'yours-api'}));
  app.get('/ready',async c=>{await db.query('SELECT 1');return c.json({ok:true});});
- app.get('/api/config',c=>c.json({name:'yours',origin:config.PUBLIC_ORIGIN,chainId:config.CHAIN_ID,network:config.CHAIN_ID===80002?'Polygon Amoy':'Local test chain',ucpVersion:UCP_VERSION,merchant:{id:config.MERCHANT_ID,name:config.MERCHANT_NAME},paymentsConfigured:Boolean(chain&&config.MANDATES_URL&&config.GATE_ADDRESS&&config.JPYC_ADDRESS&&config.MERCHANT_PAY_TO),gate:config.GATE_ADDRESS,token:config.JPYC_ADDRESS,geminiConfigured:Boolean(config.AGENT_URL)}));
+ app.get('/api/config',c=>c.json({name:'yours',origin:config.PUBLIC_ORIGIN,chainId:config.CHAIN_ID,network:config.CHAIN_ID===80002?'Polygon Amoy':'Local test chain',ucpVersion:UCP_VERSION,merchant:{id:config.MERCHANT_ID,name:config.MERCHANT_NAME},merchants:merchants(config),paymentsConfigured:Boolean(chain&&config.MANDATES_URL&&config.GATE_ADDRESS&&config.JPYC_ADDRESS&&config.MERCHANT_PAY_TO),gate:config.GATE_ADDRESS,token:config.JPYC_ADDRESS,geminiConfigured:Boolean(config.AGENT_URL)}));
  for(const path of ['/.well-known/ucp','/profiles/platform'])app.get(path,c=>{
   const document=profile(config.PUBLIC_ORIGIN,'platform',[signer.publicJwk],{network:'eip155:'+config.CHAIN_ID,asset:config.JPYC_ADDRESS,gate:config.GATE_ADDRESS});
   c.header('Cache-Control','public, max-age=300');c.header('ETag','"'+sha256(JSON.stringify(document))+'"');return c.json(document);
@@ -62,7 +63,7 @@ export function createApp(db:Db,config:Config,signer:P256Signer,chain?:ChainRunt
  app.route('/api/agent',agentRoutes(db,config,signer,chain));
  app.use('/api/owner/*',async(c,next)=>{c.set('actor',await authenticate(c,db,config));owner(c);await next();});
  app.route('/api/owner/purchases',purchaseRoutes(db,config));
- app.route('/api/owner/tasks',taskRoutes(db,config));
+ app.route('/api/owner/tasks',taskRoutes(db,config,signer));
  app.route('/api/owner/approvals',approvalRoutes(db,config));
  app.route('/api/owner/runs',runRoutes(db,config));
  if(chain)app.route('/api/owner/permissions',permissionRoutes(db,config,chain));
@@ -70,7 +71,7 @@ export function createApp(db:Db,config:Config,signer:P256Signer,chain?:ChainRunt
   const actor=owner(c);
   const {rows:connections}=await db.query('SELECT c.id,c.name,c.provider,c.agent_address,c.status,c.created_at,(SELECT CASE WHEN d.completed_at IS NULL AND (d.document->>\'controlRevision\')::integer=c.control_revision THEN d.id ELSE NULL END FROM permission_drafts d WHERE d.connection_id=c.id ORDER BY d.created_at DESC LIMIT 1) AS pending_draft,p.document AS permission,p.status AS permission_status FROM connections c LEFT JOIN permissions p ON p.connection_id=c.id WHERE c.account_id=$1 ORDER BY c.created_at',[actor.accountId]);
   const {rows:[policy]}=await db.query('SELECT document,gate_address,token_address,currency,activation_tx FROM policies WHERE account_id=$1',[actor.accountId]);
-  const {rows:intents}=await db.query('SELECT id,connection_id,merchant_id,currency,amount_minor,amount_atomic,state,reasons,transaction_hash,created_at FROM intents WHERE account_id=$1 ORDER BY created_at DESC LIMIT 50',[actor.accountId]);
+  const {rows:intents}=await db.query("SELECT id,connection_id,merchant_id,snapshot->'checkout'->'merchant'->>'name' AS merchant_name,currency,amount_minor,amount_atomic,state,reasons,transaction_hash,created_at FROM intents WHERE account_id=$1 ORDER BY created_at DESC LIMIT 50",[actor.accountId]);
   const usage=policy?await transaction(db,tx=>budgetUsage(tx,actor.accountId,connections[0]?.id??'00000000-0000-0000-0000-000000000000',periodIndex(policy.document,Math.floor(Date.now()/1000)))):null;
   return c.json({account:{id:actor.accountId,address:actor.address,chainId:config.CHAIN_ID},connections,policy:policy??null,intents,usage});
  });

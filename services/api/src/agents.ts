@@ -15,7 +15,7 @@ export function agentRoutes(db:Db,config:Config,signer:P256Signer,chain?:ChainRu
  router.use('*',async(c,next)=>{const actor=await authenticate(c,db,config);if(actor.kind!=='agent')throw new DomainError('agent_required',403);c.set('actor',actor);await next();});
  router.get('/tasks',async c=>{
   const actor=c.get('actor');if(actor.kind!=='agent')throw new DomainError('agent_required',403);
-  const {rows}=await db.query('SELECT m.id,m.task,m.expires_at,mc.intent_id,i.state FROM mandates m LEFT JOIN mandate_consumptions mc ON mc.mandate_id=m.id LEFT JOIN intents i ON i.id=mc.intent_id WHERE m.connection_id=$1 AND m.revoked_at IS NULL AND m.expires_at>now() AND ($2::uuid IS NULL OR m.id=$2) ORDER BY m.created_at DESC LIMIT 20',[actor.connectionId,actor.mandateId??null]);return c.json({tasks:rows});
+  const {rows}=await db.query("SELECT m.id,m.task,m.expires_at,mc.intent_id,i.state,s.platform_profile AS checkout_profile FROM mandates m LEFT JOIN mandate_consumptions mc ON mc.mandate_id=m.id LEFT JOIN intents i ON i.id=mc.intent_id LEFT JOIN merchant_sessions s ON s.id::text=m.task->>'checkout_id' WHERE m.connection_id=$1 AND m.revoked_at IS NULL AND m.expires_at>now() AND ($2::uuid IS NULL OR m.id=$2) ORDER BY m.created_at DESC LIMIT 20",[actor.connectionId,actor.mandateId??null]);return c.json({tasks:rows});
  });
  router.post('/present',async c=>{
   const actor=c.get('actor');if(actor.kind!=='agent')throw new DomainError('agent_required',403);

@@ -8,19 +8,24 @@ import {consentDomain,taskConsentTypes} from '@yours/wallet-sdk';
 import {owner,type Env} from './auth.js';
 import type {Config} from './config.js';
 import {internalPost} from './internal.js';
+import type {P256Signer} from '@yours/signing';
+import {merchantFor} from './merchants.js';
+import {prepareEcCheckout,authorizeEcCheckout} from './ec-checkout.js';
 
 const taskRequest=z.object({
  connectionId:z.string().uuid(),merchantId:z.string().min(1),
  items:z.array(z.object({id:z.string().min(1).max(256),quantity:z.number().int().min(1).max(10000)}).strict()).min(1).max(50),
+ requestId:z.string().uuid().optional(),email:z.string().email().max(254).optional(),
  maxAmount:z.number().int().positive().safe(),minutes:z.number().int().min(5).max(1440).default(60),
 }).strict();
 
-export function taskRoutes(db:Db,config:Config){
+export function taskRoutes(db:Db,config:Config,signer:P256Signer){
  const router=new Hono<Env>();
  router.post('/prepare',async c=>{
   const actor=owner(c),request=taskRequest.parse(await c.req.json());
   if(!config.GATE_ADDRESS||!config.MANDATES_URL)throw new DomainError('payments_not_configured',503);
-  if(request.merchantId!==config.MERCHANT_ID)throw new DomainError('merchant_not_enrolled',422);
+  const merchant=merchantFor(config,request.merchantId);
+  if(merchant.adapter==='jpyc-ec')return c.json(await prepareEcCheckout(db,config,signer,actor,request),201);
   const ids=request.items.map(i=>i.id);
   if(new Set(ids).size!==ids.length)throw new DomainError('duplicate_line_item',422);
   const result=await transaction(db,async tx=>{
@@ -51,9 +56,10 @@ export function taskRoutes(db:Db,config:Config){
  });
  router.post('/:id/approve',async c=>{
   const actor=owner(c),id=z.string().uuid().parse(c.req.param('id'));
-  const request=z.object({signature:z.string().regex(/^0x[0-9a-fA-F]{130}$/)}).strict().parse(await c.req.json());
+  const request=z.object({signature:z.string().regex(/^0x[0-9a-fA-F]{130}$/),transferSignature:z.string().regex(/^0x[0-9a-fA-F]{130}$/).optional()}).strict().parse(await c.req.json());
   const {rows:[row]}=await db.query('SELECT id FROM task_consents WHERE id=$1 AND account_id=$2',[id,actor.accountId]);
   if(!row)throw new DomainError('task_not_found',404);
+  await authorizeEcCheckout(db,config,signer,actor,id,request.transferSignature);
   const issued=await internalPost<{id:string;open_checkout:string;open_payment:string}>(config,config.MANDATES_URL,'/v1/issue',{consent_id:id,signature:request.signature});
   return c.json({id:issued.id,status:'authorized'});
  });
