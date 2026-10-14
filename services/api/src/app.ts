@@ -10,6 +10,7 @@ import type {P256Signer} from '@yours/signing';
 import type {Config} from './config.js';
 import {authRoutes,authenticate,owner,type Env} from './auth.js';
 import {merchantRoutes} from './merchant.js';
+import {taskRoutes} from './tasks.js';
 
 export function createApp(db:Db,config:Config,signer:P256Signer){
  const app=new Hono<Env>();
@@ -30,6 +31,7 @@ export function createApp(db:Db,config:Config,signer:P256Signer){
  app.route('/api/auth',authRoutes(db,config));
  app.route('/ucp',merchantRoutes(db,config,signer));
  app.use('/api/owner/*',async(c,next)=>{c.set('actor',await authenticate(c,db,config));owner(c);await next();});
+ app.route('/api/owner/tasks',taskRoutes(db,config));
  app.get('/api/owner/me',async c=>{
   const actor=owner(c);
   const {rows:connections}=await db.query('SELECT c.id,c.name,c.provider,c.agent_address,c.status,c.created_at,p.document AS permission,p.status AS permission_status FROM connections c LEFT JOIN permissions p ON p.connection_id=c.id WHERE c.account_id=$1 ORDER BY c.created_at',[actor.accountId]);
