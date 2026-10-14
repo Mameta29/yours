@@ -12,6 +12,7 @@ import tempfile
 parser = argparse.ArgumentParser()
 parser.add_argument('--tag', required=True)
 parser.add_argument('--migrate-only', action='store_true')
+parser.add_argument('--public', action='store_true', help='Expose only the API/console; all private services retain IAM')
 args = parser.parse_args()
 project, region = 'yours-511602', 'asia-northeast1'
 number = '110852561536'
@@ -49,12 +50,19 @@ services = {
         'HUMAN_KEY': key + 'human/cryptoKeyVersions/1',
         'MERCHANT_PUBLIC_JWK': json.dumps(manifest['merchantPublicJwk']),
     },
+    'agent': {
+        'ENVIRONMENT': 'production', 'GOOGLE_GENAI_USE_VERTEXAI': 'true',
+        'GOOGLE_CLOUD_PROJECT': project, 'GOOGLE_CLOUD_LOCATION': 'global',
+        'GEMINI_MODEL': 'gemini-3.8-flash', 'YOURS_API_ORIGIN': origin,
+    },
     'api': {
         'NODE_ENV': 'production', **common,
         'RPC_URL': 'https://polygon-amoy-bor-rpc.publicnode.com',
         'JPYC_ADDRESS': manifest['jpyc'], 'AGENT_ADDRESS': manifest['addresses']['agent'],
         'MERCHANT_ID': 'yours-lab', 'MERCHANT_NAME': 'yours Market',
         'MERCHANT_PAY_TO': manifest['addresses']['merchant'],
+        'AGENT_URL': f'https://yours-agent-{number}.{region}.run.app',
+        'WORKER_URL': f'https://yours-worker-{number}.{region}.run.app',
         'UCP_SIGNING_KEY': key + 'ucp-merchant/cryptoKeyVersions/1', 'MANDATES_URL': mandates_url,
     },
     'worker': {
@@ -69,13 +77,13 @@ for service, values in services.items():
     env = env_file(values)
     try:
         arguments = ['run', 'deploy', 'yours-' + service,
-            '--image=' + base + ('mandates' if service == 'mandates' else 'api') + ':' + args.tag,
+            '--image=' + base + (service if service in ('mandates','agent') else 'api') + ':' + args.tag,
             '--service-account=yours-' + service + '@' + project + '.iam.gserviceaccount.com',
-            '--add-cloudsql-instances=' + project + ':' + region + ':yours-db',
-            '--set-secrets=DATABASE_URL=yours-db-runtime:latest',
-            '--env-vars-file=' + str(env), '--no-allow-unauthenticated',
-            '--min-instances=0', '--max-instances=1', '--concurrency=8' if service == 'api' else '--concurrency=1',
-            '--cpu=1', '--memory=512Mi', '--timeout=180', '--quiet']
+            '--env-vars-file=' + str(env), '--allow-unauthenticated' if service=='api' and args.public else '--no-allow-unauthenticated',
+            '--min-instances=0', '--max-instances=2' if service=='api' else '--max-instances=1', '--concurrency=40' if service=='api' else '--concurrency=4' if service=='agent' else '--concurrency=1',
+            '--cpu=1', '--memory=1Gi' if service=='agent' else '--memory=512Mi', '--timeout=180', '--quiet']
+        if service != 'agent':
+            arguments += ['--add-cloudsql-instances=' + project + ':' + region + ':yours-db', '--set-secrets=DATABASE_URL=yours-db-runtime:latest']
         if service == 'worker':
             arguments += ['--command=node', '--args=services/worker/dist/server.js']
         gcloud(*arguments)
@@ -83,6 +91,6 @@ for service, values in services.items():
         env.unlink()
     print(json.dumps({'service': service, 'url': gcloud('run', 'services', 'describe', 'yours-' + service, '--format=value(status.url)', capture=True)}))
 
-for source, target in [('api','mandates'), ('worker','mandates'), ('scheduler','worker')]:
+for source, target in [('api','mandates'), ('api','agent'), ('api','worker'), ('worker','mandates'), ('scheduler','worker')]:
     gcloud('run', 'services', 'add-iam-policy-binding', 'yours-' + target,
         '--member=serviceAccount:yours-' + source + '@' + project + '.iam.gserviceaccount.com', '--role=roles/run.invoker', '--quiet')

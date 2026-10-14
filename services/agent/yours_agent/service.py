@@ -44,7 +44,7 @@ async def run(request: RunRequest):
     headers = {'UCP-Agent': 'profile="' + ORIGIN + '/.well-known/ucp"'}
     if request.agent_token:
         headers['Authorization'] = 'Bearer ' + request.agent_token
-    async with httpx.AsyncClient(base_url=ORIGIN, headers=headers, timeout=25, follow_redirects=False) as http:
+    async with httpx.AsyncClient(base_url=ORIGIN, headers=headers, timeout=55, follow_redirects=False) as http:
         async def api(method, path, body=None, extra=None):
             nonlocal steps
             steps += 1
