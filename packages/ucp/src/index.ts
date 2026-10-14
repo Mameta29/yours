@@ -12,6 +12,7 @@ export const CAPABILITIES={
  'dev.ucp.shopping.catalog.search':'shopping/catalog_search.json',
  'dev.ucp.shopping.catalog.lookup':'shopping/catalog_lookup.json',
  'dev.ucp.shopping.order':'shopping/order.json',
+ 'dev.ucp.shopping.fulfillment':'shopping/fulfillment.json',
  [AP2_CAPABILITY]:'common/payment_ap2_mandate.json',
 } as const;
 export interface Entity {version:string;id?:string;spec?:string;schema?:string;transport?:string;endpoint?:string;extends?:string|string[];config?:Record<string,unknown>}
@@ -20,7 +21,7 @@ export interface Profile {
  keys:JWK[];
 }
 export function profile(origin:string,role:'business'|'platform',keys:JWK[],handlerConfig:Record<string,unknown>={}):Profile{
- const capabilities=Object.fromEntries(Object.entries(CAPABILITIES).map(([name,path])=>[name,[{version:UCP_VERSION,spec:'https://ucp.dev/specification/'+path.replace('.json','/'),schema:'https://ucp.dev/schemas/'+path,...(name===AP2_CAPABILITY?{extends:CHECKOUT}:{}),...(name==='dev.ucp.shopping.order'&&role==='platform'?{config:{webhook_url:origin+'/api/webhooks/orders'}}:{})}]]));
+ const capabilities=Object.fromEntries(Object.entries(CAPABILITIES).map(([name,path])=>[name,[{version:UCP_VERSION,spec:'https://ucp.dev/specification/'+path.replace('.json','/'),schema:'https://ucp.dev/schemas/'+path,...(name===AP2_CAPABILITY||name==='dev.ucp.shopping.fulfillment'?{extends:CHECKOUT}:{}),...(name==='dev.ucp.shopping.order'&&role==='platform'?{config:{webhook_url:origin+'/api/webhooks/orders'}}:{})}]]));
  const result:Profile={ucp:{version:UCP_VERSION,services:{'dev.ucp.shopping':[{version:UCP_VERSION,spec:'https://ucp.dev/specification/overview/',schema:'https://ucp.dev/services/shopping/rest.openapi.json',transport:'rest',endpoint:origin+'/ucp'}]},capabilities,payment_handlers:{[HANDLER]:[{id:'yours-stablecoin',version:UCP_VERSION,spec:origin+'/payment-handler',schema:origin+'/schemas/stablecoin-handler.json',config:handlerConfig}]}},keys};
  validateSchema('profile.json#/$defs/'+role+'_schema',result);return result;
 }

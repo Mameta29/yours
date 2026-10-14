@@ -9,6 +9,7 @@ import {profile,UCP_VERSION} from '@yours/ucp';
 import type {P256Signer} from '@yours/signing';
 import type {Config} from './config.js';
 import {authRoutes,authenticate,owner,type Env} from './auth.js';
+import {merchantRoutes} from './merchant.js';
 
 export function createApp(db:Db,config:Config,signer:P256Signer){
  const app=new Hono<Env>();
@@ -27,6 +28,7 @@ export function createApp(db:Db,config:Config,signer:P256Signer){
  app.get('/api/config',c=>c.json({name:'yours',chainId:config.CHAIN_ID,network:config.CHAIN_ID===80002?'Polygon Amoy':'Local test chain',ucpVersion:UCP_VERSION,merchant:{id:config.MERCHANT_ID,name:config.MERCHANT_NAME},paymentsConfigured:Boolean(config.GATE_ADDRESS&&config.JPYC_ADDRESS&&config.MERCHANT_PAY_TO),gate:config.GATE_ADDRESS,token:config.JPYC_ADDRESS,geminiConfigured:Boolean(config.AGENT_URL)}));
  app.get('/.well-known/ucp',c=>c.json(profile(config.PUBLIC_ORIGIN,'platform',[signer.publicJwk],{network:'eip155:'+config.CHAIN_ID,asset:config.JPYC_ADDRESS,gate:config.GATE_ADDRESS})));
  app.route('/api/auth',authRoutes(db,config));
+ app.route('/ucp',merchantRoutes(db,config,signer));
  app.use('/api/owner/*',async(c,next)=>{c.set('actor',await authenticate(c,db,config));owner(c);await next();});
  app.get('/api/owner/me',async c=>{
   const actor=owner(c);
