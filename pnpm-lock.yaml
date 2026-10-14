@@ -170,6 +170,9 @@ importers:
       '@yours/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@yours/jpyc-ec':
+        specifier: workspace:*
+        version: link:../../adapters/jpyc-ec
       '@yours/signing':
         specifier: workspace:*
         version: link:../../packages/signing
@@ -210,6 +213,9 @@ importers:
       '@yours/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@yours/jpyc-ec':
+        specifier: workspace:*
+        version: link:../../adapters/jpyc-ec
       '@yours/signing':
         specifier: workspace:*
         version: link:../../packages/signing

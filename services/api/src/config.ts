@@ -1,4 +1,5 @@
 import {z} from 'zod';
+import {parseMerchants} from '@yours/jpyc-ec';
 export const configSchema=z.object({
  NODE_ENV:z.enum(['development','test','production']).default('development'),
  DATABASE_URL:z.string().min(1),PUBLIC_ORIGIN:z.string().url().default('http://localhost:8080'),
@@ -15,10 +16,13 @@ export const configSchema=z.object({
  LOCAL_KEY_DIR:z.string().default('.local/keys'),
  WORKER_IDENTITY:z.string().email().optional(),WORKER_URL:z.string().url().optional(),MANDATES_URL:z.string().url().optional(),AGENT_URL:z.string().url().optional(),
  TRUSTED_PROFILE_ORIGINS:z.string().default(''),
+ EC_MERCHANTS_JSON:z.string().default('[]'),
 });
 export type Config=z.infer<typeof configSchema>;
 export function readConfig(env:NodeJS.ProcessEnv=process.env):Config{
  const config=configSchema.parse(env);
+ const merchants=parseMerchants(config.EC_MERCHANTS_JSON,config.NODE_ENV==='test');
+ if(merchants.some(m=>m.id===config.MERCHANT_ID))throw new Error('duplicate_merchant');
  if(config.CHAIN_ID!==80002&&config.NODE_ENV!=='test'&&config.NODE_ENV!=='development')throw new Error('Only Polygon Amoy is enabled for this deployment');
  if(config.NODE_ENV==='production'&&(!config.UCP_SIGNING_KEY||!config.PUBLIC_ORIGIN.startsWith('https://')))throw new Error('Production requires KMS and HTTPS');
  return config;

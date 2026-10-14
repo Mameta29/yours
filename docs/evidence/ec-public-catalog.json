@@ -1,0 +1,52 @@
+{
+  "checkedAt": "2026-10-14T07:47:00.777Z",
+  "scope": "Read-only public staging EC catalog, pinned shop identities/payees and Amoy support. No reservation or purchase.",
+  "results": [
+    {
+      "merchantId": "ec:cheap-rice-shop",
+      "products": [
+        {
+          "id": "63d28592-d2d6-4bc5-ad96-75466a96805f",
+          "title": "お米 5kg / Rice 5 kg",
+          "description": "白米5kg（1袋）。毎日の食卓に、お手頃なお米。\n5 kg of white rice.\nETHGlobal Tokyoのテストネット購入デモ用商品です。会場受取を想定しています。",
+          "amountMinor": 400,
+          "stock": 0,
+          "maxQuantity": 10000,
+          "available": false
+        },
+        {
+          "id": "8671cbaa-471c-4ea5-a527-c2dc8073b23e",
+          "title": "お米 10kg / Rice 10 kg",
+          "description": "白米10kg（5kg×2袋）。毎日の食卓に、お手頃なお米。\n10 kg of white rice.\nETHGlobal Tokyoのテストネット購入デモ用商品です。会場受取を想定しています。",
+          "amountMinor": 800,
+          "stock": 1,
+          "maxQuantity": 10000,
+          "available": true
+        }
+      ]
+    },
+    {
+      "merchantId": "ec:high-rice-shop",
+      "products": [
+        {
+          "id": "6c8f9561-2aeb-4007-b0d4-7bea961a013d",
+          "title": "新潟県産コシヒカリ 5kg / Koshihikari 5 kg",
+          "description": "白米5kg（1袋）。新潟県産コシヒカリ。\n5 kg of Niigata Koshihikari rice.\nETHGlobal Tokyoのテストネット購入デモ用商品です。会場受取を想定しています。",
+          "amountMinor": 1200,
+          "stock": 20,
+          "maxQuantity": 10000,
+          "available": true
+        },
+        {
+          "id": "820cc7f7-47e8-4240-9388-0f4015d2ea64",
+          "title": "新潟県産コシヒカリ 10kg / Koshihikari 10 kg",
+          "description": "白米10kg（5kg×2袋）。新潟県産コシヒカリ。\n10 kg of Niigata Koshihikari rice.\nETHGlobal Tokyoのテストネット購入デモ用商品です。会場受取を想定しています。",
+          "amountMinor": 2400,
+          "stock": 20,
+          "maxQuantity": 10000,
+          "available": true
+        }
+      ]
+    }
+  ]
+}

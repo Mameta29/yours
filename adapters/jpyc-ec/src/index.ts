@@ -103,6 +103,7 @@ export type EcQuote = {
   accepted: z.infer<typeof requirementsSchema>;
   requirementsHash: string;
   message: string;
+  items: { id: string; title: string; quantity: number; price: number }[];
 };
 export type EcReservationInput = {
   requestId: string;
@@ -316,6 +317,11 @@ export class JpycEcClient {
       accepted,
       requirementsHash: digest(accepted),
       message,
+      items: input.items.map((item) => ({
+        ...item,
+        title: catalog.find((p) => p.id === item.id)!.title,
+        price: catalog.find((p) => p.id === item.id)!.amountMinor,
+      })),
     };
   }
   async authorize(quote: EcQuote, signature: string) {

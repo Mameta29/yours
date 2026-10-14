@@ -1,3 +1,4 @@
+import {merchantFor} from './merchants.js';
 import {randomUUID} from 'node:crypto';
 import {Hono} from 'hono';
 import {z} from 'zod';
@@ -119,7 +120,8 @@ export function permissionRoutes(db:Db,config:Config,chain:ChainRuntime){
  });
  router.post('/connections/:id/prepare',async c=>{
   const actor=owner(c),connectionId=z.string().uuid().parse(c.req.param('id')),input=setting.parse(await c.req.json());
-  if(!config.MERCHANT_PAY_TO||input.merchants.some(id=>id!==config.MERCHANT_ID)||new Set(input.merchants).size!==input.merchants.length)throw new DomainError('merchant_not_enrolled',422);
+  if(new Set(input.merchants).size!==input.merchants.length)throw new DomainError('merchant_not_enrolled',422);
+  const selectedMerchants=input.merchants.map(id=>merchantFor(config,id));
   const [block,onchain,nonce,registryNonce,decimals]=await Promise.all([
    client.getBlock(),client.readContract({...gate,functionName:'policy',args:[actor.address as Address]}),
    client.readContract({...gate,functionName:'ownerNonce',args:[actor.address as Address]}),client.readContract({...registry,functionName:'nonces',args:[actor.address as Address]}),
@@ -138,7 +140,7 @@ export function permissionRoutes(db:Db,config:Config,chain:ChainRuntime){
    const now=Number(block.timestamp),validUntil=storedPolicy&&Number(onchain.validUntil)>now+600?Number(onchain.validUntil):now+input.days*86400;
    if(validUntil<=now+600)throw new DomainError('global_permission_renewal_required',409);
    const permission=permissionSchema.parse({connectionId,revision:(oldPermission?.revision??0)+1,perOrder:uint(input.perOrder),perPeriod:uint(input.perPeriod),validUntil,
-    merchants:input.merchants.map(id=>({id,origin:config.PUBLIC_ORIGIN,payTo:config.MERCHANT_PAY_TO}))});
+    merchants:selectedMerchants.map(({id,origin,payTo})=>({id,origin,payTo}))});
    const {rows:others}=await tx.query("SELECT c.agent_address,w.* FROM wallet_grants w JOIN connections c ON c.id=w.connection_id WHERE c.account_id=$1 AND c.id<>$2 AND c.status<>'revoked' ORDER BY c.agent_address,w.token_address",[actor.accountId,connectionId]);
    if(others.some(row=>Number(row.valid_until)<validUntil))throw new DomainError('existing_grant_expires_earlier',409);
    const {rows:otherPermissions}=await tx.query("SELECT p.document FROM permissions p JOIN connections c ON c.id=p.connection_id WHERE c.account_id=$1 AND c.id<>$2 AND c.status<>'revoked'",[actor.accountId,connectionId]);

@@ -8,6 +8,7 @@ import type {P256Signer} from '@yours/signing';
 import type {Config} from './config.js';
 import {authenticate,type Env} from './auth.js';
 import {paymentRoutes} from './payments.js';
+import {merchants,syncEcCatalog} from './merchants.js';
 
 type MerchantEnv=Env&{Variables:Env['Variables']&{platform:string;capabilities:Record<string,Entity[]>}};
 type LineInput={id?:string;item:{id:string;quantity_unit?:{unit:string;scale?:number}};quantity:number};
@@ -15,12 +16,12 @@ const lineSchema=z.object({id:z.string().optional(),item:z.object({id:z.string()
 const requestSchema=z.object({line_items:z.array(lineSchema).min(1).max(50),buyer:z.record(z.unknown()).optional(),context:z.record(z.unknown()).optional(),fulfillment:z.record(z.unknown()).optional()}).passthrough();
 function actorId(c:any):string{const actor=c.get('actor');return actor.kind==='agent'?'agent:'+actor.connectionId:'owner:'+actor.accountId;}
 function ucp(capabilities:Record<string,Entity[]>,checkout=false){return {version:UCP_VERSION,status:'success',capabilities,...(checkout?{payment_handlers:{[HANDLER]:[{id:'yours-stablecoin',version:UCP_VERSION}]}}:{})};}
-function product(row:any,origin:string,lookup=false){
+function product(row:any,origin:string,lookup=false,merchant?:any){
  const price={amount:Number(row.amount_minor),currency:row.currency};if(!Number.isSafeInteger(price.amount))throw new Error('price_overflow');
  const description={plain:row.description};
  return {id:row.id,title:row.title,description,url:origin+'/market/'+encodeURIComponent(row.id),price_range:{min:price,max:price},
   variants:[{id:row.id,title:row.title,description,price,availability:{available:row.stock>0,status:row.stock>0?'in_stock':'out_of_stock'},...(lookup?{inputs:[{id:row.id,match:'exact'}]}:{})}],
-  metadata:{requires_shipping:row.requires_shipping}};
+  metadata:{requires_shipping:row.requires_shipping,merchant_id:row.merchant_id,merchant_name:merchant?.name??row.merchant_id,external:merchant?.adapter==='jpyc-ec'}};
 }
 async function priceLines(tx:Tx,merchantId:string,input:LineInput[],sessionId:string,reserve:boolean,expires:Date){
  const ids=input.map(l=>l.item.id);
@@ -49,6 +50,8 @@ async function priceLines(tx:Tx,merchantId:string,input:LineInput[],sessionId:st
 }
 export function merchantRoutes(db:Db,config:Config,signer:P256Signer){
  const router=new Hono<MerchantEnv>();
+ const directory=merchants(config),merchantIds=directory.map(m=>m.id);
+ const catalogProduct=(row:any,lookup=false)=>product(row,config.PUBLIC_ORIGIN,lookup,directory.find(m=>m.id===row.merchant_id));
  const localProfile=()=>profile(config.PUBLIC_ORIGIN,'business',[signer.publicJwk]);
  router.use('*',async(c,next)=>{
   const platform=parseAgentHeader(c.req.header('UCP-Agent'));
@@ -73,27 +76,30 @@ export function merchantRoutes(db:Db,config:Config,signer:P256Signer){
   const body=await c.req.json();validateSchema('shopping/catalog_search.json#/$defs/search_request',body);
   const request=z.object({query:z.string().max(256).default(''),pagination:z.object({limit:z.number().int().positive().optional(),cursor:z.string().max(1024).optional()}).optional(),filters:z.record(z.unknown()).optional()}).passthrough().parse(body);
   if(request.filters&&Object.keys(request.filters).length)throw new DomainError('filter_unsupported',422);
+  await syncEcCatalog(db,config);
   const limit=Math.min(request.pagination?.limit??10,50);
   let cursor='';if(request.pagination?.cursor){try{cursor=Buffer.from(request.pagination.cursor,'base64url').toString('utf8');}catch{throw new DomainError('invalid_cursor',422);}}
   const escaped=request.query.replace(/[\\%_]/g,'\\$&');
-  const {rows}=await db.query("SELECT * FROM merchant_products WHERE merchant_id=$1 AND active=true AND id>$2 AND (title ILIKE $3 OR description ILIKE $3) ORDER BY id LIMIT $4",[config.MERCHANT_ID,cursor,'%'+escaped+'%',limit+1]);
+  const {rows}=await db.query("SELECT * FROM merchant_products WHERE merchant_id=ANY($1) AND active=true AND id>$2 AND (title ILIKE $3 OR description ILIKE $3) ORDER BY id LIMIT $4",[merchantIds,cursor,'%'+escaped+'%',limit+1]);
   const hasNext=rows.length>limit;const selected=rows.slice(0,limit);
-  const response={ucp:ucp(c.get('capabilities')),products:selected.map(r=>product(r,config.PUBLIC_ORIGIN)),pagination:{has_next_page:hasNext,...(hasNext?{cursor:Buffer.from(selected.at(-1)!.id).toString('base64url')}:{})}};
+  const response={ucp:ucp(c.get('capabilities')),products:selected.map(r=>catalogProduct(r)),pagination:{has_next_page:hasNext,...(hasNext?{cursor:Buffer.from(selected.at(-1)!.id).toString('base64url')}:{})}};
   validateSchema('shopping/catalog_search.json#/$defs/search_response',response);return c.json(response);
  });
  router.post('/catalog/lookup',async c=>{
   const body=await c.req.json();validateSchema('shopping/catalog_lookup.json#/$defs/lookup_request',body);
   const request=z.object({ids:z.array(z.string().min(1).max(256)).min(1).max(100)}).passthrough().parse(body);
-  const {rows}=await db.query('SELECT * FROM merchant_products WHERE merchant_id=$1 AND id=ANY($2) AND active=true ORDER BY id',[config.MERCHANT_ID,request.ids]);
-  const response={ucp:ucp(c.get('capabilities')),products:rows.map(r=>product(r,config.PUBLIC_ORIGIN,true))};
+  await syncEcCatalog(db,config);
+  const {rows}=await db.query('SELECT * FROM merchant_products WHERE merchant_id=ANY($1) AND id=ANY($2) AND active=true ORDER BY id',[merchantIds,request.ids]);
+  const response={ucp:ucp(c.get('capabilities')),products:rows.map(r=>catalogProduct(r,true))};
   validateSchema('shopping/catalog_lookup.json#/$defs/lookup_response',response);return c.json(response);
  });
  router.post('/catalog/product',async c=>{
   const body=await c.req.json();validateSchema('shopping/catalog_lookup.json#/$defs/get_product_request',body);
   const request=z.object({id:z.string().min(1).max(256),selected:z.array(z.unknown()).optional(),filters:z.record(z.unknown()).optional()}).passthrough().parse(body);
   if(request.selected?.length||request.filters&&Object.keys(request.filters).length)throw new DomainError('product_option_unsupported',422);
-  const {rows:[row]}=await db.query('SELECT * FROM merchant_products WHERE merchant_id=$1 AND id=$2 AND active=true',[config.MERCHANT_ID,request.id]);if(!row)throw new DomainError('product_not_found',404);
-  const response={ucp:ucp(c.get('capabilities')),product:product(row,config.PUBLIC_ORIGIN)};validateSchema('shopping/catalog_lookup.json#/$defs/get_product_response',response);return c.json(response);
+  await syncEcCatalog(db,config);
+  const {rows:[row]}=await db.query('SELECT * FROM merchant_products WHERE merchant_id=ANY($1) AND id=$2 AND active=true',[merchantIds,request.id]);if(!row)throw new DomainError('product_not_found',404);
+  const response={ucp:ucp(c.get('capabilities')),product:catalogProduct(row)};validateSchema('shopping/catalog_lookup.json#/$defs/get_product_response',response);return c.json(response);
  });
  for(const [path,kind] of [['/carts','cart'],['/checkout-sessions','checkout']] as const){
   const respond=(c:any,result:any)=>{c.header('ETag','"'+result.yours.revision+'"');return c.json(result);};
@@ -127,6 +133,7 @@ export function merchantRoutes(db:Db,config:Config,signer:P256Signer){
    const id=z.string().uuid().parse(c.req.param('id')),actor=actorId(c);
    const result=await idempotent(db,actor+':update:'+id,c.req.header('Idempotency-Key')??'',{body,etag:c.req.header('If-Match')??null},async tx=>{
     const row=await session(tx,id,actor,c.get('platform'),kind,true);
+    if(row.merchant_id!==config.MERCHANT_ID)throw new DomainError('ec_checkout_immutable',409);
     if(!['incomplete','ready_for_complete','active'].includes(row.status))throw new DomainError('session_not_editable',409);
     if(new Date(row.expires_at).getTime()<=Date.now())throw new DomainError('session_expired',409);
     if(c.req.header('If-Match')!=='"'+row.revision+'"')throw new DomainError('revision_conflict',412);
@@ -163,7 +170,7 @@ export async function session(db:Pick<Db,'query'>|Tx,id:unknown,actor:string,pla
  const {rows:[row]}=await db.query('SELECT * FROM merchant_sessions WHERE id=$1 AND actor=$2 AND platform_profile=$3 AND kind=$4'+(lock?' FOR UPDATE':''),[z.string().uuid().parse(id),actor,platform,kind]);
  if(!row)throw new DomainError('session_not_found',404);return row;
 }
-async function makeDocument(id:string,kind:'cart'|'checkout',request:any,priced:any,revision:number,expires:Date,capabilities:Record<string,Entity[]>,config:Config,signer:P256Signer){
+export async function makeDocument(id:string,kind:'cart'|'checkout',request:any,priced:any,revision:number,expires:Date,capabilities:Record<string,Entity[]>,config:Config,signer:P256Signer){
  let incomplete=priced.shipping;
  const document:any={ucp:ucp(capabilities,kind==='checkout'),id,line_items:priced.lines,currency:'JPY',totals:[{type:'subtotal',amount:priced.subtotal},{type:'total',amount:priced.subtotal}],
  links:[{type:'privacy_policy',url:config.PUBLIC_ORIGIN+'/privacy'},{type:'terms_of_service',url:config.PUBLIC_ORIGIN+'/terms'}],expires_at:expires.toISOString(),

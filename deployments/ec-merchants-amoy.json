@@ -1,0 +1,18 @@
+[
+  {
+    "id": "ec:cheap-rice-shop",
+    "name": "CHEAP RICE SHOP",
+    "origin": "https://stg-ec.jpyc-service.com",
+    "shopId": "feb3c557-27d9-45ab-970d-b65f8b440cf8",
+    "slug": "cheap-rice-shop",
+    "payTo": "0xaf09f3071c418c9515ce7350c2bc95fb5fd00699"
+  },
+  {
+    "id": "ec:high-rice-shop",
+    "name": "HIGH RICE SHOP",
+    "origin": "https://stg-ec.jpyc-service.com",
+    "shopId": "0c453196-3dc7-4669-8977-24e470f821da",
+    "slug": "high-rice-shop",
+    "payTo": "0xf2784529937a0a10f018039e1bc3ce5ef0df1007"
+  }
+]
