@@ -5,22 +5,29 @@
     "ordinary EOA initiates EIP-5792 upgrade from the permission button",
     "two zero-value self calls apply the pinned EIP-7702 implementation",
     "interrupted upgrade status survives reload without a second batch",
+    "wallet reconnect cancellation preserves the pending form",
+    "same-owner reconnect restores edited limits without sending a transaction",
+    "reconnected owner explicitly reviews conditions before registration",
+    "different-wallet login discards the previous owner action without sending",
+    "reload passively restores an authorized account without new login signatures",
     "actual policy transaction succeeds",
     "second wallet transaction intentionally canceled",
     "reloaded page restores the same permission conditions",
     "only the missing registry transaction is sent",
     "five confirmations activate the AI",
+    "same account and chain notifications keep the session",
+    "account change closes the pending form and logs out without sending",
     "no JavaScript errors"
   ],
-  "upgradeTransaction": "0x1bcd34e581a18b632335bc77eb0974ff156199017e52d8081099003870c0bf57",
+  "upgradeTransaction": "0xf3ac7dba66faff6ed0a94594337fa9fc5385937a596987e21c508c9dcd1fb869",
   "transactions": [
     {
       "to": "0x8c1106124cafc1064666730359b575baaee93f58",
-      "hash": "0x9a56808fadb73594e6b4c5373c39fde0d7ed093d50fb03416e1276e33f530da0"
+      "hash": "0x4e960efdd8bce7721d3b2ddedc4009d780406cabf770dda9435fe89f4c027582"
     },
     {
       "to": "0x3241eE5772e7bDf3F0232A20C665D517342aD080",
-      "hash": "0x258c581b71ceba9f22c01263ac87a2444bfeacb42ec409df48148576e3f826e3"
+      "hash": "0xfb85c1815685efd9536572fa15f70d18a9520d5c90ea85f1c3eadab0c128d448"
     }
   ]
 }

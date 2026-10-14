@@ -83,6 +83,7 @@ function App() {
     [chat, setChat] = useState(""),
     [selected, setSelected] = useState(""),
     [wallet, setWallet] = useState(null);
+  const logoutPending = useRef(Promise.resolve());
   const refresh = useCallback(async () => {
     try {
       const me = await api("/api/owner/me");
@@ -176,26 +177,73 @@ function App() {
     );
   }, [data?.account.id]);
   useEffect(() => {
-    if (!provider) return;
+    if (provider || !data?.account.address || !config || !providers.length)
+      return;
+    let alive = true;
+    const owner = data.account.address.toLowerCase();
+    Promise.all(
+      providers.map(async ({ provider: candidate }) => {
+        let timer;
+        try {
+          const result = await Promise.race([
+            Promise.all([
+              candidate.request({ method: "eth_accounts" }),
+              candidate.request({ method: "eth_chainId" }),
+            ]),
+            new Promise((resolve) => {
+              timer = setTimeout(() => resolve(null), 3000);
+            }),
+          ]);
+          return result?.[0]?.[0]?.toLowerCase() === owner &&
+            Number(result[1]) === config.chainId
+            ? candidate
+            : null;
+        } catch {
+          return null;
+        } finally {
+          clearTimeout(timer);
+        }
+      }),
+    ).then((matches) => {
+      const unique = [...new Set(matches.filter(Boolean))];
+      // Only reattach an already authorized, unambiguous account/network.
+      // Never request accounts, signatures or a network switch on page load.
+      if (alive && unique.length === 1) setProvider(unique[0]);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [provider, providers, data?.account.address, config]);
+  useEffect(() => {
+    if (!provider || !data?.account.address || !config) return;
     const changed = () => {
+      setProvider(null);
       setData(null);
+      setModal(null);
       setWallet(null);
       setTasks([]);
       setRuns([]);
       setNotice({
         text: "ウォレットが変更されました。もう一度接続してください。",
       });
-      api("/api/auth/logout", {}).catch(() => {});
+      logoutPending.current = api("/api/auth/logout", {}).catch(() => {});
     };
-    provider.on?.("accountsChanged", changed);
-    provider.on?.("chainChanged", changed);
+    const accountsChanged = (accounts) => {
+      if (accounts?.[0]?.toLowerCase() !== data.account.address.toLowerCase())
+        changed();
+    };
+    const chainChanged = (chainId) => {
+      if (Number(chainId) !== config.chainId) changed();
+    };
+    provider.on?.("accountsChanged", accountsChanged);
+    provider.on?.("chainChanged", chainChanged);
     provider.on?.("disconnect", changed);
     return () => {
-      provider.removeListener?.("accountsChanged", changed);
-      provider.removeListener?.("chainChanged", changed);
+      provider.removeListener?.("accountsChanged", accountsChanged);
+      provider.removeListener?.("chainChanged", chainChanged);
       provider.removeListener?.("disconnect", changed);
     };
-  }, [provider]);
+  }, [provider, data?.account.address, config]);
   async function action(message, fn) {
     setBusy(message);
     setNotice(null);
@@ -209,10 +257,27 @@ function App() {
     }
   }
   async function login(p) {
+    const returnTo = modal?.returnTo,
+      returnAddress = modal?.returnAddress;
     await action("ウォレットでログインの署名を確認してください", async () => {
-      await connect(p, config);
+      await logoutPending.current;
+      const connectedAddress = await connect(p, config);
       setProvider(p);
-      setModal(null);
+      if (
+        returnTo &&
+        returnAddress?.toLowerCase() === connectedAddress.toLowerCase()
+      ) {
+        setModal(returnTo);
+        setNotice({
+          text: "接続しました。内容を確認して、操作を続けてください。",
+        });
+      } else {
+        setModal(null);
+        if (returnTo)
+          setNotice({
+            text: "別のウォレットに接続しました。このウォレットで操作するAIを選び直してください。",
+          });
+      }
     });
   }
   const address = data?.account.address,
@@ -230,9 +295,9 @@ function App() {
   const chosen =
     active.find((c) => c.id === selected && c.provider === "gemini") ??
     active.find((c) => c.provider === "gemini");
-  const needProvider = () => {
-    if (!provider) {
-      setModal({ kind: "wallet" });
+  const needProvider = (returnTo = modal) => {
+    if (!provider || !data) {
+      setModal({ kind: "wallet", returnTo, returnAddress: address });
       return false;
     }
     return true;
@@ -255,7 +320,6 @@ function App() {
     });
   }
   async function approveOrder(intent) {
-    if (!needProvider()) return;
     await action("この注文への本人同意を準備しています", async () => {
       const approval = await api(
         "/api/owner/approvals/" + intent.id + "/prepare",
@@ -1231,28 +1295,32 @@ function ModalContent({
     [permissionDraft, setPermissionDraft] = useState(null),
     [draftLoading, setDraftLoading] = useState(modal.kind === "permission"),
     [checked, setChecked] = useState(false),
-    [quantity, setQuantity] = useState(1),
-    [email, setEmail] = useState(""),
-    purchaseRequest = useRef(null),
-    [purchaseConnection, setPurchaseConnection] = useState(chosen?.id ?? ""),
-    [settings, setSettings] = useState({
-      perOrder: modal.connection?.permission
-        ? fromAtomic(modal.connection.permission.perOrder)
-        : 2000,
-      perPeriod: modal.connection?.permission
-        ? fromAtomic(modal.connection.permission.perPeriod)
-        : 5000,
-      globalPerOrder: data?.policy
-        ? fromAtomic(data.policy.document.perOrder)
-        : 3000,
-      globalPerPeriod: data?.policy
-        ? fromAtomic(data.policy.document.perPeriod)
-        : 10000,
-      days: 7,
-      merchants:
-        modal.connection?.permission?.merchants.map((m) => m.id) ??
-        (config?.merchant?.id ? [config.merchant.id] : []),
-    });
+    [quantity, setQuantity] = useState(modal.form?.quantity ?? 1),
+    [email, setEmail] = useState(modal.form?.email ?? ""),
+    purchaseRequest = useRef(modal.form?.purchaseRequest ?? null),
+    [purchaseConnection, setPurchaseConnection] = useState(
+      modal.form?.purchaseConnection ?? chosen?.id ?? "",
+    ),
+    [settings, setSettings] = useState(
+      modal.form?.settings ?? {
+        perOrder: modal.connection?.permission
+          ? fromAtomic(modal.connection.permission.perOrder)
+          : 2000,
+        perPeriod: modal.connection?.permission
+          ? fromAtomic(modal.connection.permission.perPeriod)
+          : 5000,
+        globalPerOrder: data?.policy
+          ? fromAtomic(data.policy.document.perOrder)
+          : 3000,
+        globalPerPeriod: data?.policy
+          ? fromAtomic(data.policy.document.perPeriod)
+          : 10000,
+        days: 7,
+        merchants:
+          modal.connection?.permission?.merchants.map((m) => m.id) ??
+          (config?.merchant?.id ? [config.merchant.id] : []),
+      },
+    );
   const address = data?.account.address;
   useEffect(() => {
     if (modal.kind !== "permission") return;
@@ -1285,6 +1353,11 @@ function ModalContent({
         </span>
         <h2 id="modal-title">あなたのウォレットを接続</h2>
         <p>ログインの署名では、資産の移動や購入権限の付与は行われません。</p>
+        {modal.returnTo && (
+          <p className="notice">
+            同じウォレットに接続すると、入力した内容を保って元の画面へ戻ります。
+          </p>
+        )}
         {providers.length ? (
           providers.map((p) => (
             <button
@@ -1431,7 +1504,7 @@ function ModalContent({
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          if (!needProvider()) return;
+          if (!needProvider({ ...modal, form: { settings } })) return;
           action("購入権限を設定しています", async () => {
             await registerPermission({
               provider,
@@ -1567,7 +1640,18 @@ function ModalContent({
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          if (!needProvider()) return;
+          if (
+            !needProvider({
+              ...modal,
+              form: {
+                quantity,
+                email,
+                purchaseConnection,
+                purchaseRequest: purchaseRequest.current,
+              },
+            })
+          )
+            return;
           action("この購入への同意を準備しています", async () => {
             const formKey = JSON.stringify({
               connectionId: buyer.id,
@@ -1735,7 +1819,8 @@ function ModalContent({
         <button
           className="button primary full"
           disabled={!!busy}
-          onClick={() =>
+          onClick={() => {
+            if (!needProvider()) return;
             action("今回だけの同意を確認しています", async () => {
               const signature = await typed(
                 provider,
@@ -1751,8 +1836,8 @@ function ModalContent({
               setNotice({
                 text: "この注文への同意を記録しました。アシスタントに購入の再開を依頼できます。",
               });
-            })
-          }
+            });
+          }}
         >
           署名して、一件だけ許可
         </button>

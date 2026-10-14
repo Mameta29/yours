@@ -37,9 +37,11 @@ try{
  const page=await browser.newPage({viewport:{width:1440,height:1100}});page.setDefaultTimeout(30000);
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
  let rejectSecond=true,loseUpgradeStatus=true,upgradeHash,upgradeRequests=0;
+ let visibleAccounts=true,selectedOwner=owner,rejectLogin=false,accountRequests=0,loginSignatures=0;
  const transactions=[];
  await page.exposeFunction('yoursTestProvider',async({method,params=[]})=>{
-  if(method==='eth_requestAccounts'||method==='eth_accounts')return [owner.address];
+  if(method==='eth_requestAccounts'){accountRequests++;visibleAccounts=true;return [selectedOwner.address];}
+  if(method==='eth_accounts')return visibleAccounts?[selectedOwner.address]:[];
   if(method==='eth_chainId')return toHex(31337);
   if(method==='wallet_getCapabilities')return {[toHex(31337)]:{atomic:{status:'ready'}}};
   if(method==='wallet_sendCalls'){
@@ -57,7 +59,10 @@ try{
    if(loseUpgradeStatus){loseUpgradeStatus=false;throw new Error('Lost wallet status response');}
    return {id:upgradeHash,version:'2.0.0',chainId:toHex(31337),status:200,atomic:true,receipts:[{transactionHash:upgradeHash,status:'0x1'}]};
   }
-  if(method==='personal_sign')return owner.signMessage({message:{raw:params[0]}});
+  if(method==='personal_sign'){
+   if(rejectLogin){rejectLogin=false;throw new Error('User rejected request');}
+   loginSignatures++;return selectedOwner.signMessage({message:{raw:params[0]}});
+  }
   if(method==='eth_signTypedData_v4'){assert.equal(params[0].toLowerCase(),owner.address.toLowerCase());return owner.signTypedData(JSON.parse(params[1]));}
   if(method==='eth_sendTransaction'){
    const tx=params[0];assert.equal(tx.from.toLowerCase(),owner.address.toLowerCase());
@@ -68,7 +73,11 @@ try{
   }
   throw new Error('unsupported_test_method:'+method);
  });
- await page.addInitScript(()=>{window.ethereum={request:args=>window.yoursTestProvider(args),on(){},removeListener(){}};});
+ await page.addInitScript(()=>{
+  const listeners=new Map();
+  window.ethereum={request:args=>window.yoursTestProvider(args),on(name,fn){if(!listeners.has(name))listeners.set(name,new Set());listeners.get(name).add(fn);},removeListener(name,fn){listeners.get(name)?.delete(fn);}};
+  window.yoursTestWalletEvent=(name,value)=>{for(const fn of listeners.get(name)??[])fn(value);};
+ });
  const login=async()=>{await page.locator('.wallet-button').click();await page.getByRole('button',{name:'ブラウザのウォレット',exact:true}).click();await expect(page.getByRole('dialog')).toHaveCount(0);};
  await page.goto(origin);await login();
  await page.getByRole('button',{name:'AIを追加する',exact:true}).first().click();
@@ -77,14 +86,46 @@ try{
  await page.getByRole('button',{name:'ウォレットで承認する'}).click();
  await expect(page.getByRole('dialog')).toContainText('ウォレットとの通信を確認できませんでした。',{timeout:60000});
  assert.equal(upgradeRequests,1);assert.equal(transactions.length,0);
- await page.reload();await login();
+ // A valid SIWE cookie survives reload, but a locked wallet needs reconnection.
+ // Reconnecting must return to the form, not silently finish on the home page.
+ visibleAccounts=false;await page.reload();
  await page.getByRole('button',{name:'権限を設定',exact:true}).first().click();
+ await page.getByLabel(/このAI：1回の上限/).fill('1700');
+ await page.getByLabel(/このAI：24時間の上限/).fill('4900');
+ await page.getByLabel('この条件で購入を任せることを確認しました').check();
+ await page.getByRole('button',{name:'ウォレットで承認する'}).click();
+ await expect(page.getByRole('heading',{name:'あなたのウォレットを接続'})).toBeVisible();
+ rejectLogin=true;
+ await page.getByRole('button',{name:'ブラウザのウォレット',exact:true}).click();
+ await expect(page.getByRole('dialog')).toContainText('ウォレットでの操作をキャンセルしました。');
+ await page.getByRole('button',{name:'ブラウザのウォレット',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'My Geminiに任せる範囲'})).toBeVisible({timeout:5000});
+ await expect(page.getByLabel(/このAI：1回の上限/)).toHaveValue('1700');
+ await expect(page.getByLabel(/このAI：24時間の上限/)).toHaveValue('4900');
+ await expect(page.getByLabel('この条件で購入を任せることを確認しました')).not.toBeChecked();
+ assert.equal(transactions.length,0);assert.equal(upgradeRequests,1);
  await page.getByLabel('この条件で購入を任せることを確認しました').check();
  await page.getByRole('button',{name:'ウォレットで承認する'}).click();
  await expect(page.getByRole('dialog')).toContainText('ウォレットでの操作をキャンセルしました。',{timeout:60000});
  assert.equal(transactions.length,1);assert.equal(upgradeRequests,1);
  assert.equal((await client.getCode({address:owner.address})).toLowerCase(),'0xef0100'+m.accountImplementation.slice(2).toLowerCase());
- await page.reload();await login();
+ // A different account must never inherit the original owner's pending action.
+ visibleAccounts=false;await page.reload();
+ await page.getByRole('button',{name:'登録を再開',exact:true}).first().click();
+ await page.getByLabel('この条件で購入を任せることを確認しました').check();
+ await page.getByRole('button',{name:'残りの登録を進める'}).click();
+ await expect(page.getByRole('heading',{name:'あなたのウォレットを接続'})).toBeVisible();
+ selectedOwner=privateKeyToAccount(generatePrivateKey());
+ await page.getByRole('button',{name:'ブラウザのウォレット',exact:true}).click();
+ await expect(page.getByRole('dialog')).toHaveCount(0);
+ await expect(page.getByRole('alert')).toContainText('別のウォレットに接続しました');
+ await expect.poll(async()=>page.evaluate(()=>fetch('/api/owner/me').then(r=>r.json()).then(me=>me.account.address.toLowerCase()))).toBe(selectedOwner.address.toLowerCase());
+ assert.equal(transactions.length,1);assert.equal(upgradeRequests,1);
+ // Return to the owner, then verify passive account restoration after reload:
+ // no new wallet-connect request or login signature is required.
+ selectedOwner=owner;await login();
+ const requestsBeforeReload=accountRequests,signaturesBeforeReload=loginSignatures;
+ await page.reload();
  await page.getByRole('button',{name:'登録を再開',exact:true}).first().click();
  await expect(page.getByRole('dialog')).toContainText('前回確認した条件で登録を再開');
  await page.getByLabel('この条件で購入を任せることを確認しました').check();
@@ -92,10 +133,20 @@ try{
  await expect(page.getByRole('dialog')).toHaveCount(0,{timeout:60000});
  await expect(page.getByRole('alert')).toContainText('購入権限を登録しました');
  assert.equal(transactions.length,2);assert.equal(transactions[0].to.toLowerCase(),m.gate.toLowerCase());assert.equal(transactions[1].to.toLowerCase(),m.registry.toLowerCase());
+ assert.equal(accountRequests,requestsBeforeReload);assert.equal(loginSignatures,signaturesBeforeReload);
  assert.deepEqual(errors,[]);
  const state=await page.evaluate(()=>fetch('/api/owner/me').then(r=>r.json()));
  assert.equal(state.connections[0].status,'active');assert.equal(state.connections[0].pending_draft,null);
  await page.screenshot({path:'.local/console-permission-active.png',fullPage:true});
- const evidence={scope:'Headless Chrome with a disposable EIP-1193 test provider. Real EIP-7702 owner upgrade, EIP-712 signatures, real HTTP API/PostgreSQL and official MetaMask contracts on local Anvil. No wallet-extension or public Amoy claim.',passed:['browser SIWE login','ordinary EOA initiates EIP-5792 upgrade from the permission button','two zero-value self calls apply the pinned EIP-7702 implementation','interrupted upgrade status survives reload without a second batch','actual policy transaction succeeds','second wallet transaction intentionally canceled','reloaded page restores the same permission conditions','only the missing registry transaction is sent','five confirmations activate the AI','no JavaScript errors'],upgradeTransaction:upgradeHash,transactions};
+ await page.evaluate(({owner,chain})=>{window.yoursTestWalletEvent('accountsChanged',[owner]);window.yoursTestWalletEvent('chainChanged',chain);},{owner:owner.address,chain:toHex(31337)});
+ assert.equal(await page.evaluate(()=>fetch('/api/owner/me').then(r=>r.status)),200);
+ await page.getByRole('button',{name:'権限を編集',exact:true}).first().click();
+ selectedOwner=privateKeyToAccount(generatePrivateKey());
+ await page.evaluate(account=>window.yoursTestWalletEvent('accountsChanged',[account]),selectedOwner.address);
+ await expect(page.getByRole('dialog')).toHaveCount(0);
+ await expect.poll(()=>page.evaluate(()=>fetch('/api/owner/me').then(r=>r.status))).toBe(401);
+ assert.equal(transactions.length,2);
+ assert.deepEqual(errors,[]);
+ const evidence={scope:'Headless Chrome with a disposable EIP-1193 test provider. Real EIP-7702 owner upgrade, EIP-712 signatures, real HTTP API/PostgreSQL and official MetaMask contracts on local Anvil. No wallet-extension or public Amoy claim.',passed:['browser SIWE login','ordinary EOA initiates EIP-5792 upgrade from the permission button','two zero-value self calls apply the pinned EIP-7702 implementation','interrupted upgrade status survives reload without a second batch','wallet reconnect cancellation preserves the pending form','same-owner reconnect restores edited limits without sending a transaction','reconnected owner explicitly reviews conditions before registration','different-wallet login discards the previous owner action without sending','reload passively restores an authorized account without new login signatures','actual policy transaction succeeds','second wallet transaction intentionally canceled','reloaded page restores the same permission conditions','only the missing registry transaction is sent','five confirmations activate the AI','same account and chain notifications keep the session','account change closes the pending form and logs out without sending','no JavaScript errors'],upgradeTransaction:upgradeHash,transactions};
  await writeFile('docs/evidence/browser-permissions.json',JSON.stringify(evidence,null,2)+'\n');console.log(JSON.stringify({passed:evidence.passed.length,evidence:'docs/evidence/browser-permissions.json'}));
 }finally{clearInterval(mine);await browser?.close();await new Promise(resolve=>server.close(resolve));await db.end();}
