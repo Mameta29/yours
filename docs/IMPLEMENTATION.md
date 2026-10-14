@@ -23,7 +23,7 @@
 
 Google Cloudの配備先はユーザー指定の `yours-511602`、regionは`asia-northeast1`。課金の関連付けはユーザーが完了。すべてのcloud操作でprojectを明示し、既存CLI設定の別projectには配備しない。
 
-`infra/bootstrap.sh`を実行済み。必要なAPI、Artifact Registry、サービス別アカウント、署名用途別のCloud KMS HSM鍵を作成。Cloud SQL `yours-db`（PostgreSQL 16）、専用DB利用者・Secret Managerを作成し、ユーザー承認済みの`infra/IAM.md`の権限を適用。Cloud BuildでAPI imageを構築し、Cloud Run migration job `yours-migrate-k9skl`は03:52 UTCに成功。runtime DB権限の縮小、サービス配備は継続中。
+`infra/bootstrap.sh`を実行済み。必要なAPI、Artifact Registry、サービス別アカウント、署名用途別のCloud KMS HSM鍵を作成。Cloud SQL `yours-db`（PostgreSQL 16）、専用DB利用者・Secret Managerを作成し、ユーザー承認済みの`infra/IAM.md`の権限を適用。Cloud BuildでAPI imageを構築し、Cloud Run migration job `yours-migrate-k9skl`は03:52 UTCに成功。`yours-migrate-9ngl8`でruntime DB利用者の管理者membership・CREATEDB・CREATEROLEを除去し、4項目ともfalseを実DBで検証。サービス配備は継続中。
 
 Polygon Amoyにyours専用Gate `0x42eec579df8fb1f87ae3bddbb90c6a4a9f790504` とRegistry `0xa5524081a219422ee5247afDEda40791E953eF2B`を配備。Cloud HSM relayerの実署名を使用し、5 confirmationsとblock hashを検証。txは`0x7ffe2572d92c1b32b33ec16cead5156b1a9c7ec2a0381f9e5bc5048a121664b9`。公開情報・code hashは`deployments/amoy.json`。これは配備の証拠であり、公開Amoyでの購入成功はまだ確認していない。
 
