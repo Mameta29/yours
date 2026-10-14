@@ -90,4 +90,7 @@ try{
  assert.equal((await request('/api/owner/me')).json.connections[0].permission_status,'revoked');
  const evidence={scope:'Local Anvil and real PostgreSQL. Actual owner signatures, official MetaMask delegation, policy/permission registration and revocation through the API. No browser-extension or public Amoy claim.',passed:['SIWE owner login','owner-signed restricted delegation','wrong policy signer rejected','no activation from signatures alone','five confirmations required','exact registration calls verified','idempotent activation','immediate API pause','confirmed onchain revocation','registration progress survives a reopened session','first confirmed call reconciled without activating AI','expired second call renewed with fresh owner signature','old signature and substituted transaction hash rejected','renewal preserves shared period anchor'],policyTransaction:hashes[0],permissionTransaction:hashes[1],revocationTransaction:hash};
  await writeFile(new URL('docs/evidence/permissions-api.json',root),JSON.stringify(evidence,null,2)+'\n');console.log(JSON.stringify({passed:evidence.passed.length,evidence:'docs/evidence/permissions-api.json'}));
-}finally{await db.end();await client.request({method:'evm_revert',params:[snapshot]});}
+}finally{
+ await db.end();await client.request({method:'evm_revert',params:[snapshot]});
+ const now=Math.floor(Date.now()/1000);if(Number((await client.getBlock()).timestamp)<now){await client.request({method:'evm_setNextBlockTimestamp',params:[now]});await client.request({method:'anvil_mine',params:['0x1']});}
+}

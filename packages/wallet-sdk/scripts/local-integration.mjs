@@ -20,6 +20,11 @@ const chain = foundry, chainId = foundry.id;
 const client = createPublicClient({ chain, transport: http(rpc) });
 assert.equal(await client.getChainId(), chainId);
 assert.match(await client.request({ method: 'web3_clientVersion' }), /anvil/i);
+// Other lifecycle tests advance and revert time. Re-align this disposable
+// chain before mixing wall-clock AP2 attestations with onchain expiry checks.
+const wallClock=Math.floor(Date.now()/1000),head=await client.getBlock();
+if(Number(head.timestamp)<wallClock){await client.request({method:'evm_setNextBlockTimestamp',params:[wallClock]});await client.request({method:'anvil_mine',params:['0x1']});}
+else if(Number(head.timestamp)>wallClock+15)throw new Error('Local chain clock is ahead; finish the time-travel test before this integration');
 const keys = Object.fromEntries(['owner', 'agent', 'merchantSigner', 'riskSigner', 'humanSigner', 'priceSigner', 'relayer'].map(name => [name, generatePrivateKey()]));
 const accounts = Object.fromEntries(Object.entries(keys).map(([name, key]) => [name, privateKeyToAccount(key)]));
 const wallet = createWalletClient({ account: accounts.relayer, chain, transport: http(rpc) });
