@@ -1,0 +1,141 @@
+{
+  "source_project": "JPYC EC agent commerce",
+  "source_revision": "1c2024383c2c76f887b94dd19d7a963ca9f307f7",
+  "files": [
+    {
+      "source": "packages/agent-commerce/package.json",
+      "destination": "packages/wallet-sdk/package.json",
+      "sha256": "4815163c7a0322a9bd6009d87e1ebf847c018d5b10ba95a1e6352065ae7d597d"
+    },
+    {
+      "source": "packages/agent-commerce/src/core.ts",
+      "destination": "packages/wallet-sdk/src/core.ts",
+      "sha256": "087c67e6d2bf7d4567685a3ad80249db8ab3d65f513f7f70038e30e1acd19664"
+    },
+    {
+      "source": "packages/agent-commerce/src/gate-abi.ts",
+      "destination": "packages/wallet-sdk/src/gate-abi.ts",
+      "sha256": "04c9af5db7d5d99de1003893c49816efaa193ad5392e3deb8f2e9e1a512bd080"
+    },
+    {
+      "source": "packages/agent-commerce/src/index.ts",
+      "destination": "packages/wallet-sdk/src/index.ts",
+      "sha256": "20056b1f62bef6983122d53316343b8f28cad5b71ff65b1fe777d9a5063bcf89"
+    },
+    {
+      "source": "packages/agent-commerce/src/permissions.ts",
+      "destination": "packages/wallet-sdk/src/permissions.ts",
+      "sha256": "b3569a0864df5e8a84b4faa0b5c1fb36c3b296a1e0c55903cecc7744acac71e1"
+    },
+    {
+      "source": "packages/agent-commerce/src/protocol.ts",
+      "destination": "packages/wallet-sdk/src/protocol.ts",
+      "sha256": "eb70fbffed8a6c2f10c4bbcd1f4ccf8a6165eae959978ccaa9091307ba9ea6a4"
+    },
+    {
+      "source": "packages/agent-commerce/src/types.ts",
+      "destination": "packages/wallet-sdk/src/types.ts",
+      "sha256": "aa30eb94895fdaa1218c411d87a4cdca3a6cd043dc86146e0ecad21d7a0e3ed2"
+    },
+    {
+      "source": "packages/agent-commerce/src/wallet.ts",
+      "destination": "packages/wallet-sdk/src/wallet.ts",
+      "sha256": "b91256be8a7b1794963607eaae947c5c6a1349bce65d419eb9d20b4f1258ddd8"
+    },
+    {
+      "source": "packages/agent-commerce/src/wire.ts",
+      "destination": "packages/wallet-sdk/src/wire.ts",
+      "sha256": "1d23cf02eb5122b623f3992fe7f99d1f238a6a50b2dfbed12c3eeedae69a8fa9"
+    },
+    {
+      "source": "packages/agent-commerce/test/gate-actions.test.ts",
+      "destination": "packages/wallet-sdk/test/gate-actions.test.ts",
+      "sha256": "6809b24544f86f25dee38a6d9529a8fd948118cdfb53719dd31e3fe136bc6d17"
+    },
+    {
+      "source": "packages/agent-commerce/test/permissions.test.ts",
+      "destination": "packages/wallet-sdk/test/permissions.test.ts",
+      "sha256": "b92655b382faf2545052604212025094e3c3c5db6b21649dec5bce049d72425d"
+    },
+    {
+      "source": "packages/agent-commerce/test/protocol.test.ts",
+      "destination": "packages/wallet-sdk/test/protocol.test.ts",
+      "sha256": "e3af1194ec3511508a3d66a1e7d1f24350630a1edf38d1b71164c03d140abfcd"
+    },
+    {
+      "source": "packages/agent-commerce/test/vectors.json",
+      "destination": "packages/wallet-sdk/test/vectors.json",
+      "sha256": "313a0f6475a6f327de41ed4c9d257d17525feafbb786946fea158d5579f53f8f"
+    },
+    {
+      "source": "packages/agent-commerce/test/wallet.test.ts",
+      "destination": "packages/wallet-sdk/test/wallet.test.ts",
+      "sha256": "27d712d38ded9253842129a0faaef8cfbd45c5e51dcd82ec0cb08848c683b8b9"
+    },
+    {
+      "source": "packages/agent-commerce/tsconfig.json",
+      "destination": "packages/wallet-sdk/tsconfig.json",
+      "sha256": "cc3e65a57fa05ef0ed49565936a201451cfe1335e1981c9369832f89ec2d2c3f"
+    },
+    {
+      "source": "packages/agent-contracts/foundry.toml",
+      "destination": "packages/contracts/foundry.toml",
+      "sha256": "11a3039fbe42f77251c657f84632295d9d3b4431be940b6be1151daabd345410"
+    },
+    {
+      "source": "packages/agent-contracts/package.json",
+      "destination": "packages/contracts/package.json",
+      "sha256": "43f6aa806a7f42ed477d303a10880b212aae2ef8a6659328c954adf53dd714d7"
+    },
+    {
+      "source": "packages/agent-contracts/src/DelegationCodec.sol",
+      "destination": "packages/contracts/src/DelegationCodec.sol",
+      "sha256": "0452a965f5b7860509665f58cd325e0f0cd7c80b5899fadbbca07dce1945d9ae"
+    },
+    {
+      "source": "packages/agent-contracts/src/GateHash.sol",
+      "destination": "packages/contracts/src/GateHash.sol",
+      "sha256": "1b9a7a31d4f7f09d6901a769347b60db37ff218f8e41b7f4261f7fe7a4585a49"
+    },
+    {
+      "source": "packages/agent-contracts/src/GatePolicy.sol",
+      "destination": "packages/contracts/src/GatePolicy.sol",
+      "sha256": "4f1305fd843528f4eafeb8972120eb3e8cc482036ca8c011330f9fa520e00ac9"
+    },
+    {
+      "source": "packages/agent-contracts/src/IPurchaseGateV1.sol",
+      "destination": "packages/contracts/src/IPurchaseGateV1.sol",
+      "sha256": "6c08ba5fead8fd8327ce9d726bf990ee6c0effe5ea2f97b5a411851604cd8d24"
+    },
+    {
+      "source": "packages/agent-contracts/src/PurchaseGateV1.sol",
+      "destination": "packages/contracts/src/PurchaseGateV1.sol",
+      "sha256": "aa05abdd4a3f6c065ef984c2f0a1ad194f78d7d081c030c6eb7ff4352b1f8d3a"
+    },
+    {
+      "source": "packages/agent-contracts/src/PurchaseValidatorV1.sol",
+      "destination": "packages/contracts/src/PurchaseValidatorV1.sol",
+      "sha256": "a9d77af28a56e274c9a8ca7f6f03134743e2576abf08841702a317a61cb909cd"
+    },
+    {
+      "source": "packages/agent-contracts/src/UniswapV3FundingAdapterV1.sol",
+      "destination": "packages/contracts/src/UniswapV3FundingAdapterV1.sol",
+      "sha256": "b9406b8cde11d0603d6b1c75cf0416c48140daa7e07c15998ad15ea5a01c6340"
+    },
+    {
+      "source": "packages/agent-contracts/test/GateFixture.sol",
+      "destination": "packages/contracts/test/GateFixture.sol",
+      "sha256": "376a5e603b15aaf4534631c6bbfdbc861db3c0ae5a931e90032fe5224ba820b6"
+    },
+    {
+      "source": "packages/agent-contracts/test/HashVectors.t.sol",
+      "destination": "packages/contracts/test/HashVectors.t.sol",
+      "sha256": "8bc8812b20da5f2ab6e5f65d9f02c40e5a72790046b5749eb3a1387f47b048b2"
+    },
+    {
+      "source": "packages/agent-contracts/test/PurchaseGate.t.sol",
+      "destination": "packages/contracts/test/PurchaseGate.t.sol",
+      "sha256": "cb9bacd757efeaa3cc63647038f6f6d8650265de2e31ce2dd5bc921f2fa63b49"
+    }
+  ]
+}

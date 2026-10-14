@@ -9,7 +9,7 @@
 ## 実装順序
 
 - [x] 独立repoの準備、Google Cloudハッカソン要項の再確認。
-- [ ] EC非依存SDK・Gate・既存試験の抽出。
+- [x] EC非依存SDK・Gate・既存試験の抽出。
 - [ ] 複数AIの権限・共有予算・停止・例外同意。
 - [ ] PostgreSQLの永続状態・認証・API/SDK。
 - [ ] UCP discovery/catalog/cart/checkout/orderとEC adapter。
@@ -25,4 +25,4 @@ Google Cloudの配備先project IDを確認中。現在のCLI設定は別用途�
 
 ## 変更と確認
 
-初期状態は空repo。親ECの未コミット作業と他worktreeを保持し、独立cloneで作業する。まだアプリの動作・新しいcloud配備・実決済は確認していない。
+初期状態は空repo。親ECの未コミット作業と他worktreeを保持し、独立cloneで作業する。SDKのTypeScript buildと48件のテスト、Solidityの既存テストが通過。抽出元のrevisionとファイル一覧はEXTRACTION.jsonに保存した。まだ新しいcloud配備・実決済は確認していない。

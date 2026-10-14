@@ -1,0 +1,690 @@
+{
+  "scope": "Offline type/hash fixtures, not signed transactions or product integration tests. Addresses are synthetic.",
+  "compiler": "0.8.23+commit.f704f362.Emscripten.clang",
+  "interfaceSha256": "e00cae4f56d71654415f97fb29cd0b2470c5b7fcb566bc018abcc38cc8d3030c",
+  "domain": {
+    "name": "JPYC PurchaseGate",
+    "version": "1",
+    "chainId": 11155111,
+    "verifyingContract": "0x00000000000000000000000000000000000003e8"
+  },
+  "arrays": {
+    "shops": [
+      {
+        "shopIdHash": "0x0000000000000000000000000000000000000000000000000000000000000001",
+        "payTo": "0x00000000000000000000000000000000000000c8"
+      }
+    ],
+    "assets": [
+      {
+        "token": "0x000000000000000000000000000000000000012c",
+        "autoPerOrder": "10000000",
+        "autoPerPeriod": "100000000"
+      }
+    ],
+    "relayers": [
+      "0x0000000000000000000000000000000000000190"
+    ]
+  },
+  "types": {
+    "PurchaseOrder": [
+      {
+        "name": "orderId",
+        "type": "bytes32"
+      },
+      {
+        "name": "revisionId",
+        "type": "bytes32"
+      },
+      {
+        "name": "policyId",
+        "type": "bytes32"
+      },
+      {
+        "name": "policyVersion",
+        "type": "uint64"
+      },
+      {
+        "name": "periodIndex",
+        "type": "uint64"
+      },
+      {
+        "name": "account",
+        "type": "address"
+      },
+      {
+        "name": "agent",
+        "type": "address"
+      },
+      {
+        "name": "shopIdHash",
+        "type": "bytes32"
+      },
+      {
+        "name": "payTo",
+        "type": "address"
+      },
+      {
+        "name": "settlementToken",
+        "type": "address"
+      },
+      {
+        "name": "settlementAmount",
+        "type": "uint256"
+      },
+      {
+        "name": "basketCommitment",
+        "type": "bytes32"
+      },
+      {
+        "name": "fundingHash",
+        "type": "bytes32"
+      },
+      {
+        "name": "requirementsHash",
+        "type": "bytes32"
+      },
+      {
+        "name": "validUntil",
+        "type": "uint64"
+      }
+    ],
+    "Funding": [
+      {
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "name": "maxInput",
+        "type": "uint256"
+      },
+      {
+        "name": "outputJpyc",
+        "type": "uint256"
+      },
+      {
+        "name": "adapter",
+        "type": "address"
+      },
+      {
+        "name": "routeHash",
+        "type": "bytes32"
+      },
+      {
+        "name": "quoteDeadline",
+        "type": "uint64"
+      }
+    ],
+    "ExecutionIntent": [
+      {
+        "name": "orderHash",
+        "type": "bytes32"
+      },
+      {
+        "name": "paymentLeafHash",
+        "type": "bytes32"
+      },
+      {
+        "name": "fundingLeafHash",
+        "type": "bytes32"
+      },
+      {
+        "name": "validUntil",
+        "type": "uint64"
+      }
+    ],
+    "RiskStamp": [
+      {
+        "name": "intentHash",
+        "type": "bytes32"
+      },
+      {
+        "name": "riskDigest",
+        "type": "bytes32"
+      },
+      {
+        "name": "rulesHash",
+        "type": "bytes32"
+      },
+      {
+        "name": "reasonMask",
+        "type": "uint32"
+      },
+      {
+        "name": "checkedAt",
+        "type": "uint64"
+      },
+      {
+        "name": "validUntil",
+        "type": "uint64"
+      }
+    ],
+    "PriceStamp": [
+      {
+        "name": "orderHash",
+        "type": "bytes32"
+      },
+      {
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "name": "fairInputAtomic",
+        "type": "uint256"
+      },
+      {
+        "name": "sourceDigest",
+        "type": "bytes32"
+      },
+      {
+        "name": "observedAt",
+        "type": "uint64"
+      },
+      {
+        "name": "validUntil",
+        "type": "uint64"
+      }
+    ],
+    "HumanApproval": [
+      {
+        "name": "approvalId",
+        "type": "bytes32"
+      },
+      {
+        "name": "intentHash",
+        "type": "bytes32"
+      },
+      {
+        "name": "riskDigest",
+        "type": "bytes32"
+      },
+      {
+        "name": "identityBindingId",
+        "type": "bytes32"
+      },
+      {
+        "name": "overrideMask",
+        "type": "uint32"
+      },
+      {
+        "name": "authenticatedAt",
+        "type": "uint64"
+      },
+      {
+        "name": "validUntil",
+        "type": "uint64"
+      }
+    ],
+    "Signatures": [
+      {
+        "name": "merchant",
+        "type": "bytes"
+      },
+      {
+        "name": "agent",
+        "type": "bytes"
+      },
+      {
+        "name": "risk",
+        "type": "bytes"
+      },
+      {
+        "name": "price",
+        "type": "bytes"
+      },
+      {
+        "name": "human",
+        "type": "bytes"
+      }
+    ],
+    "PurchaseResult": [
+      {
+        "name": "orderHash",
+        "type": "bytes32"
+      },
+      {
+        "name": "actualInput",
+        "type": "uint256"
+      },
+      {
+        "name": "reasons",
+        "type": "uint32"
+      },
+      {
+        "name": "periodJpycSpentAfter",
+        "type": "uint256"
+      },
+      {
+        "name": "periodInputSpentAfter",
+        "type": "uint256"
+      }
+    ],
+    "Policy": [
+      {
+        "name": "account",
+        "type": "address"
+      },
+      {
+        "name": "policyId",
+        "type": "bytes32"
+      },
+      {
+        "name": "version",
+        "type": "uint64"
+      },
+      {
+        "name": "validAfter",
+        "type": "uint64"
+      },
+      {
+        "name": "validUntil",
+        "type": "uint64"
+      },
+      {
+        "name": "periodStart",
+        "type": "uint64"
+      },
+      {
+        "name": "periodSeconds",
+        "type": "uint64"
+      },
+      {
+        "name": "autoPerOrderJpyc",
+        "type": "uint256"
+      },
+      {
+        "name": "autoPerPeriodJpyc",
+        "type": "uint256"
+      },
+      {
+        "name": "merchantSetHash",
+        "type": "bytes32"
+      },
+      {
+        "name": "assetLimitsHash",
+        "type": "bytes32"
+      },
+      {
+        "name": "riskRulesHash",
+        "type": "bytes32"
+      },
+      {
+        "name": "identityBindingId",
+        "type": "bytes32"
+      },
+      {
+        "name": "relayerSetHash",
+        "type": "bytes32"
+      },
+      {
+        "name": "autoMaxPremiumBps",
+        "type": "uint32"
+      },
+      {
+        "name": "humanOverrideMask",
+        "type": "uint32"
+      },
+      {
+        "name": "merchantSigner",
+        "type": "address"
+      },
+      {
+        "name": "riskSigner",
+        "type": "address"
+      },
+      {
+        "name": "humanSigner",
+        "type": "address"
+      },
+      {
+        "name": "priceSigner",
+        "type": "address"
+      }
+    ],
+    "Merchant": [
+      {
+        "name": "shopIdHash",
+        "type": "bytes32"
+      },
+      {
+        "name": "payTo",
+        "type": "address"
+      }
+    ],
+    "AssetLimit": [
+      {
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "name": "autoPerOrder",
+        "type": "uint256"
+      },
+      {
+        "name": "autoPerPeriod",
+        "type": "uint256"
+      }
+    ],
+    "GrantBinding": [
+      {
+        "name": "policyId",
+        "type": "bytes32"
+      },
+      {
+        "name": "policyVersion",
+        "type": "uint64"
+      },
+      {
+        "name": "agent",
+        "type": "address"
+      },
+      {
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "name": "grantChainHash",
+        "type": "bytes32"
+      },
+      {
+        "name": "validUntil",
+        "type": "uint64"
+      }
+    ],
+    "PolicyRegistration": [
+      {
+        "name": "policyHash",
+        "type": "bytes32"
+      },
+      {
+        "name": "grantsHash",
+        "type": "bytes32"
+      },
+      {
+        "name": "nonce",
+        "type": "uint64"
+      },
+      {
+        "name": "validUntil",
+        "type": "uint64"
+      }
+    ],
+    "Revoke": [
+      {
+        "name": "account",
+        "type": "address"
+      },
+      {
+        "name": "policyId",
+        "type": "bytes32"
+      },
+      {
+        "name": "nonce",
+        "type": "uint64"
+      },
+      {
+        "name": "validUntil",
+        "type": "uint64"
+      }
+    ],
+    "Cancel": [
+      {
+        "name": "account",
+        "type": "address"
+      },
+      {
+        "name": "orderId",
+        "type": "bytes32"
+      },
+      {
+        "name": "nonce",
+        "type": "uint64"
+      },
+      {
+        "name": "validUntil",
+        "type": "uint64"
+      }
+    ],
+    "InvalidateRevision": [
+      {
+        "name": "account",
+        "type": "address"
+      },
+      {
+        "name": "policyId",
+        "type": "bytes32"
+      },
+      {
+        "name": "orderId",
+        "type": "bytes32"
+      },
+      {
+        "name": "revisionId",
+        "type": "bytes32"
+      },
+      {
+        "name": "nonce",
+        "type": "uint64"
+      },
+      {
+        "name": "validUntil",
+        "type": "uint64"
+      }
+    ]
+  },
+  "fixtures": {
+    "PurchaseOrder": {
+      "message": {
+        "orderId": "0x00000000000000000000000000000000000000000000000000000000000003e9",
+        "revisionId": "0x00000000000000000000000000000000000000000000000000000000000003ea",
+        "policyId": "0x0000000000000000000000000000000000000000000000000000000000000064",
+        "policyVersion": "1",
+        "periodIndex": "0",
+        "account": "0x0000000000000000000000000000000000000064",
+        "agent": "0x0000000000000000000000000000000000000065",
+        "shopIdHash": "0x0000000000000000000000000000000000000000000000000000000000000001",
+        "payTo": "0x00000000000000000000000000000000000000c8",
+        "settlementToken": "0x000000000000000000000000000000000000012d",
+        "settlementAmount": "2000000000000000000000",
+        "basketCommitment": "0x000000000000000000000000000000000000000000000000000000000000006f",
+        "fundingHash": "0xd350329df83d75bfec5201b192c32211791eb1e0327fae6e99d1fd096fdb792e",
+        "requirementsHash": "0x11de7f245625ef0c9a1846dd4bac4edbe381299df221ea9791592b9d376553ab",
+        "validUntil": "1790381100"
+      },
+      "structHash": "0x4c2c71c0c93ef6c7fdf1ad527770dd5c775368cf93b9c5528c4261a27bfcf483",
+      "digest": "0x062f27020d3b7edc874147ac5b1ac4b1e92fab065975e785cfe2e18f0008a1b4"
+    },
+    "Funding": {
+      "message": {
+        "token": "0x000000000000000000000000000000000000012c",
+        "maxInput": "15000000",
+        "outputJpyc": "2000000000000000000000",
+        "adapter": "0x00000000000000000000000000000000000001f4",
+        "routeHash": "0x000000000000000000000000000000000000000000000000000000000000022b",
+        "quoteDeadline": "1790381100"
+      },
+      "structHash": "0xd350329df83d75bfec5201b192c32211791eb1e0327fae6e99d1fd096fdb792e",
+      "digest": "0x0469d1cd70fb6cb48fef40589097380aaec8434ac9357e1a82d81678b51d3285"
+    },
+    "ExecutionIntent": {
+      "message": {
+        "orderHash": "0x062f27020d3b7edc874147ac5b1ac4b1e92fab065975e785cfe2e18f0008a1b4",
+        "paymentLeafHash": "0x0000000000000000000000000000000000000000000000000000000000000065",
+        "fundingLeafHash": "0x0000000000000000000000000000000000000000000000000000000000000066",
+        "validUntil": "1790381100"
+      },
+      "structHash": "0x2f077dbdd183b899b83dd937c3d256e5fc8374f8761540888e25f6b1e9a2e673",
+      "digest": "0xaf4f2919b7b72987ba1ffb46b18cd2a9d3def516c9facfa0839064b2cc0857c3"
+    },
+    "RiskStamp": {
+      "message": {
+        "intentHash": "0xaf4f2919b7b72987ba1ffb46b18cd2a9d3def516c9facfa0839064b2cc0857c3",
+        "riskDigest": "0x00000000000000000000000000000000000000000000000000000000000002bc",
+        "rulesHash": "0x000000000000000000000000000000000000000000000000000000000000006f",
+        "reasonMask": 64,
+        "checkedAt": "1790380801",
+        "validUntil": "1790380861"
+      },
+      "structHash": "0xc45e8bce4b824b063218894d7ed2970a76ae2871396adbe3919f22ec8076c1c6",
+      "digest": "0xdac14e7770eccb2fa061dc19275363d547f64c841ed718e63b136128ee218e3f"
+    },
+    "PriceStamp": {
+      "message": {
+        "orderHash": "0x062f27020d3b7edc874147ac5b1ac4b1e92fab065975e785cfe2e18f0008a1b4",
+        "token": "0x000000000000000000000000000000000000012c",
+        "fairInputAtomic": "14000000",
+        "sourceDigest": "0x0000000000000000000000000000000000000000000000000000000000000067",
+        "observedAt": "5",
+        "validUntil": "6"
+      },
+      "structHash": "0x4893ab48eef2c25ae11648bcaf79b132dcfdc06a467d11c668c3c54cd62d44ab",
+      "digest": "0xee75a3e49a6eaf4734767bb9c9ae06ae0d53bb47251ebbee046c48572de95051"
+    },
+    "HumanApproval": {
+      "message": {
+        "approvalId": "0x0000000000000000000000000000000000000000000000000000000000000384",
+        "intentHash": "0xaf4f2919b7b72987ba1ffb46b18cd2a9d3def516c9facfa0839064b2cc0857c3",
+        "riskDigest": "0x00000000000000000000000000000000000000000000000000000000000002bc",
+        "identityBindingId": "0x0000000000000000000000000000000000000000000000000000000000000070",
+        "overrideMask": 66,
+        "authenticatedAt": "1790380801",
+        "validUntil": "1790380861"
+      },
+      "structHash": "0x37098c3756737ae07eff95a6db710b1a0f8715d25dde73f3b1691385088adb32",
+      "digest": "0x2762d2cfe12648550ec9c65ab4a387579e1cd058de4d09afd6f8cbfa3b6aa776"
+    },
+    "Signatures": {
+      "message": {
+        "merchant": "0x",
+        "agent": "0x",
+        "risk": "0x",
+        "price": "0x",
+        "human": "0x"
+      },
+      "structHash": "0xb6b095f2b6439d5085dc3998f75eb8c0e48cfcecd155d1b84e86de85160483a4",
+      "digest": "0x2b297c459d453f9d7b1124acc391d930d94f9b0ae68fc848d61b5e14e3b2898c"
+    },
+    "PurchaseResult": {
+      "message": {
+        "orderHash": "0x0000000000000000000000000000000000000000000000000000000000000064",
+        "actualInput": "2",
+        "reasons": "3",
+        "periodJpycSpentAfter": "4",
+        "periodInputSpentAfter": "5"
+      },
+      "structHash": "0x3050eea925dcb3501449b863d0f592bf68d52c8309df5ce59cab2dfcb98923af",
+      "digest": "0xda0957d93f984b2acb18e8672b6b2af36fb6acb4ce50762578f7ddb3faa3277b"
+    },
+    "Policy": {
+      "message": {
+        "account": "0x0000000000000000000000000000000000000064",
+        "policyId": "0x0000000000000000000000000000000000000000000000000000000000000064",
+        "version": "1",
+        "validAfter": "1790380800",
+        "validUntil": "1792972800",
+        "periodStart": "1790380800",
+        "periodSeconds": "2592000",
+        "autoPerOrderJpyc": "3000000000000000000000",
+        "autoPerPeriodJpyc": "10000000000000000000000",
+        "merchantSetHash": "0x59c3a67ade4943ba77540a793216d37c12f46b244175e42833064941922a9d1c",
+        "assetLimitsHash": "0xced27a5910ae4096e27d27e188d690de9ea976bd782df3bb295c42584d048ed0",
+        "riskRulesHash": "0x000000000000000000000000000000000000000000000000000000000000006f",
+        "identityBindingId": "0x0000000000000000000000000000000000000000000000000000000000000070",
+        "relayerSetHash": "0xc1d1c776f6370d05f1d47e28797181dd07963bfe4e3aa2c731a0d3caea43fa4b",
+        "autoMaxPremiumBps": 200,
+        "humanOverrideMask": 255,
+        "merchantSigner": "0x0000000000000000000000000000000000000074",
+        "riskSigner": "0x0000000000000000000000000000000000000075",
+        "humanSigner": "0x0000000000000000000000000000000000000076",
+        "priceSigner": "0x0000000000000000000000000000000000000077"
+      },
+      "structHash": "0x175aefafcf92e44ffa6f8bc2c45ac31621030f369338b51058d3f0a007ccd1f3",
+      "digest": "0xe93eeb3e9a9fa3fe73b735b2216a6c238d7765f5f7cda499a6f1643a6432f851"
+    },
+    "Merchant": {
+      "message": {
+        "shopIdHash": "0x0000000000000000000000000000000000000000000000000000000000000064",
+        "payTo": "0x0000000000000000000000000000000000000065"
+      },
+      "structHash": "0x7832f65604f12c8cf824ca0bbce6667f359d7c7703b959c408600bc565b07fe4",
+      "digest": "0x72f1d4ae26a1ba3120a0020e66cc2d56229f015232a00d11a890ce908bd64bc6"
+    },
+    "AssetLimit": {
+      "message": {
+        "token": "0x0000000000000000000000000000000000000064",
+        "autoPerOrder": "2",
+        "autoPerPeriod": "3"
+      },
+      "structHash": "0xb13251bfd3062493b9f34583f60c686690f5a4af4cf1cb8035f66d870986a1f2",
+      "digest": "0x18644628d50759a18b7ed2bc4589a4f14d8e6a695b90b39468e0e04c9d15eee7"
+    },
+    "GrantBinding": {
+      "message": {
+        "policyId": "0x0000000000000000000000000000000000000000000000000000000000000064",
+        "policyVersion": "1",
+        "agent": "0x0000000000000000000000000000000000000065",
+        "token": "0x000000000000000000000000000000000000012c",
+        "grantChainHash": "0x0000000000000000000000000000000000000000000000000000000000000068",
+        "validUntil": "1792972800"
+      },
+      "structHash": "0xc542c9d6db29dba0bf0c06fd84d28b0e8c92a0853f4f8f5cf3a569afd2812dc3",
+      "digest": "0x67d07a24afcf43f19c5c66dfac8ff116f27210d4e04f6269c3d3139645b498c4"
+    },
+    "PolicyRegistration": {
+      "message": {
+        "policyHash": "0x175aefafcf92e44ffa6f8bc2c45ac31621030f369338b51058d3f0a007ccd1f3",
+        "grantsHash": "0x11daae92d920d9f52b1c6ecae4e78c298af9cb60830593c471670ee081460a43",
+        "nonce": "0",
+        "validUntil": "1790381100"
+      },
+      "structHash": "0xb1f3e8d6b9030729262402935db1d12285a84d655c3b7494511ef137f7ece5ee",
+      "digest": "0xd5582ec952a29b6c720fbb6b68f5c5f48725cb0bade18fd47bbcf1310989d935"
+    },
+    "Revoke": {
+      "message": {
+        "account": "0x0000000000000000000000000000000000000064",
+        "policyId": "0x0000000000000000000000000000000000000000000000000000000000000065",
+        "nonce": "3",
+        "validUntil": "4"
+      },
+      "structHash": "0xe9c4bbf3658dd862528227d29e4443e1e3fe9b3c8aa9ead1635f8c9de22d628b",
+      "digest": "0x6ab66e0e7b9c3a7b8bc240ed0d4090b099832ac6cd7e85643f017c3b2192a4ad"
+    },
+    "Cancel": {
+      "message": {
+        "account": "0x0000000000000000000000000000000000000064",
+        "orderId": "0x0000000000000000000000000000000000000000000000000000000000000065",
+        "nonce": "3",
+        "validUntil": "4"
+      },
+      "structHash": "0x6db77cc4d8d19bf2d0a13ea6c4233138e19ece7fc6b53e9b390022b8d250ea27",
+      "digest": "0x6ffb740dcc2fffd53f5e6f6a456735adf9b91c4e9754e47a52b05618519075c7"
+    },
+    "InvalidateRevision": {
+      "message": {
+        "account": "0x0000000000000000000000000000000000000064",
+        "policyId": "0x0000000000000000000000000000000000000000000000000000000000000065",
+        "orderId": "0x0000000000000000000000000000000000000000000000000000000000000066",
+        "revisionId": "0x0000000000000000000000000000000000000000000000000000000000000067",
+        "nonce": "5",
+        "validUntil": "6"
+      },
+      "structHash": "0xf5b215843e016c23af828bf18e900f5b415ae22049c412b4c2852705a2eac13c",
+      "digest": "0x38a76c517807c339b5c4c3fed000c088bb2f9bdfa79c9921f6e6901e5b03f0c9"
+    }
+  },
+  "validation": {
+    "interfaceCompilation": "passed",
+    "mutationChecks": [
+      "chain domain binds order",
+      "Gate domain binds order",
+      "order binds settlementAmount",
+      "order binds payTo",
+      "order binds revisionId",
+      "human approval binds risk digest",
+      "human approval binds intent",
+      "policy digest differs from struct hash"
+    ],
+    "count": 8
+  }
+}
