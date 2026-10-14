@@ -80,8 +80,8 @@ export async function localP256Signer(path:string,kid:string):Promise<P256Signer
  const publicJwk={...createPublicKey(key).export({format:'jwk'}),kid,alg:'ES256',use:'sig'};
  return {kid,publicJwk,sign:async input=>new Uint8Array(cryptoSign('sha256',input,{key,dsaEncoding:'ieee-p1363'}))};
 }
-export async function kmsP256Signer(keyVersion:string,kid:string):Promise<P256Signer>{
- const client=new KeyManagementServiceClient();const [key]=await client.getPublicKey({name:keyVersion});
+export async function kmsP256Signer(keyVersion:string,kid:string,client=new KeyManagementServiceClient()):Promise<P256Signer>{
+ const [key]=await client.getPublicKey({name:keyVersion});
  if(key.algorithm!=='EC_SIGN_P256_SHA256'&&key.algorithm!==12)throw new Error('wrong_ap2_key_algorithm');
  if(!key.pem)throw new Error('kms_public_key_missing');const publicKey=createPublicKey(key.pem);
  const publicJwk={...publicKey.export({format:'jwk'}),kid,alg:'ES256',use:'sig'};

@@ -1,0 +1,30 @@
+{
+  "project": "yours-511602",
+  "region": "asia-northeast1",
+  "checkedAt": "2026-10-14T03:38:42.848Z",
+  "secp256k1": {
+    "address": "0x11e0a3De677551D3A4704FB7faFa99599eCF7366",
+    "recoveryVerified": true
+  },
+  "p256": {
+    "publicJwk": {
+      "kty": "EC",
+      "x": "q3KWuvjer93_GXbXNlvkYCfcDGQU9MEppQLY397VbeQ",
+      "y": "j_C9kn5WDHcnfrWH1dQbBQa_Cn4-OH6pxl68b4VM3y0",
+      "crv": "P-256",
+      "kid": "ucp-merchant",
+      "alg": "ES256",
+      "use": "sig"
+    },
+    "signatureVerified": true
+  },
+  "addresses": {
+    "relayer": "0x11e0a3De677551D3A4704FB7faFa99599eCF7366",
+    "merchant": "0xAe82ccD35a88F4FF22E6bc47B842B5e1f560453a",
+    "risk": "0x03f40BEc16566C95A71892d59592e05C3ee9E2bf",
+    "human": "0x4be5EB3648200E3E5fbaCb53906111D89ef33E7D",
+    "price": "0x66796A883b7c0624F297911A1Ccf35275E600F49",
+    "agent": "0x0541F9CBE415D2faEBe5f259e3D594733C90bc01"
+  },
+  "scope": "Actual HSM signatures; no private-key export. This file alone does not prove settlement."
+}

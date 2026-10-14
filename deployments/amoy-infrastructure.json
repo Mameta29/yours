@@ -1,0 +1,92 @@
+{
+  "chainId": 80002,
+  "manager": "0xdb9B1e94B5b69Df7e401DDbedE43491141047dB3",
+  "accountImplementation": "0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B",
+  "jpyc": "0xE7C3D8C9a439feDe00D2600032D5dB0Be71C3c29",
+  "usdc": "0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582",
+  "enforcers": {
+    "periodic": "0x474e3Ae7E169e940607cC624Da8A15Eb120139aB",
+    "redeemer": "0xE144b0b2618071B4E56f746313528a669c7E65c5",
+    "timestamp": "0x1046bb45C8d673d4ea75321280DB34899413c069",
+    "value": "0x92Bf12322527cAA612fd31a0e810472BBB106A8F",
+    "nonce": "0xDE4f2FAC4B3D87A1d9953Ca5FC09FCa7F366254f",
+    "transferAmount": "0xf100b0819427117EcF76Ed94B358B1A5b5C6D2Fc",
+    "calldata": "0xc2b0d624c1c4319760C96503BA27C347F3260f55"
+  },
+  "router": "0x7462c2644b21476f68F437E62994BfB02e4D8F88",
+  "factory": "0xF91ec1D91B8666504853C5eeE5C76e12e88CF9D0",
+  "fee": 3000,
+  "contracts": [
+    {
+      "address": "0xdb9B1e94B5b69Df7e401DDbedE43491141047dB3",
+      "codeHash": "0x7f2a1a757879e5030b657f8d05823b96c75dfeb46633101e4d827ec2d346620c"
+    },
+    {
+      "address": "0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B",
+      "codeHash": "0xddc1c1b0583d57f3937d04c7bdacfaecb699d8aa27ee00040ab2c7b656ed239b"
+    },
+    {
+      "address": "0x474e3Ae7E169e940607cC624Da8A15Eb120139aB",
+      "codeHash": "0xd9a721435a13aaa562f7e6c7f7d062170a725ffdb7dd7c1e30798194ee9e186c"
+    },
+    {
+      "address": "0xE144b0b2618071B4E56f746313528a669c7E65c5",
+      "codeHash": "0x0acea3889e6bab48774ee99ed9ada1b91875bde5a15976330063e91998e84228"
+    },
+    {
+      "address": "0x1046bb45C8d673d4ea75321280DB34899413c069",
+      "codeHash": "0x1da353833766081398664c131a50988f6f7190d6a1a974f497607b974705900c"
+    },
+    {
+      "address": "0x92Bf12322527cAA612fd31a0e810472BBB106A8F",
+      "codeHash": "0x825495cede463ecea97c3c6c2bee85d5a4645906e1f0498a9432b39f43cfad19"
+    },
+    {
+      "address": "0xDE4f2FAC4B3D87A1d9953Ca5FC09FCa7F366254f",
+      "codeHash": "0x7bbb80e3cd46e4a1cee4c2cbf712f6de0aa06f9bce616c39e1358210ee023ad8"
+    },
+    {
+      "address": "0xf100b0819427117EcF76Ed94B358B1A5b5C6D2Fc",
+      "codeHash": "0xa9104d82ccfcdb251f90da0f1b49f36432d574925f72ed4cb97bec5b3a94cd54"
+    },
+    {
+      "address": "0xc2b0d624c1c4319760C96503BA27C347F3260f55",
+      "codeHash": "0x26a87ea53c698e47fbea2566d50d18964062d0c74bd0baebc60316393461bf84"
+    },
+    {
+      "address": "0xE7C3D8C9a439feDe00D2600032D5dB0Be71C3c29",
+      "codeHash": "0xed040fe509076fecc53768e957b9b52a3b3fba907d9d0ed4dc029c86ec3e904e"
+    },
+    {
+      "address": "0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582",
+      "codeHash": "0xaab3cdd83735aac2126baf8481dd19d744ecfadd5a9b1d12a6148e800967385c"
+    },
+    {
+      "address": "0xF91ec1D91B8666504853C5eeE5C76e12e88CF9D0",
+      "codeHash": "0x99a33f9bef986c147f8f7421ae1c3de5d27816246e5d30d29c46b3a4706e6d76"
+    },
+    {
+      "address": "0x7462c2644b21476f68F437E62994BfB02e4D8F88",
+      "codeHash": "0x24c43024152dc73c2ec471818050a8b10fcde286cf776ebcabda28cc468e99b4"
+    }
+  ],
+  "proxyImplementations": [
+    {
+      "proxy": "0xE7C3D8C9a439feDe00D2600032D5dB0Be71C3c29",
+      "slot": "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc",
+      "implementation": "0xafac17fc3936a29ca2d2787ced3c5d1c52007d2e",
+      "codeHash": "0xe79ee627372f287ed4c10739504509aa22e6445c3ca0eb83fdacc98ba57394b2"
+    },
+    {
+      "proxy": "0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582",
+      "slot": "0x7050c9e0f4ca769c69bd3a8ef740bc37934f8e2c036e5a723fd8ee048ed3f8c3",
+      "implementation": "0xc8a087ac4bab015261dfc3469201f1169b8a5e00",
+      "codeHash": "0xad1e08cab219e5b3cc17b8f22f8a415112f37b9520b2fc339d91da09a319e291"
+    }
+  ],
+  "source": {
+    "repository": "Mameta29/jpyc-ec-platform",
+    "revision": "1c2024383c2c76f887b94dd19d7a963ca9f307f7",
+    "path": "packages/agent-commerce/deployments/amoy.manifest.json"
+  }
+}
