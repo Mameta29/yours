@@ -8,11 +8,21 @@ const code = `0xef0100${implementation.slice(2)}`;
 function fixture() {
   let currentCode: string | undefined, chain = '0x13882';
   const status = { id, version: '2.0.0', chainId: chain, status: 200, atomic: true, receipts: [{ status: '0x1', transactionHash: txHash }] };
-  const request = vi.fn(async ({ method }: { method: string }) => {
+  const request = vi.fn(async ({ method, params }: { method: string; params?: any[] }) => {
     if (method === 'eth_chainId') return chain;
     if (method === 'eth_accounts') return [owner];
     if (method === 'wallet_getCapabilities') return { '0x13882': { atomic: { status: 'ready' } } };
-    if (method === 'wallet_sendCalls') return { id };
+    if (method === 'wallet_sendCalls') {
+      // MetaMask 13.48 / eip-5792-middleware 3.0.3 uses optional(StrictHexStruct)
+      // for data: omitted is valid, but an explicit empty "0x" is rejected.
+      // Reproduce the reported RPC boundary instead of accepting any payload.
+      for (const call of params![0].calls) {
+        if (call.data !== undefined && (typeof call.data !== 'string' || !/^0x[0-9a-f]+$/.test(call.data))) {
+          throw { code: -32602, message: 'Invalid params: calls.data must be omitted or nonempty hex' };
+        }
+      }
+      return { id };
+    }
     if (method === 'wallet_getCallsStatus') return status;
     throw new Error('unexpected_method');
   });
@@ -26,7 +36,7 @@ describe('explicit owner smart-account upgrade', () => {
   it('sends only two zero-value self calls, persists the ID and requires canonical five-confirmation code', async () => {
     const f = fixture();
     await ensureGateSmartAccount(f.options);
-    expect(f.request.mock.calls.find(([r]) => r.method === 'wallet_sendCalls')).toEqual([{ method: 'wallet_sendCalls', params: [{ version: '2.0.0', from: owner, chainId: '0x13882', atomicRequired: true, calls: [{ to: owner, value: '0x0', data: '0x' }, { to: owner, value: '0x0', data: '0x' }] }] }]);
+    expect(f.request.mock.calls.find(([r]) => r.method === 'wallet_sendCalls')).toEqual([{ method: 'wallet_sendCalls', params: [{ version: '2.0.0', from: owner, chainId: '0x13882', atomicRequired: true, calls: [{ to: owner, value: '0x0' }, { to: owner, value: '0x0' }] }] }]);
     expect(f.options.onSubmitted).toHaveBeenCalledWith(id);
     expect(f.options.onSubmitted.mock.invocationCallOrder[0]).toBeLessThan(f.waitForTransactionReceipt.mock.invocationCallOrder[0]!);
     expect(f.waitForTransactionReceipt).toHaveBeenCalledWith({ hash: txHash, confirmations: 5, timeout: 180000 });

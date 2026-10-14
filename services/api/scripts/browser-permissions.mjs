@@ -47,9 +47,9 @@ try{
   if(method==='wallet_sendCalls'){
    const batch=params[0];
    assert.equal(batch.from.toLowerCase(),owner.address.toLowerCase());assert.equal(batch.chainId,toHex(31337));assert.equal(batch.atomicRequired,true);
-   assert.deepEqual(batch.calls,[{to:owner.address.toLowerCase(),value:'0x0',data:'0x'},{to:owner.address.toLowerCase(),value:'0x0',data:'0x'}]);
+   assert.deepEqual(batch.calls,[{to:owner.address.toLowerCase(),value:'0x0'},{to:owner.address.toLowerCase(),value:'0x0'}]);
    const upgrade=await owner.signAuthorization({contractAddress:m.accountImplementation,chainId:31337,nonce:await client.getTransactionCount({address:owner.address})+1});
-   const data=encodeFunctionData({abi:parseAbi(['function execute(bytes32 mode,bytes executionCalldata) payable']),functionName:'execute',args:['0x01'+'00'.repeat(31),encodeAbiParameters([{type:'tuple[]',components:[{name:'target',type:'address'},{name:'value',type:'uint256'},{name:'callData',type:'bytes'}]}],[batch.calls.map(call=>({target:call.to,value:0n,callData:call.data}))])]});
+   const data=encodeFunctionData({abi:parseAbi(['function execute(bytes32 mode,bytes executionCalldata) payable']),functionName:'execute',args:['0x01'+'00'.repeat(31),encodeAbiParameters([{type:'tuple[]',components:[{name:'target',type:'address'},{name:'value',type:'uint256'},{name:'callData',type:'bytes'}]}],[batch.calls.map(call=>({target:call.to,value:0n,callData:call.data??'0x'}))])]});
    upgradeHash=await wallet.sendTransaction({to:owner.address,authorizationList:[upgrade],data,gas:200000n});upgradeRequests++;
    assert.equal((await client.waitForTransactionReceipt({hash:upgradeHash})).status,'success');
    return {id:upgradeHash};

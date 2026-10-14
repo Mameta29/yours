@@ -1,0 +1,25 @@
+{
+  "checkedAt": "2026-10-14T10:20:09.410461+00:00",
+  "scope": "Actual SDK-generated wallet_sendCalls parameters checked with the published MetaMask runtime struct; no browser wallet or transaction.",
+  "upstream": {
+    "package": "@metamask/eip-5792-middleware",
+    "version": "3.0.3",
+    "source": "https://registry.npmjs.org/@metamask/eip-5792-middleware/-/eip-5792-middleware-3.0.3.tgz",
+    "schemaPath": "dist/types.mjs",
+    "schemaSha256": "0595bb0601faee47abd40e80a91c4716c1d71358b274bbcfdd06f83092c21cf5"
+  },
+  "runtimeDependencies": {
+    "@metamask/superstruct": "3.4.1",
+    "@metamask/utils": "11.12.1"
+  },
+  "before": {
+    "data": "0x",
+    "valid": false,
+    "error": "At path: 0.calls.0.data -- Expected a string matching `/^0x[0-9a-f]+$/` but received \"0x\""
+  },
+  "after": {
+    "data": "omitted",
+    "valid": true
+  },
+  "regression": "packages/wallet-sdk/test/upgrade.test.ts rejects explicit empty call data at the provider boundary; browser-permissions.mjs encodes omitted call data as empty bytes for the real local-chain execution."
+}

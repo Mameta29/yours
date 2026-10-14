@@ -42,9 +42,10 @@ export async function ensureGateSmartAccount(options: UpgradeOptions): Promise<v
     onProgress?.('approval');
     // Two empty, zero-value self calls explicitly request atomic execution,
     // following MetaMask's documented upgrade flow. Do not retry this RPC.
+    // Omit data: MetaMask's optional StrictHexStruct rejects an explicit '0x'.
     const result = await provider.request({ method: 'wallet_sendCalls', params: [{
       version: '2.0.0', from: owner, chainId: toHex(chainId), atomicRequired: true,
-      calls: [{ to: owner, value: '0x0', data: '0x' }, { to: owner, value: '0x0', data: '0x' }],
+      calls: [{ to: owner, value: '0x0' }, { to: owner, value: '0x0' }],
     }] }).catch(error => { throw walletRpcError(error, 'wallet_sendCalls'); });
     if (!result || !batchId.test(result.id)) throw new Error('wallet_upgrade_response_invalid');
     id = result.id as Hex;
