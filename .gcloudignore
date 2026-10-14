@@ -1,0 +1,16 @@
+.git
+.local
+**/node_modules
+**/dist
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/out
+**/cache
+**/coverage
+**/.env
+**/.env.*
+**/*.log
+**/test-results
+**/playwright-report
+.DS_Store

@@ -4,7 +4,7 @@ export const configSchema=z.object({
  DATABASE_URL:z.string().min(1),PUBLIC_ORIGIN:z.string().url().default('http://localhost:8080'),
  PORT:z.coerce.number().int().min(1).max(65535).default(8080),
  CHAIN_ID:z.coerce.number().int().default(80002),
- RPC_URL:z.string().url().default('https://rpc-amoy.polygon.technology'),
+ RPC_URL:z.string().url().default('https://polygon-amoy-bor-rpc.publicnode.com'),
  MERCHANT_ID:z.string().default('yours-lab'),MERCHANT_NAME:z.string().default('yours Market'),
  MERCHANT_PAY_TO:z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
  JPYC_ADDRESS:z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),

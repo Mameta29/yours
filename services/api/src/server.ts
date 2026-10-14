@@ -6,7 +6,7 @@ import {readConfig} from './config.js';
 import {createApp} from './app.js';
 const config=readConfig();
 const db=createDb(config.DATABASE_URL);
-const signer=config.UCP_SIGNING_KEY?await kmsP256Signer(config.UCP_SIGNING_KEY,'yours-ucp-1'):await localP256Signer(config.LOCAL_KEY_DIR+'/merchant.pem','yours-ucp-1');
+const signer=config.UCP_SIGNING_KEY?await kmsP256Signer(config.UCP_SIGNING_KEY,'ucp-merchant'):await localP256Signer(config.LOCAL_KEY_DIR+'/merchant.pem','ucp-merchant');
 const app=createApp(db,config,signer);
 app.use('/*',serveStatic({root:'apps/console/dist'}));
 app.get('*',serveStatic({path:'apps/console/dist/index.html'}));

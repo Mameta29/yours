@@ -1,0 +1,11 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ['build', '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/yours/api:${_TAG}', '.']
+images:
+  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/yours/api:${_TAG}'
+options:
+  logging: CLOUD_LOGGING_ONLY
+substitutions:
+  _REGION: asia-northeast1
+  _TAG: latest
+timeout: 1200s
