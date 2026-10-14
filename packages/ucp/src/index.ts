@@ -1,5 +1,7 @@
 import {canonicalJson,DomainError} from '@yours/domain';
 import {base64url,compactVerify,decodeProtectedHeader,importJWK,type JWK} from 'jose';
+import {parseDictionary,isInnerList} from 'structured-headers';
+import {safeRequest} from './network.js';
 import {validateSchema} from './schema.js';
 export * from './schema.js';
 export const UCP_VERSION='2026-08-25';
@@ -43,22 +45,32 @@ export function negotiate(business:Profile,platform:Profile,{requireAp2=true}={}
 }
 export function parseAgentHeader(header:string|undefined):string{
  if(!header||header.length>2048)throw new DomainError('ucp_agent_required',400);
- const matches=[...header.matchAll(/(?:^|,)\s*profile="([^"\\]+)"/g)];
- if(matches.length!==1)throw new DomainError('ucp_agent_invalid',400);
- const url=new URL(matches[0][1]);if(url.hash||url.username||url.password)throw new DomainError('ucp_agent_invalid',400);
- return url.href;
+ try{
+  const masked=header.replace(/"(?:[^"\\]|\\.)*"/g,'""');
+  if([...masked.matchAll(/(?:^|,)\s*profile(?:=|;|$)/g)].length!==1)throw new Error('duplicate_profile');
+  const value=parseDictionary(header).get('profile');
+  if(!value||isInnerList(value)||typeof value[0]!=='string')throw new Error('invalid_profile');
+  const url=new URL(value[0]);if(url.hash||url.username||url.password||!['https:','http:'].includes(url.protocol))throw new Error('invalid_profile');
+  return url.href;
+ }catch{throw new DomainError('ucp_agent_invalid',400);}
 }
-/** Only operator-enrolled HTTPS origins. Redirects are never followed. */
+const profiles=new Map<string,{expires:number;value:Profile}>();
+const pendingProfiles=new Map<string,Promise<Profile>>();
+/** Bounded, cached discovery with DNS pinning and no redirects. */
 export async function fetchProfile(url:string,allowedOrigins:ReadonlySet<string>,allowLoopback=false):Promise<Profile>{
  const parsed=new URL(url);
- if(!allowedOrigins.has(parsed.origin)||parsed.username||parsed.password||parsed.hash||!(parsed.protocol==='https:'||(allowLoopback&&parsed.protocol==='http:'&&['localhost','127.0.0.1'].includes(parsed.hostname))))throw new DomainError('profile_origin_not_allowed',403);
- const response=await fetch(url,{redirect:'error',signal:AbortSignal.timeout(5000),headers:{Accept:'application/json'}});
- if(!response.ok||!(response.headers.get('content-type')??'').includes('application/json'))throw new DomainError('profile_unavailable',502);
- const reader=response.body?.getReader();if(!reader)throw new DomainError('profile_unavailable',502);
- const chunks:Uint8Array[]=[];let size=0;
- try{while(true){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>262144)throw new DomainError('profile_too_large',502);chunks.push(value);}}finally{await reader.cancel();}
- const result=JSON.parse(Buffer.concat(chunks).toString('utf8'));
- validateSchema('profile.json',result);return result as Profile;
+ if(!allowedOrigins.has(parsed.origin)||parsed.username||parsed.password||parsed.hash||!(parsed.protocol==='https:'||allowLoopback&&parsed.protocol==='http:'&&['localhost','127.0.0.1'].includes(parsed.hostname)))throw new DomainError('profile_origin_not_allowed',403);
+ const cached=profiles.get(url);if(cached&&cached.expires>Date.now())return cached.value;
+ if(pendingProfiles.has(url))return pendingProfiles.get(url)!;
+ if(pendingProfiles.size>=8)throw new DomainError('profile_discovery_busy',503);
+ const promise=(async()=>{
+  const response=await safeRequest(url,{allowedOrigins,allowLoopback});
+  if(response.status!==200||!response.headers['content-type']?.includes('application/json'))throw new DomainError('profile_unavailable',502);
+  const result=JSON.parse(response.body.toString('utf8'));validateSchema('profile.json',result);
+  if(profiles.size>=64)profiles.delete(profiles.keys().next().value!);
+  profiles.set(url,{expires:Date.now()+60000,value:result});return result as Profile;
+ })();
+ pendingProfiles.set(url,promise);try{return await promise;}finally{pendingProfiles.delete(url);}
 }
 export interface DetachedSigner {kid:string;sign(input:Uint8Array):Promise<Uint8Array>}
 export function checkoutPayload(checkout:Record<string,unknown>):string{
@@ -86,3 +98,5 @@ export async function verifyCheckout(checkout:Record<string,unknown>,keys:JWK[])
  }catch{throw new DomainError('merchant_authorization_invalid',422);}
 }
 export * from './transport.js';
+
+export * from "./network.js";
