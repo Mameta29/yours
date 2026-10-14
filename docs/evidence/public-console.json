@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-10-14T09:17:03.480Z",
+  "checkedAt": "2026-10-14T09:56:28.039910+00:00",
   "origin": "https://yours-api-110852561536.asia-northeast1.run.app",
   "scope": "Public Cloud Run console read-only checks. Actual MetaMask signatures and public Amoy purchase are separate.",
   "checks": [
@@ -11,13 +11,13 @@
     "no JavaScript errors"
   ],
   "chunks": [
-    "/assets/index-fnHoQQmx.js",
+    "/assets/index-aat8_wxU.js",
     "/assets/react-C2KYkj3z.js",
-    "/assets/wallet-Dw9dHSWU.js",
-    "/assets/index-CUTL5Wxv.css"
+    "/assets/wallet-Cv6Uvc1p.js",
+    "/assets/index-6OUXtx4g.css"
   ],
-  "source": "22bbaea",
-  "imageTag": "wallet-resume-20261014",
+  "source": "fc5b488",
+  "imageTag": "wallet-rpc-20261014",
   "catalog": {
     "products": 7,
     "externalProducts": 4,

@@ -19,6 +19,8 @@
 - 再接続が必要な場合は戻り先と入力値を画面内で保持する。同じ本人のログイン後に元の画面へ戻し、条件を再確認してから登録する。接続キャンセル後も戻り先を失わない。
 - 別walletでログインした場合は以前の本人の操作を引き継がない。accountやnetworkが実際に変わった場合は画面を閉じてログアウトする。同じ値の再通知ではログアウトしない。
 
-SDKの10項目と、実Chrome→HTTP API→PostgreSQL→Anvil/公式MetaMask contractsの17項目を確認。通常EOAからの実EIP-7702 transactionと、設定状態の応答消失後に再送しないことを含む。[ブラウザ検証](../evidence/browser-permissions.json)は試験用EIP-1193 providerによるもので、実MetaMask拡張の公開Amoy成功を意味しない。
+SDKの設定・RPCエラー分類の20項目と、実Chrome→HTTP API→PostgreSQL→Anvil/公式MetaMask contractsの18項目を確認。通常EOAからの実EIP-7702 transactionと、設定状態の応答消失後に再送しないことを含む。[ブラウザ検証](../evidence/browser-permissions.json)は試験用EIP-1193 providerによるもので、実MetaMask拡張の公開Amoy成功を意味しない。
 
 仕様の根拠: [MetaMaskのbatch transactionと対応network](https://docs.metamask.io/metamask-connect/evm/guides/send-transactions/batch-transactions/)、[EIP-5792](https://eips.ethereum.org/EIPS/eip-5792)。
+
+MetaMaskのRPC失敗は一律の通信エラーにまとめず、接続権限不足・要求形式・不明なbatch ID・確認待ちを区別する。「エラーの詳細」で処理名、RPC番号、長さ制限・hex/URL/credential除去済みの理由だけを表示する。要求payloadや署名をログへ送信しない。元の失敗理由にかかわらず、batch照合エラーだけで保存済みIDを消したり新しい取引を自動送信したりしない。
