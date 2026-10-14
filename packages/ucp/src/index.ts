@@ -85,3 +85,4 @@ export async function verifyCheckout(checkout:Record<string,unknown>,keys:JWK[])
   return jwt;
  }catch{throw new DomainError('merchant_authorization_invalid',422);}
 }
+export * from './transport.js';
