@@ -34,7 +34,7 @@ Polygon Amoyにyours専用Gate `0x42eec579df8fb1f87ae3bddbb90c6a4a9f790504` とR
 初期状態は空repo。親ECの未コミット作業と他worktreeを保持し、独立cloneで作業する。抽出元のrevisionとファイル一覧はEXTRACTION.jsonに保存した。
 
 - SDK: 型付きowner同意、委任検証、生成ABI。buildと58テスト通過。EIP-5792によるアプリからのスマートアカウント設定と、batch IDによる再開を追加。
-- 権限API: 本人署名・公式MetaMask委任・5 confirmations後の有効化・即時pause・onchain revokeを実装。実PostgreSQL/Anvilで14項目通過（`docs/evidence/permissions-api.json`）。中断した登録のhashを保持し、確定済みpolicyの期間を保ったまま2件目だけ新しい本人署名で再開。実Chromeと試験用EIP-1193 providerによる10項目も通過（`docs/evidence/browser-permissions.json`）。実MetaMask拡張は別途確認する。
+- 権限API: 本人署名・公式MetaMask委任・5 confirmations後の有効化・即時pause・onchain revokeを実装。実PostgreSQL/Anvilで14項目通過（`docs/evidence/permissions-api.json`）。中断した登録のhashを保持し、確定済みpolicyの期間を保ったまま2件目だけ新しい本人署名で再開。実Chromeと試験用EIP-1193 providerによる17項目も通過（`docs/evidence/browser-permissions.json`）。実MetaMask拡張は別途確認する。
 - Solidity: AI接続別の権限と共有予算を同一transactionで強制。36テスト（fuzzを含む）通過、EIP-170サイズ制限内。公式MetaMask DelegationManager・EIP-7702とのローカル統合12件通過（`docs/evidence/local-chain.json`）。公開Amoy配備済み。
 - Domain: 単位の厳密変換、期限・共有予算・AI別予算をfail-closedで判定。7テスト通過。
 - PostgreSQL: owner署名認証、idempotency、outbox、予算予約、署名済みtransactionを送信前に保存するjournal。実PostgreSQLで6件の同時実行・復旧試験通過。
@@ -46,16 +46,16 @@ Polygon Amoyにyours専用Gate `0x42eec579df8fb1f87ae3bddbb90c6a4a9f790504` とR
 
 ## 公開環境での確認
 
-[管理画面/API](https://yours-api-110852561536.asia-northeast1.run.app)を公開。mandates・worker・agentは非公開のCloud Run。Cloud Build `12c78537-9a28-49fe-a3a5-5de3ede1b2ee`で既存EC連携を配備し、migration job `yours-migrate-qc5b6`で001〜010を反映。Geminiのページ取得修正はCloud Build `97bb9b8a-6f10-4a11-b274-c4264c044504`で追加反映した。
+[管理画面/API](https://yours-api-110852561536.asia-northeast1.run.app)を公開。mandates・worker・agentは非公開のCloud Run。Cloud Build `12c78537-9a28-49fe-a3a5-5de3ede1b2ee`で既存EC連携を配備し、migration job `yours-migrate-qc5b6`で001〜010を反映。Geminiのページ取得修正はCloud Build `97bb9b8a-6f10-4a11-b274-c4264c044504`、wallet再接続の修正はCloud Build `799a615c-3f7c-462a-8894-1f2bc20ab09d`で追加反映した。
 
 | service | revision | image tag | source |
 | --- | --- | --- | --- |
-| API / Console | `yours-api-00006-fnf` | `commerce-20261014` | `c785810` |
+| API / Console | `yours-api-00007-5qc` | `wallet-resume-20261014` | `22bbaea` |
 | worker | `yours-worker-00006-z4v` | `commerce-20261014` | `c785810` |
 | mandates | `yours-mandates-00006-cjn` | `commerce-20261014` | `c785810` |
 | Gemini agent | `yours-agent-00006-98c` | `catalog-20261014` | `55b074d` |
 
-Cloud SQL接続、HSM公開鍵とdiscoveryの一致、4サービスのhealthと公開範囲を確認（[証拠](evidence/cloud-services.json)）。追加反映後も4件成功。配備後のCloud Run ERRORログは確認時点で0件。後続commitは再配備するまで公開環境の成果に含めない。
+Cloud SQL接続、HSM公開鍵とdiscoveryの一致、4サービスのhealthと公開範囲を確認（[証拠](evidence/cloud-services.json)）。再接続修正の反映後も4件成功。公開Chromeの1440px・390px表示、JavaScriptエラーなし、検証したbuild assetの配信を確認。後続commitは再配備するまで公開環境の成果に含めない。
 
 Google ADK → Vertex AI `gemini-3.8-flash` → 実Cloud SQL catalogの検索が公開画面のAPI経由で成功（[証拠](evidence/gemini-cloud.json)）。未接続の試用は検索専用で、決済権限を持たない。購入は本人署名・AP2・x402を経由する。
 
@@ -63,7 +63,9 @@ Google ADK → Vertex AI `gemini-3.8-flash` → 実Cloud SQL catalogの検索が
 
 商品数の増加に合わせ、Geminiの検索toolへUCP cursorを追加。全商品を尋ねると6件→1件の2ページを実際に取得し、最後の商品まで7件を回答した（[全件検索](evidence/gemini-paginated-cloud.json)）。続きが残る場合は全件取得したと答えないよう指示している。
 
-管理画面は1440pxと390pxで実ブラウザ検証済み（[公開検証](evidence/public-console.json)）。接続、AI別権限、共有予算、停止、注文専用同意、購入品downloadを実APIへ接続。未設定EOAから「ウォレットで承認する」を押すとMetaMaskの設定確認を開始する。画像で報告された`wallet_upgrade_required`の原因を修正し、設定取引の応答消失・reload・部分登録復旧を含むローカルChromeの10項目を確認（[設計](design/WALLET-ONBOARDING.md)）。公開Amoyで実MetaMaskの設定・本人購入はユーザーに再確認を依頼中。
+管理画面は1440pxと390pxで実ブラウザ検証済み（[公開検証](evidence/public-console.json)）。接続、AI別権限、共有予算、停止、注文専用同意、購入品downloadを実APIへ接続。未設定EOAから「ウォレットで承認する」を押すとMetaMaskの設定確認を開始する。画像で報告された`wallet_upgrade_required`の原因を修正し、設定取引の応答消失・reload・部分登録復旧を含むローカルChromeの17項目を確認（[設計](design/WALLET-ONBOARDING.md)）。公開Amoyで実MetaMaskの設定・本人購入はユーザーに再確認を依頼中。
+
+再読み込み後の「登録を再開」でwalletへ再接続すると、登録画面が閉じる不具合も修正。旧版で同じ停止を再現した。修正版は接続済みの同じ本人・networkを復元し、再接続が必要な場合は入力した条件を保って元の画面へ戻す。接続キャンセル・別walletへの切り替え・条件の再確認を上記17項目に含めている。source `22bbaea`のGitHub CI [38540356112](https://github.com/Mameta29/yours/actions/runs/38540356112)も全項目成功。
 
 UCP RFC 9421署名、API keyとplatform profileの結び付け、DNSを固定したprofile取得、order webhookのoutbox・inbox・重複排除・非同期auditを実装・配備。非公開workerへの1分間隔のScheduler `yours-outbox`を設定済み。
 
@@ -75,7 +77,7 @@ UCP RFC 9421署名、API keyとplatform profileの結び付け、DNSを固定し
 
 `adapters/jpyc-ec`を新設。登録済みのorigin・店舗ID・送金先だけを使い、実ECの予約・personal_sign・transfer照合を接続する。migration 010で予約の冪等キーとcheckout/AP2の結び付きを永続化。本人の署名・同意を得るまではAP2を発行せず、メールの宛先をAIへ渡さない。workerは確定後に同じtx hashでEC注文を照合し、応答消失から復旧する。
 
-adapter境界の12テスト、AP2 authorityの19テスト、実Chromeを含む68項目のpipeline、権限API14項目、wallet登録10項目が通過。ECのHTTP境界はfixtureで、本人署名と実ERC20 receiptを検証している。実ECの[公開catalogの読み取り](evidence/ec-public-catalog.json)とは区別する。公開ECでの本人購入は未確認。
+adapter境界の12テスト、AP2 authorityの19テスト、実Chromeを含む68項目のpipeline、権限API14項目、wallet登録17項目が通過。ECのHTTP境界はfixtureで、本人署名と実ERC20 receiptを検証している。実ECの[公開catalogの読み取り](evidence/ec-public-catalog.json)とは区別する。公開ECでの本人購入は未確認。
 
 注文の受付を配達完了とは扱わない。外部ECの商品は本人が準備・同意したcheckoutを使用し、yours Marketのcart/create-checkoutを直接流用しない。配送先・variant・必須追加optionのある商品、返金処理は対象外。
 

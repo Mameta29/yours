@@ -13,6 +13,12 @@
 - 設定完了後、既存の本人署名によるGate/Registry登録へ進む。途中で中断した登録は同じ条件・共有予算の期間を維持して再開する。
 - ownerの秘密鍵をアプリ、サーバ、AIへ入力・送信する工程はない。
 
-SDKの10項目と、実Chrome→HTTP API→PostgreSQL→Anvil/公式MetaMask contractsの10項目を確認。通常EOAからの実EIP-7702 transactionと、設定状態の応答消失後に再送しないことを含む。[ブラウザ検証](../evidence/browser-permissions.json)は試験用EIP-1193 providerによるもので、実MetaMask拡張の公開Amoy成功を意味しない。
+再読み込み後にSIWEのsessionだけが残る場合、再接続の成功時に登録画面が閉じる問題も修正した。以前の画面で同じ経路を再現し、修正版では入力した1回・期間上限を保ったまま戻り、登録が完了することを確認している。
+
+- `eth_accounts`と`eth_chainId`だけで、ログイン済み本人と一致する接続先を復元する。候補が一意でない場合は本人が選ぶ。ページを開いただけでは接続要求・network変更・署名要求を出さない。
+- 再接続が必要な場合は戻り先と入力値を画面内で保持する。同じ本人のログイン後に元の画面へ戻し、条件を再確認してから登録する。接続キャンセル後も戻り先を失わない。
+- 別walletでログインした場合は以前の本人の操作を引き継がない。accountやnetworkが実際に変わった場合は画面を閉じてログアウトする。同じ値の再通知ではログアウトしない。
+
+SDKの10項目と、実Chrome→HTTP API→PostgreSQL→Anvil/公式MetaMask contractsの17項目を確認。通常EOAからの実EIP-7702 transactionと、設定状態の応答消失後に再送しないことを含む。[ブラウザ検証](../evidence/browser-permissions.json)は試験用EIP-1193 providerによるもので、実MetaMask拡張の公開Amoy成功を意味しない。
 
 仕様の根拠: [MetaMaskのbatch transactionと対応network](https://docs.metamask.io/metamask-connect/evm/guides/send-transactions/batch-transactions/)、[EIP-5792](https://eips.ethereum.org/EIPS/eip-5792)。

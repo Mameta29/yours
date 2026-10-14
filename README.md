@@ -77,7 +77,7 @@ UCP公式schemaとAP2 v0.2 SDKでは、delegated SD-JWTの表現に上流の不�
 | 公開Google Cloud | 4サービスの稼働、公開範囲、Cloud SQL、実HSM鍵とdiscoveryの一致、Gemini→既存ECを含む実カタログ検索 |
 | 公開Amoy | yours専用Gate/Registryの配備、5 confirmations、code hash。本人walletによる公開購入は確認中 |
 | ローカルAnvil + PostgreSQL | 本人同意→公式AP2→UCP→x402→実ERC-7710送金→order/receipt、応答消失復旧、外部AI自身の署名、複数AI共有予算・外部client・本人限定の注文ページ・既存EC接続を含む68項目 |
-| 実Chrome + 試験用EIP-1193 provider | 通常EOAの実EIP-7702設定、中断・再読込・部分登録の再開など10項目。実MetaMask拡張とは区別 |
+| 実Chrome + 試験用EIP-1193 provider | 通常EOAの実EIP-7702設定、中断・再読込・部分登録・ウォレット再接続の復旧など17項目。実MetaMask拡張とは区別 |
 
 [検証の証拠](docs/evidence/README.md) · [配備・実装記録](docs/IMPLEMENTATION.md) · [再現手順](docs/DEVELOPMENT.md)
 

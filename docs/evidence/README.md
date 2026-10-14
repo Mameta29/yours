@@ -30,6 +30,6 @@ scriptはchain ID・Anvil・loopback URL・framework commitを検証し、生成
 | [ec-public-catalog.json](ec-public-catalog.json) | 実ECの2店舗・4商品を読み取り。注文・送金なし |
 | [payment-pipeline.json](payment-pipeline.json) | 68項目。実Anvil・PostgreSQL・AP2 HTTP・外部client・Chrome。外部EC境界はfixture |
 | [permissions-api.json](permissions-api.json) | 権限の登録・停止・失効・復旧14項目 |
-| [browser-permissions.json](browser-permissions.json) | EIP-7702登録・中断再開10項目。Chromeと試験用provider |
+| [browser-permissions.json](browser-permissions.json) | EIP-7702登録・中断再開・再接続17項目。Chromeと試験用provider |
 
 公開AmoyのGate配備は[manifest](../../deployments/amoy.json)で確認する。本人の公開購入・実MetaMask拡張での操作は別途確認が必要。
