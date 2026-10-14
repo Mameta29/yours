@@ -1,0 +1,31 @@
+{
+  "checkedAt": "2026-10-14T08:25:03.507Z",
+  "origin": "https://yours-api-110852561536.asia-northeast1.run.app",
+  "source": "55b074d",
+  "imageTag": "catalog-20261014",
+  "apiSource": "c785810",
+  "apiImageTag": "commerce-20261014",
+  "scope": "Public API -> private Google ADK -> Vertex AI -> real UCP catalog. Gemini follows the returned cursor and reports all 7 actual products across pages of 6 and 1. Read-only; no owner signature or purchase.",
+  "result": {
+    "id": "d171a759-c7d9-4b08-9601-b7920843eb98",
+    "status": "completed",
+    "result": {
+      "text": "カタログに登録されている全商品の一覧です。\n\n| 店舗名 | 商品名 | 価格 | 在庫 |\n| :--- | :--- | :--- | :--- |\n| CHEAP RICE SHOP | お米 5kg / Rice 5 kg | 400 JPY | なし（在庫切れ） |\n| CHEAP RICE SHOP | お米 10kg / Rice 10 kg | 800 JPY | あり |\n| HIGH RICE SHOP | 新潟県産コシヒカリ 5kg / Koshihikari 5 kg | 1,200 JPY | あり |\n| HIGH RICE SHOP | 新潟県産コシヒカリ 10kg / Koshihikari 10 kg | 2,400 JPY | あり |\n| yours Market | 個人プロジェクト計画キット | 1,200 JPY | あり |\n| yours Market | 旅の持ち物チェックリスト | 600 JPY | あり |\n| yours Market | 週次ふりかえりテンプレート | 300 JPY | あり |",
+      "events": [
+        {
+          "type": "catalog.search",
+          "at": 1791966299,
+          "count": 6
+        },
+        {
+          "type": "catalog.search",
+          "at": 1791966301,
+          "count": 1
+        }
+      ],
+      "model": "gemini-3.8-flash",
+      "framework": "Google ADK",
+      "readOnly": true
+    }
+  }
+}

@@ -74,14 +74,14 @@ UCP公式schemaとAP2 v0.2 SDKでは、delegated SD-JWTの表現に上流の不�
 
 | 実行場所 | 確認できた内容 |
 | --- | --- |
-| 公開Google Cloud | 4サービスの稼働、公開範囲、Cloud SQL、実HSM鍵とdiscoveryの一致、Gemini→実カタログ検索 |
+| 公開Google Cloud | 4サービスの稼働、公開範囲、Cloud SQL、実HSM鍵とdiscoveryの一致、Gemini→既存ECを含む実カタログ検索 |
 | 公開Amoy | yours専用Gate/Registryの配備、5 confirmations、code hash。本人walletによる公開購入は確認中 |
 | ローカルAnvil + PostgreSQL | 本人同意→公式AP2→UCP→x402→実ERC-7710送金→order/receipt、応答消失復旧、外部AI自身の署名、複数AI共有予算・外部client・本人限定の注文ページ・既存EC接続を含む68項目 |
 | 実Chrome + 試験用EIP-1193 provider | 通常EOAの実EIP-7702設定、中断・再読込・部分登録の再開など10項目。実MetaMask拡張とは区別 |
 
 [検証の証拠](docs/evidence/README.md) · [配備・実装記録](docs/IMPLEMENTATION.md) · [再現手順](docs/DEVELOPMENT.md)
 
-独立したyours Marketに加え、既存ECの2店舗を接続するadapterを実装しています。外部ECの対象は配送・variant・必須追加optionのないAmoy商品で、本人が予約へ同意したcheckoutを使います。実ECの公開カタログ取得と、HTTP fixture・実Anvil送金による注文復旧を確認済みです。公開ECへの本人購入、返金処理は未完了です。[接続の範囲](docs/design/EC-ADAPTER.md)
+独立したyours Marketに加え、既存ECの2店舗を接続するadapterを実装・配備しています。外部ECの対象は配送・variant・必須追加optionのないAmoy商品で、本人が予約へ同意したcheckoutを使います。公開Google CloudでGeminiによる実ECの検索、ローカルでHTTP fixtureと実Anvil送金を使った注文復旧を確認済みです。公開ECへの本人購入、返金処理は未完了です。[接続の範囲](docs/design/EC-ADAPTER.md)
 
 ## 開発
 

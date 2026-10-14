@@ -13,7 +13,8 @@
 - [x] 複数AIの権限・共有予算・停止・例外同意。
 - [x] PostgreSQLの永続状態・認証・API/SDK。
 - [x] UCP discovery/catalog/cart/checkout/order。
-- [ ] 既存EC adapterと公開Amoyでの本人購入確認。
+- [x] 既存EC adapter、Google Cloud配備、実ECカタログの公開確認。
+- [ ] 公開Amoyでの本人購入確認。
 - [x] AP2実署名・制約・receiptとstablecoin handler。
 - [x] x402実行・journal・KMS署名・chain照合。
 - [x] Gemini ADKと外部agent接続。
@@ -41,13 +42,26 @@ Polygon Amoyにyours専用Gate `0x42eec579df8fb1f87ae3bddbb90c6a4a9f790504` とR
 - KMS: 非export鍵のEVM/P-256署名adapter、CRC・署名復元検証。ローカル暗号試験2件通過。Cloud HSMの実EVM/P-256署名を検証済み（`docs/evidence/cloud-kms.json`）。
 - AP2: 固定した公式v0.2 SDKでopen→closed mandate、制約・署名検証、receiptを実装。実署名・公式SDK・本人の新しいEIP-712同意とprivate issuerの19件通過。Cloud Run配備と、mandateの一回消費・実決済receiptへの束縛を実装済み。上流仕様との差異は`docs/design/INTEROPERABILITY.md`。
 
-`PAYMENT_PIPELINE=1 node packages/wallet-sdk/scripts/local-integration.mjs`で、本人署名→AP2 private HTTP→UCP complete→x402 HTTP 402/支払署名→実ERC-7710送金→order/署名付きreceiptの68項目を検証。送信応答消失から同一hashで復旧、金額改変拒否、期間超過の本人一件同意も含む。証拠は`docs/evidence/payment-pipeline.json`。これはAnvilと試験tokenでの結合検証。
+`PAYMENT_PIPELINE=1 BROWSER_PURCHASE=1 node packages/wallet-sdk/scripts/local-integration.mjs`で、本人署名→AP2 private HTTP→UCP complete→x402 HTTP 402/支払署名→実ERC-7710送金→order/署名付きreceiptの68項目を検証。送信応答消失から同一hashで復旧、金額改変拒否、期間超過の本人一件同意も含む。証拠は`docs/evidence/payment-pipeline.json`。これはAnvilと試験tokenでの結合検証。
 
 ## 公開環境での確認
 
-[管理画面/API](https://yours-api-110852561536.asia-northeast1.run.app)を公開。mandates・worker・agentは非公開のCloud Run。現在のimage tagは`orders-20261014`、Cloud Buildは`48a5dc52-d85c-47a1-a3a6-a5f5048e1807`、sourceは`3bb249e`。migration job `yours-migrate-xkpgv`で001〜009を反映。API revisionは`yours-api-00005-hk7`。Cloud SQL接続、HSM公開鍵とdiscoveryの一致、4サービスのhealthと公開範囲を確認（[証拠](evidence/cloud-services.json)）。後続commitは再配備するまで公開環境の成果に含めない。
+[管理画面/API](https://yours-api-110852561536.asia-northeast1.run.app)を公開。mandates・worker・agentは非公開のCloud Run。Cloud Build `12c78537-9a28-49fe-a3a5-5de3ede1b2ee`で既存EC連携を配備し、migration job `yours-migrate-qc5b6`で001〜010を反映。Geminiのページ取得修正はCloud Build `97bb9b8a-6f10-4a11-b274-c4264c044504`で追加反映した。
+
+| service | revision | image tag | source |
+| --- | --- | --- | --- |
+| API / Console | `yours-api-00006-fnf` | `commerce-20261014` | `c785810` |
+| worker | `yours-worker-00006-z4v` | `commerce-20261014` | `c785810` |
+| mandates | `yours-mandates-00006-cjn` | `commerce-20261014` | `c785810` |
+| Gemini agent | `yours-agent-00006-98c` | `catalog-20261014` | `55b074d` |
+
+Cloud SQL接続、HSM公開鍵とdiscoveryの一致、4サービスのhealthと公開範囲を確認（[証拠](evidence/cloud-services.json)）。追加反映後も4件成功。配備後のCloud Run ERRORログは確認時点で0件。後続commitは再配備するまで公開環境の成果に含めない。
 
 Google ADK → Vertex AI `gemini-3.8-flash` → 実Cloud SQL catalogの検索が公開画面のAPI経由で成功（[証拠](evidence/gemini-cloud.json)）。未接続の試用は検索専用で、決済権限を持たない。購入は本人署名・AP2・x402を経由する。
+
+既存ECの2店舗・4商品をyoursの公開UCPへ接続。店舗の送金先設定、商品・価格・在庫と、cursorによる次ページ取得を確認（[公開UCP](evidence/ucp-ec-cloud.json)）。公開Geminiも実ECを検索し、2店舗の価格と品切れを実データに沿って回答した（[Geminiと実EC](evidence/gemini-ec-cloud.json)）。これは検索の確認であり、公開ECでの購入成功はまだ含まない。
+
+商品数の増加に合わせ、Geminiの検索toolへUCP cursorを追加。全商品を尋ねると6件→1件の2ページを実際に取得し、最後の商品まで7件を回答した（[全件検索](evidence/gemini-paginated-cloud.json)）。続きが残る場合は全件取得したと答えないよう指示している。
 
 管理画面は1440pxと390pxで実ブラウザ検証済み（[公開検証](evidence/public-console.json)）。接続、AI別権限、共有予算、停止、注文専用同意、購入品downloadを実APIへ接続。未設定EOAから「ウォレットで承認する」を押すとMetaMaskの設定確認を開始する。画像で報告された`wallet_upgrade_required`の原因を修正し、設定取引の応答消失・reload・部分登録復旧を含むローカルChromeの10項目を確認（[設計](design/WALLET-ONBOARDING.md)）。公開Amoyで実MetaMaskの設定・本人購入はユーザーに再確認を依頼中。
 
@@ -55,9 +69,9 @@ UCP RFC 9421署名、API keyとplatform profileの結び付け、DNSを固定し
 
 外部AIのP-256 AP2 holderとEVM agentを分離して実装・配備。注文専用leafとintentを外部AI自身が署名し、yours側は署名の検証とrelayを行う。公式AP2 SDKによる外部holderの提示、実ERC-7710送金、別AIを追加しても共有消費が維持されること、共有予算超過で送信前に止まることと外部client単体の実行を含む68項目のローカル結合検証が成功。外部AI向けclient例、購入するAIの選択、本人だけができるtoken再発行を追加。client単体の公開決済は未確認。
 
-本人限定の注文詳細ページと実ファイルのdownloadを実装・配備。受け取り操作は一つのdigital fulfillment eventと署名付きwebhookにまとめ、同時再試行でも重複しない。実Chromeで注文リンクから実ファイルを受け取る試験を68項目に含めた。GitHub CI [38527935512](https://github.com/Mameta29/yours/actions/runs/38527935512)も全項目成功。提出用README・構成図・試用手順を公開済み。
+本人限定の注文詳細ページと実ファイルのdownloadを実装・配備。受け取り操作は一つのdigital fulfillment eventと署名付きwebhookにまとめ、同時再試行でも重複しない。実Chromeで注文リンクから実ファイルを受け取る試験を68項目に含めた。source `c785810`のGitHub CI [38532719152](https://github.com/Mameta29/yours/actions/runs/38532719152)も全項目成功。提出用README・構成図・試用手順を公開済み。
 
-## 既存ECの接続（今回の追加・配備前）
+## 既存ECの接続（実装・配備済み）
 
 `adapters/jpyc-ec`を新設。登録済みのorigin・店舗ID・送金先だけを使い、実ECの予約・personal_sign・transfer照合を接続する。migration 010で予約の冪等キーとcheckout/AP2の結び付きを永続化。本人の署名・同意を得るまではAP2を発行せず、メールの宛先をAIへ渡さない。workerは確定後に同じtx hashでEC注文を照合し、応答消失から復旧する。
 
@@ -68,7 +82,7 @@ adapter境界の12テスト、AP2 authorityの19テスト、実Chromeを含む68
 ## 次に完了する事項
 
 - 公開Amoyで本人の資産から実購入。外部AI client単体はローカルの実HTTP・実送金で確認済み、公開Amoyは未確認。
-- 既存EC adapterを含む最新commitをCloud Runへ配備・公開確認。返金処理は未実装。
+- 返金処理は未実装。現在は対応capabilityとして公開しない。
 - 実処理のデモ動画とDashboard提出。
 
 ローカルの最新結合証拠は[決済pipeline](evidence/payment-pipeline.json)。API/SDK、Anvil、公開Google Cloud、公開Amoyの証拠はそれぞれ区別する。

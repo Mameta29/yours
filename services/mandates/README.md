@@ -15,4 +15,4 @@ UV_CACHE_DIR=../../.local/uv-cache uv run pytest -q
 uv run uvicorn yours_mandates.service:from_environment --factory --host 0.0.0.0 --port 8080
 ```
 
-productionは`ENVIRONMENT=production`、`DATABASE_URL`、`PUBLIC_ORIGIN`、`GATE_ADDRESS`、公開merchant JWK、`AP2_ISSUER_KEY` / `AP2_AGENT_KEY`のKMS version名を必要とする。private keyによるproduction起動は禁止する。2026-10-14時点で18件の暗号・公式SDK相互運用・実PostgreSQL試験が通過。非公開Cloud Runへ配備済み。公開範囲とHSM鍵の確認は[配備記録](../../docs/IMPLEMENTATION.md)。
+productionは`ENVIRONMENT=production`、`DATABASE_URL`、`PUBLIC_ORIGIN`、`GATE_ADDRESS`、公開merchant JWK、`AP2_ISSUER_KEY` / `AP2_AGENT_KEY`のKMS version名を必要とする。private keyによるproduction起動は禁止する。2026-10-14時点で19件の暗号・公式SDK相互運用・実PostgreSQL試験が通過。非公開Cloud Runへ配備済み。公開範囲とHSM鍵の確認は[配備記録](../../docs/IMPLEMENTATION.md)。

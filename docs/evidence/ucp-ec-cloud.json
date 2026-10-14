@@ -1,0 +1,174 @@
+{
+  "checkedAt": "2026-10-14T08:22:34.884Z",
+  "origin": "https://yours-api-110852561536.asia-northeast1.run.app",
+  "source": "c785810",
+  "imageTag": "commerce-20261014",
+  "scope": "Read-only deployed UCP catalog with live external EC products and pinned merchant payees. Two catalog pages fetched with returned UCP cursor. No owner signature, reservation or purchase.",
+  "chainId": 80002,
+  "merchants": [
+    {
+      "id": "yours-lab",
+      "name": "yours Market",
+      "origin": "https://yours-api-110852561536.asia-northeast1.run.app",
+      "payTo": "0xAe82ccD35a88F4FF22E6bc47B842B5e1f560453a",
+      "adapter": "local"
+    },
+    {
+      "id": "ec:cheap-rice-shop",
+      "name": "CHEAP RICE SHOP",
+      "origin": "https://stg-ec.jpyc-service.com",
+      "shopId": "feb3c557-27d9-45ab-970d-b65f8b440cf8",
+      "slug": "cheap-rice-shop",
+      "payTo": "0xaf09f3071c418c9515ce7350c2bc95fb5fd00699",
+      "adapter": "jpyc-ec"
+    },
+    {
+      "id": "ec:high-rice-shop",
+      "name": "HIGH RICE SHOP",
+      "origin": "https://stg-ec.jpyc-service.com",
+      "shopId": "0c453196-3dc7-4669-8977-24e470f821da",
+      "slug": "high-rice-shop",
+      "payTo": "0xf2784529937a0a10f018039e1bc3ce5ef0df1007",
+      "adapter": "jpyc-ec"
+    }
+  ],
+  "pages": [
+    {
+      "count": 6,
+      "has_next_page": true,
+      "cursor": "dHJhdmVsLWNoZWNrbGlzdA"
+    },
+    {
+      "count": 1,
+      "has_next_page": false
+    }
+  ],
+  "products": [
+    {
+      "id": "ec:cheap-rice-shop/63d28592-d2d6-4bc5-ad96-75466a96805f",
+      "title": "お米 5kg / Rice 5 kg",
+      "price": {
+        "amount": 400,
+        "currency": "JPY"
+      },
+      "availability": {
+        "available": false,
+        "status": "out_of_stock"
+      },
+      "metadata": {
+        "requires_shipping": false,
+        "merchant_id": "ec:cheap-rice-shop",
+        "merchant_name": "CHEAP RICE SHOP",
+        "external": true
+      }
+    },
+    {
+      "id": "ec:cheap-rice-shop/8671cbaa-471c-4ea5-a527-c2dc8073b23e",
+      "title": "お米 10kg / Rice 10 kg",
+      "price": {
+        "amount": 800,
+        "currency": "JPY"
+      },
+      "availability": {
+        "available": true,
+        "status": "in_stock"
+      },
+      "metadata": {
+        "requires_shipping": false,
+        "merchant_id": "ec:cheap-rice-shop",
+        "merchant_name": "CHEAP RICE SHOP",
+        "external": true
+      }
+    },
+    {
+      "id": "ec:high-rice-shop/6c8f9561-2aeb-4007-b0d4-7bea961a013d",
+      "title": "新潟県産コシヒカリ 5kg / Koshihikari 5 kg",
+      "price": {
+        "amount": 1200,
+        "currency": "JPY"
+      },
+      "availability": {
+        "available": true,
+        "status": "in_stock"
+      },
+      "metadata": {
+        "requires_shipping": false,
+        "merchant_id": "ec:high-rice-shop",
+        "merchant_name": "HIGH RICE SHOP",
+        "external": true
+      }
+    },
+    {
+      "id": "ec:high-rice-shop/820cc7f7-47e8-4240-9388-0f4015d2ea64",
+      "title": "新潟県産コシヒカリ 10kg / Koshihikari 10 kg",
+      "price": {
+        "amount": 2400,
+        "currency": "JPY"
+      },
+      "availability": {
+        "available": true,
+        "status": "in_stock"
+      },
+      "metadata": {
+        "requires_shipping": false,
+        "merchant_id": "ec:high-rice-shop",
+        "merchant_name": "HIGH RICE SHOP",
+        "external": true
+      }
+    },
+    {
+      "id": "project-kit",
+      "title": "個人プロジェクト計画キット",
+      "price": {
+        "amount": 1200,
+        "currency": "JPY"
+      },
+      "availability": {
+        "available": true,
+        "status": "in_stock"
+      },
+      "metadata": {
+        "requires_shipping": false,
+        "merchant_id": "yours-lab",
+        "merchant_name": "yours Market",
+        "external": false
+      }
+    },
+    {
+      "id": "travel-checklist",
+      "title": "旅の持ち物チェックリスト",
+      "price": {
+        "amount": 600,
+        "currency": "JPY"
+      },
+      "availability": {
+        "available": true,
+        "status": "in_stock"
+      },
+      "metadata": {
+        "requires_shipping": false,
+        "merchant_id": "yours-lab",
+        "merchant_name": "yours Market",
+        "external": false
+      }
+    },
+    {
+      "id": "weekly-review",
+      "title": "週次ふりかえりテンプレート",
+      "price": {
+        "amount": 300,
+        "currency": "JPY"
+      },
+      "availability": {
+        "available": true,
+        "status": "in_stock"
+      },
+      "metadata": {
+        "requires_shipping": false,
+        "merchant_id": "yours-lab",
+        "merchant_name": "yours Market",
+        "external": false
+      }
+    }
+  ]
+}
