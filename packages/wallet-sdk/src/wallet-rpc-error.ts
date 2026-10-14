@@ -1,7 +1,8 @@
 export type UpgradeRpcMethod = 'wallet_getCapabilities' | 'wallet_sendCalls' | 'wallet_getCallsStatus';
+export type WalletRpcMethod = UpgradeRpcMethod | 'wallet_getSupportedExecutionPermissions' | 'wallet_requestExecutionPermissions' | 'eth_signTypedData_v4';
 
 /** Displayable context only. Never include request parameters or error.data. */
-export type WalletRpcDiagnostic = { method: UpgradeRpcMethod; code?: number; message: string };
+export type WalletRpcDiagnostic = { method: WalletRpcMethod; code?: number; message: string };
 
 function safeMessage(value: unknown): string {
   if (typeof value !== 'string') return '';
@@ -14,7 +15,7 @@ function safeMessage(value: unknown): string {
     .slice(0, 240);
 }
 
-export function walletRpcError(error: unknown, method: UpgradeRpcMethod): Error & { diagnostic: WalletRpcDiagnostic } {
+export function walletRpcError(error: unknown, method: WalletRpcMethod): Error & { diagnostic: WalletRpcDiagnostic } {
   // MetaMask serializes the underlying RPC error under data.originalError;
   // viem uses cause. Bound traversal and handle cyclic provider errors.
   const seen = new Set<unknown>();
@@ -31,12 +32,14 @@ export function walletRpcError(error: unknown, method: UpgradeRpcMethod): Error 
   const specific = causes.find(cause => cause.code !== undefined && cause.code !== -32603);
   const detail = specific ?? [...causes].reverse().find(cause => cause.message) ?? causes[0];
   const code = specific?.code ?? causes.find(cause => cause.code !== undefined)?.code;
-  let message = 'wallet_upgrade_request_failed';
+  const isPermission = method === 'wallet_getSupportedExecutionPermissions' || method === 'wallet_requestExecutionPermissions';
+  const isSignature = method === 'eth_signTypedData_v4';
+  let message = isPermission ? (method === 'wallet_getSupportedExecutionPermissions' ? 'wallet_permission_probe_failed' : 'wallet_permission_request_failed') : isSignature ? 'wallet_signature_request_failed' : 'wallet_upgrade_request_failed';
   if (code === 4001 || code === 5750) message = 'wallet_rejected';
   else if (code === -32002) message = 'wallet_permission_pending';
   else if (code === 4100) message = 'wallet_permission_missing';
-  else if (code === -32602) message = 'wallet_upgrade_invalid_request';
-  else if (code === 5730) message = 'wallet_upgrade_batch_unknown';
-  else if ([-32601, 4200, 5700, 5710, 5760].includes(code ?? 0)) message = 'wallet_upgrade_unsupported';
+  else if (code === -32602) message = isPermission ? 'wallet_permission_invalid_request' : isSignature ? 'wallet_signature_invalid_request' : 'wallet_upgrade_invalid_request';
+  else if (code === 5730 && !isPermission && !isSignature) message = 'wallet_upgrade_batch_unknown';
+  else if ([-32601, 4200, 5700, 5710, 5760].includes(code ?? 0)) message = isPermission ? 'wallet_permission_unsupported' : isSignature ? 'wallet_signature_unsupported' : 'wallet_upgrade_unsupported';
   return Object.assign(new Error(message, { cause: error }), { diagnostic: { method, code, message: detail?.message ?? '' } });
 }

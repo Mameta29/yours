@@ -17,6 +17,13 @@ describe('wallet setup RPC diagnostics', () => {
     expect(error.message).toBe('wallet_upgrade_request_failed');
     expect(error.diagnostic).toEqual({ method: 'wallet_getCapabilities', code: -32603, message: 'Failed to fetch' });
   });
+  it('distinguishes a permission or signature failure from smart-account setup', () => {
+    const rejection = { code: -32603, data: { originalError: { message: 'External signature requests cannot sign delegations for internal accounts.' } } };
+    expect(walletRpcError(rejection, 'eth_signTypedData_v4')).toMatchObject({
+      message: 'wallet_signature_request_failed', diagnostic: { method: 'eth_signTypedData_v4', code: -32603, message: rejection.data.originalError.message },
+    });
+    expect(walletRpcError({ code: -32602 }, 'wallet_requestExecutionPermissions').message).toBe('wallet_permission_invalid_request');
+  });
   it('displays no request payload, signed hex, URLs or credentials', () => {
     const secret = '0x' + 'ab'.repeat(65);
     const error = walletRpcError({ message: `Failed ${secret} https://rpc.example/secret?key=secret token=secret\nretry`, data: { request: { params: [secret] } } }, 'wallet_sendCalls');

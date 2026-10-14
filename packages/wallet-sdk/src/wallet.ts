@@ -1,6 +1,7 @@
-import { createWalletClient, custom, maxUint256, parseAbi, type Address, type EIP1193Provider, type Hex, type PublicClient } from 'viem';
+import { createWalletClient, custom, maxUint256, parseAbi, type Address, type EIP1193Provider, type Hex, type PublicClient, type TypedDataDefinition } from 'viem';
 import { SIGNABLE_DELEGATION_TYPED_DATA, toDelegationStruct } from '@metamask/smart-accounts-kit/utils';
 import { hashDelegation, validatePermissionResponse, type Delegation, type GrantExpectation } from './permissions.js';
+import { walletRpcError } from './wallet-rpc-error.js';
 
 /** Portable EIP-712 signing request; contains no private key or RPC side effect. */
 export function delegationTypedData(chainId:number,manager:Address,delegation:Delegation){
@@ -24,22 +25,27 @@ async function assertWallet(provider: EIP1193Provider, chainId: number, owner?: 
     if (!accounts[0] || accounts[0].toLowerCase() !== owner.toLowerCase()) throw new Error('wallet_account_changed');
   }
 }
+/** viem supplies EIP712Domain and serializes the exact domain into the raw RPC.
+ * Local-account signers infer that type; browser wallets must receive it.
+ * Owner delegations must use ERC-7715 instead of this general signing helper.
+ */
+export async function signOwnerTypedData(provider: EIP1193Provider, chainId: number, owner: Address, data: TypedDataDefinition) {
+  if (data.primaryType === 'Delegation') throw new Error('wallet_permission_request_required');
+  if (Number(data.domain?.chainId) !== chainId) throw new Error('wallet_chain_mismatch');
+  await assertWallet(provider, chainId, owner);
+  const wallet = createWalletClient({ account: owner, transport: custom(provider, { retryCount: 0 }) });
+  const signature = await wallet.signTypedData(data).catch(error => { throw walletRpcError(error, 'eth_signTypedData_v4'); });
+  await assertWallet(provider, chainId, owner);
+  return signature;
+}
 /** Read-only capability probe after an explicit wallet connection; never treats a feature flag as acceptance. */
-export async function probeGatePermissions(provider: EIP1193Provider, chainId: number, owner: Address) {
+export async function probeGatePermissions(provider: EIP1193Provider, chainId: number, owner: Address, funding = false) {
   await assertWallet(provider, chainId, owner);
   const { erc7715ProviderActions } = await import('@metamask/smart-accounts-kit/actions');
   const wallet = createWalletClient({ transport: custom(provider, { retryCount: 0 }) }).extend(erc7715ProviderActions());
-  const supported = await wallet.getSupportedExecutionPermissions().catch(error => {
-    // SDK/viem may wrap the wallet's JSON-RPC error. Connection success alone
-    // does not imply this wallet supports Advanced Permissions.
-    let cause = error;
-    for (let i = 0; cause && i < 8; i++, cause = cause.cause) {
-      if (cause.code === -32601 || cause.code === 4200) throw new Error('wallet_permission_unsupported');
-    }
-    throw new Error('wallet_permission_probe_failed', { cause: error });
-  });
+  const supported = await wallet.getSupportedExecutionPermissions().catch(error => { throw walletRpcError(error, 'wallet_getSupportedExecutionPermissions'); });
   const permission = supported['erc20-token-allowance'];
-  const canRequest = !!permission?.chainIds.includes(chainId) && ['expiry', 'redeemer', 'payee'].every(r => permission.ruleTypes.includes(r));
+  const canRequest = !!permission?.chainIds.includes(chainId) && ['expiry', 'redeemer', ...(funding ? ['payee'] : [])].every(r => permission.ruleTypes.includes(r));
   await assertWallet(provider, chainId, owner);
   return { supported, canRequest };
 }
@@ -50,17 +56,7 @@ export async function requestGatePermissions(provider: EIP1193Provider, expectat
   await assertWallet(provider, first.chainId, first.owner);
   const { erc7715ProviderActions } = await import('@metamask/smart-accounts-kit/actions');
   const wallet = createWalletClient({ transport: custom(provider, { retryCount: 0 }) }).extend(erc7715ProviderActions());
-  const responses = await wallet.requestExecutionPermissions(requests).catch(error => {
-    // Preserve the wallet's numeric RPC code without exposing its raw message,
-    // which can contain account or permission details.
-    let cause = error;
-    for (let i = 0; cause && i < 8; i++, cause = cause.cause) {
-      if (cause.code === 4001) throw new Error('wallet_rejected', { cause: error });
-      if (cause.code === -32601 || cause.code === 4200) throw new Error('wallet_permission_unsupported', { cause: error });
-      if (cause.code === -32002) throw new Error('wallet_permission_pending', { cause: error });
-    }
-    throw new Error('wallet_permission_request_failed', { cause: error });
-  });
+  const responses = await wallet.requestExecutionPermissions(requests).catch(error => { throw walletRpcError(error, 'wallet_requestExecutionPermissions'); });
   await assertWallet(provider, first.chainId, first.owner);
   if (responses.length !== expectations.length) throw new Error('wallet_permission_count_mismatch');
   const used = new Set<number>();

@@ -32,6 +32,16 @@ function mockWallet() {
   return { provider: { request } as unknown as EIP1193Provider, request, switchChain: () => { chain = '0x1'; } };
 }
 describe('wallet grant requests and evidence boundary', () => {
+  it('requires the chain and immutable Gate rule, but not an unused funding payee rule', async () => {
+    const w = mockWallet(), original = w.request.getMockImplementation()!;
+    let rules = ['expiry', 'redeemer'];
+    w.request.mockImplementation(async args => args.method === 'wallet_getSupportedExecutionPermissions'
+      ? { 'erc20-token-allowance': { chainIds: ['0x89'], ruleTypes: rules } } : original(args));
+    expect((await probeGatePermissions(w.provider, 137, e.owner)).canRequest).toBe(true);
+    expect((await probeGatePermissions(w.provider, 137, e.owner, true)).canRequest).toBe(false);
+    rules = ['expiry'];
+    expect((await probeGatePermissions(w.provider, 137, e.owner)).canRequest).toBe(false);
+  });
   it('never retries a permission prompt after an uncertain wallet error', async () => {
     const w = mockWallet(), original = w.request.getMockImplementation()!;
     w.request.mockImplementation(async args => {
