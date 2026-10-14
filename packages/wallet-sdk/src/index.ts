@@ -4,6 +4,7 @@ export * from './wire.js';
 export * from './permissions.js';
 export * from './gate-abi.js';
 export * from './wallet.js';
+export * from './upgrade.js';
 export * from './agent-permissions.js';
 export * from './agent-registry-abi.js';
 export * from './yours-gate-abi.js';
