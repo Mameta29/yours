@@ -172,6 +172,20 @@ def create_app(runtime: Runtime):
                 error("settlement_not_confirmed", 409)
             return receipts(row["verified"], str(row["order_id"]), row["transaction_hash"], runtime.origin, runtime.issuer)
 
+    @app.post("/v1/verify-execution")
+    def verify_execution_route(request: ReceiptRequest):
+        with runtime.db.connection() as db:
+            row = db.execute("SELECT i.*,m.open_checkout,m.open_payment,m.revoked_at,m.expires_at AS mandate_expires,c.status FROM intents i JOIN mandate_consumptions mc ON mc.intent_id=i.id JOIN mandates m ON m.id=mc.mandate_id JOIN connections c ON c.id=i.connection_id WHERE i.id=%s", (request.intent_id,)).fetchone()
+            if not row or row["state"] != "authorized" or row["status"] != "active" or row["revoked_at"] or min(row["expires_at"].timestamp(), row["mandate_expires"].timestamp()) <= time.time():
+                error("execution_not_authorized", 403)
+            snapshot = row["snapshot"]
+            tokens = snapshot["mandates"]
+            for kind in ("checkout", "payment"):
+                if tokens.get(kind + "_mandate", "").split("~~")[0].rstrip("~") != row["open_" + kind].rstrip("~"):
+                    error("mandate_authority_mismatch")
+            checkout = snapshot["checkout"]
+            return verify(tokens, snapshot["checkoutJwt"], runtime.issuer.public_jwk(), runtime.merchant_jwk, checkout["yours"]["audience"], checkout["yours"]["nonce"], snapshot["instrumentId"], {"total_uses": 0, "total_amount": 0})
+
     return app
 
 

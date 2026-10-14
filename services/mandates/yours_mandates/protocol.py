@@ -135,6 +135,7 @@ def verify(mandates: dict, checkout_jwt: str, issuer_jwk: dict, merchant_jwk: di
         "checkout_reference": hash_b64(client.get_closed_mandate_jwt(mandates["checkout_mandate"])),
         "payment_reference": hash_b64(client.get_closed_mandate_jwt(mandates["payment_mandate"])),
         "transaction_id": reference,
+        "expires_at": min(claim["exp"] for chain in payloads.values() for claim in chain),
         "payment": pm.closed_mandate.model_dump(exclude_none=True, mode="json"),
     }
 

@@ -16,7 +16,10 @@ export async function budgetUsage(tx:Tx,accountId:string,connectionId:string,per
  return {accountSpent:row.account_spent,accountReserved:row.account_reserved,agentSpent:row.agent_spent,agentReserved:row.agent_reserved};
 }
 export async function preparePurchase(db:Db,connectionId:string,key:string,proposal:PurchaseProposal,now=Math.floor(Date.now()/1000)){
- return idempotent(db,'purchase:'+connectionId,key,proposal,async tx=>{
+ return idempotent(db,'purchase:'+connectionId,key,proposal,async tx=>({status:201,body:await preparePurchaseTx(tx,connectionId,proposal,now)}));
+}
+/** Caller commits mandate consumption, inventory and this reservation together. */
+export async function preparePurchaseTx(tx:Tx,connectionId:string,proposal:PurchaseProposal,now=Math.floor(Date.now()/1000)){
   const {rows:[connection]}=await tx.query('SELECT * FROM connections WHERE id=$1',[connectionId]);
   if(!connection)throw new DomainError('connection_not_found',404);
   // All budget and permission mutations lock this same owner row first.
@@ -35,10 +38,9 @@ export async function preparePurchase(db:Db,connectionId:string,key:string,propo
   const id=randomUUID();const hash=digest(proposal.snapshot);
   const {rows:[intent]}=await tx.query(`INSERT INTO intents(id,account_id,connection_id,merchant_id,checkout_id,revision,currency,amount_minor,amount_atomic,period_index,state,snapshot,snapshot_hash,reasons,expires_at)
  VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,to_timestamp($15)) RETURNING *`,[id,connection.account_id,connectionId,proposal.merchantId,proposal.checkoutId,proposal.revision,proposal.currency,proposal.amountMinor,amount,period,state,JSON.stringify(proposal.snapshot),hash,JSON.stringify(decision.kind==='approval_required'?decision.reasons:[]),proposal.expiresAt]);
-  if(state==='authorized')await enqueue(tx,'payment.execute','payment:'+id,{intentId:id});
+  await enqueue(tx,'payment.execute','payment:'+id,{intentId:id});
   await audit(tx,connection.account_id,'agent:'+connectionId,'purchase.'+state,id,{amount,currency:proposal.currency,merchantId:proposal.merchantId,snapshotHash:hash});
-  return {status:201,body:intent};
- });
+  return intent;
 }
 export async function transitionIntent(tx:Tx,id:string,from:IntentState,to:IntentState,actor:string){
  assertTransition(from,to);

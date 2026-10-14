@@ -12,6 +12,7 @@ import {authRoutes,authenticate,owner,type Env} from './auth.js';
 import {merchantRoutes} from './merchant.js';
 import {taskRoutes} from './tasks.js';
 import {permissionRoutes} from './permissions.js';
+import {agentRoutes} from './agents.js';
 import type {ChainRuntime} from './chain.js';
 
 export function createApp(db:Db,config:Config,signer:P256Signer,chain?:ChainRuntime){
@@ -32,6 +33,7 @@ export function createApp(db:Db,config:Config,signer:P256Signer,chain?:ChainRunt
  app.get('/.well-known/ucp',c=>c.json(profile(config.PUBLIC_ORIGIN,'platform',[signer.publicJwk],{network:'eip155:'+config.CHAIN_ID,asset:config.JPYC_ADDRESS,gate:config.GATE_ADDRESS})));
  app.route('/api/auth',authRoutes(db,config));
  app.route('/ucp',merchantRoutes(db,config,signer));
+ app.route('/api/agent',agentRoutes(db,config,signer));
  app.use('/api/owner/*',async(c,next)=>{c.set('actor',await authenticate(c,db,config));owner(c);await next();});
  app.route('/api/owner/tasks',taskRoutes(db,config));
  if(chain)app.route('/api/owner/permissions',permissionRoutes(db,config,chain));

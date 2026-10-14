@@ -7,6 +7,7 @@ import {profile,negotiate,parseAgentHeader,fetchProfile,authorizeCheckout,valida
 import type {P256Signer} from '@yours/signing';
 import type {Config} from './config.js';
 import {authenticate,type Env} from './auth.js';
+import {paymentRoutes} from './payments.js';
 
 type MerchantEnv=Env&{Variables:Env['Variables']&{platform:string;capabilities:Record<string,Entity[]>}};
 type LineInput={id?:string;item:{id:string;quantity_unit?:{unit:string;scale?:number}};quantity:number};
@@ -108,6 +109,7 @@ export function merchantRoutes(db:Db,config:Config,signer:P256Signer){
   });
   router.get(path+'/:id',async c=>{
    const row=await session(db,c.req.param('id'),actorId(c),c.get('platform'),kind);
+   if(kind==='checkout'&&!row.document.ap2)row.document.ap2={merchant_authorization:await authorizeCheckout(row.document,signer)};
    return respond(c,row.document);
   });
   router.put(path+'/:id',async c=>{
@@ -139,6 +141,7 @@ export function merchantRoutes(db:Db,config:Config,signer:P256Signer){
    });return respond(c,result.body);
   });
  }
+ paymentRoutes(router,db,config,signer);
  router.get('/orders/:id',async c=>{
   const {rows:[row]}=await db.query('SELECT o.document FROM merchant_orders o JOIN merchant_sessions s ON s.id=o.session_id WHERE o.id=$1 AND s.actor=$2 AND s.platform_profile=$3',[z.string().uuid().parse(c.req.param('id')),actorId(c),c.get('platform')]);
   if(!row)throw new DomainError('order_not_found',404);
