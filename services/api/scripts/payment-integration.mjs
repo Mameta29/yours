@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {serve} from '@hono/node-server';
+import {serveStatic} from '@hono/node-server/serve-static';
 import {spawn} from 'node:child_process';
 import {randomUUID,generateKeyPairSync,sign} from 'node:crypto';
 import {writeFile,mkdir,rm} from 'node:fs/promises';
@@ -26,6 +27,7 @@ export async function paymentIntegration({root,client,wallet,accounts,manifest,j
  let stderr='';authority.stderr.on('data',chunk=>{stderr=(stderr+chunk.toString()).slice(-2000);});
  const config=readConfig({NODE_ENV:'test',DATABASE_URL:'postgresql://localhost/yours_test',PUBLIC_ORIGIN:'http://127.0.0.1:18815',RPC_URL:'http://127.0.0.1:18812',CHAIN_ID:'31337',MERCHANT_PAY_TO:payTo,JPYC_ADDRESS:manifest.jpyc,GATE_ADDRESS:manifest.gate,AGENT_ADDRESS:accounts.agent.address,MANDATES_URL:'http://127.0.0.1:18813'});
  const app=createApp(db,config,signer,chainRuntime(config,manifest));
+ app.use('/*',serveStatic({root:'apps/console/dist'}));app.get('*',serveStatic({path:'apps/console/dist/index.html'}));
  const apiServer=serve({fetch:app.fetch,port:18815,hostname:'127.0.0.1'});
  let cookie='',token='';
  async function request(path,body,{status=200,asAgent=false,method,headers={}}={}){
@@ -73,6 +75,7 @@ export async function paymentIntegration({root,client,wallet,accounts,manifest,j
   const intentId=pending.yours.intent_id;
   assert.equal((await db.query('SELECT count(*)::int AS n FROM mandate_consumptions WHERE mandate_id=$1',[mandate.id])).rows[0].n,1);
   await request('/api/owner/purchases/'+intentId+'/download',undefined,{status:409});
+  await request('/api/owner/purchases/'+intentId+'/delivery',{}, {status:409});
   const merchantBefore=await client.readContract({...jpyc,functionName:'balanceOf',args:[payTo]});
   const runtime={client:new Proxy(client,{get(target,key){if(key==='sendRawTransaction')return async params=>{await target.sendRawTransaction(params);throw new Error('Injected lost broadcast response');};return target[key];}}),chainId:31337,gate:manifest.gate,manager:manifest.manager,token:manifest.jpyc,enforcers:manifest.enforcers,merchantId:'yours-lab',payTo,origin:config.PUBLIC_ORIGIN,signers:{relayer:accounts.relayer,agent:accounts.agent,merchant:accounts.merchantSigner,risk:accounts.riskSigner},verifyIntent:id=>privatePost('/v1/verify-execution',{intent_id:id})};
   const prepared=await executePayment(db,intentId,runtime);assert.equal(prepared.state,'payment_required');
@@ -87,6 +90,7 @@ export async function paymentIntegration({root,client,wallet,accounts,manifest,j
   runtime.endorseIntent=id=>privatePost('/v1/endorse-order',{intent_id:id});
   const submitted=await executePayment(db,intentId,runtime);assert.equal(submitted.state,'submitted');
   const journal=(await db.query('SELECT * FROM signed_transactions WHERE intent_id=$1',[intentId])).rows[0];assert.ok(journal.raw_transaction);assert.equal(journal.transaction_hash,submitted.transactionHash);
+  await client.waitForTransactionReceipt({hash:submitted.transactionHash,confirmations:1});
   const confirming=await executePayment(db,intentId,runtime);assert.equal(confirming.state,'confirming');
   await client.request({method:'anvil_mine',params:['0x5']});
   const settled=await executePayment(db,intentId,runtime);assert.equal(settled.state,'confirmed');
@@ -148,6 +152,20 @@ export async function paymentIntegration({root,client,wallet,accounts,manifest,j
   await db.query("UPDATE agent_runs SET expires_at=now()-interval '1 second' WHERE id=$1",[runId]);
   await request('/api/agent/tasks',undefined,{asAgent:true,status:401});token=fullToken;
   passed.push('Gemini task-scoped token cannot access another payment or presentation','expired Gemini run token is rejected');
+  const details=(await request('/api/owner/purchases/orders/'+order.id)).json;
+  assert.equal(details.id,intentId);assert.equal(details.transactionHash,settled.transactionHash);
+  const deliveryPath='/api/owner/purchases/'+intentId+'/delivery';
+  const deliveries=await Promise.all([request(deliveryPath,{}),request(deliveryPath,{})]);
+  assert.deepEqual(deliveries[0].json,deliveries[1].json);
+  const delivered=deliveries[0].json.order;validateSchema('shopping/order.json',delivered);
+  assert.equal(delivered.line_items[0].status,'fulfilled');assert.equal(delivered.line_items[0].quantity.fulfilled,1);
+  assert.equal(delivered.fulfillment.events.length,1);assert.equal(delivered.fulfillment.events[0].type,'digital_access_granted');
+  assert.deepEqual((await request('/ucp/orders/'+order.id,undefined,{asAgent:true})).json,delivered);
+  const digitalWebhook=await claimWork(db,['order.webhook'],60,intentId);assert.ok(digitalWebhook);
+  assert.equal(digitalWebhook.payload.eventId,'digital-access:'+order.id);
+  await request('/internal/webhooks/deliver',{workId:digitalWebhook.id,leaseToken:digitalWebhook.lease_token});
+  await finishWork(db,digitalWebhook);
+  assert.equal((await db.query("SELECT count(*)::int AS n FROM audit_events WHERE action='order.digital_access_granted' AND resource_id=$1",[order.id])).rows[0].n,1);
   const download=await app.request('/api/owner/purchases/'+intentId+'/download',{headers:{Cookie:cookie}});
   assert.equal(download.status,200);assert.match(await download.text(),/週次ふりかえりテンプレート/);
   const stranger=privateKeyToAccount(generatePrivateKey());
@@ -155,8 +173,18 @@ export async function paymentIntegration({root,client,wallet,accounts,manifest,j
   const foreignLogin=await request('/api/auth/verify',{nonce:foreignChallenge.nonce,signature:await stranger.signMessage({message:foreignChallenge.message})});
   const foreignCookie=foreignLogin.response.headers.get('set-cookie').split(';')[0];
   const denied=await app.request('/api/owner/purchases/'+intentId+'/download',{headers:{Cookie:foreignCookie}});assert.equal(denied.status,404);
+  await request('/api/owner/purchases/orders/'+order.id,undefined,{status:404,headers:{Cookie:foreignCookie}});
+  await request(deliveryPath,{}, {status:404,headers:{Cookie:foreignCookie}});
+  await request(deliveryPath,{}, {status:403,asAgent:true});
   passed.push('signed order webhook delivered over real HTTP','duplicate webhook persists once','durable inbox processed and audited once','completed outbox lease cannot deliver again');
   passed.push('download unavailable before confirmed settlement','actual purchased Markdown delivered to owner','other wallet cannot download the purchase');
+  passed.push('order permalink resolves only for its owner','digital access requires confirmed settlement and owner authorization','concurrent delivery grants create one event and audit','digital fulfillment uses the official UCP order schema','updated order is delivered through the signed webhook');
+
+  if(process.env.BROWSER_PURCHASE==='1'){
+   const {verifyPurchaseBrowser}=await import('./purchase-browser.mjs');
+   await verifyPurchaseBrowser({origin:config.PUBLIC_ORIGIN,cookie,orderId:order.id});
+   passed.push('browser opens the actual owner order permalink','browser downloads the actual paid file');
+  }
 
   await externalAgentIntegration({root,db,request,send,client,owner,manifest,runtime,productId,signer,passed});
 

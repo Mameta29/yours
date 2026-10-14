@@ -1699,3 +1699,36 @@ footer a:hover {
   margin-top: 12px;
   flex-wrap: wrap;
 }
+
+.order-items {
+  margin: 26px 0;
+}
+.order-items > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
+}
+.order-items small {
+  display: block;
+  margin-top: 7px;
+  color: var(--muted);
+}
+.order-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 24px 0;
+}
+.order-total > strong {
+  font-size: 28px;
+}
+.order-total small {
+  font-size: 12px;
+  font-weight: 400;
+}
+.order-id {
+  overflow-wrap: anywhere;
+}

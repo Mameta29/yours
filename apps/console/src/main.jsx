@@ -26,6 +26,7 @@ import {
   Copy,
 } from "lucide-react";
 import { api, explain, short, yen, fromAtomic } from "./api";
+import OrderDetails from "./OrderDetails";
 const walletAction =
   (name) =>
   (...args) =>
@@ -49,6 +50,9 @@ const states = {
   failed: "成立せず",
   canceled: "キャンセル",
 };
+const linkedOrder = window.location.pathname.match(
+  /^\/orders\/([0-9a-f-]{36})\/?$/i,
+)?.[1];
 const Logo = () => (
   <span className="wordmark">
     yours<span className="brand-star">✳</span>
@@ -66,7 +70,9 @@ function App() {
     [providers, setProviders] = useState([]),
     [provider, setProvider] = useState(null),
     [tab, setTab] = useState("home"),
-    [modal, setModal] = useState(null),
+    [modal, setModal] = useState(
+      linkedOrder ? { kind: "order", orderId: linkedOrder } : null,
+    ),
     [busy, setBusy] = useState(""),
     [notice, setNotice] = useState(null),
     [products, setProducts] = useState([]),
@@ -130,6 +136,10 @@ function App() {
     return () =>
       window.removeEventListener("eip6963:announceProvider", announce);
   }, [refresh]);
+  useEffect(() => {
+    if (linkedOrder && data?.account.id)
+      setModal({ kind: "order", orderId: linkedOrder });
+  }, [data?.account.id]);
   useEffect(() => {
     if (!config) return;
     api(
@@ -745,6 +755,9 @@ function App() {
                     <IntentList
                       intents={data?.intents.slice(0, 5) ?? []}
                       onApprove={approveOrder}
+                      onOpen={(intent) =>
+                        setModal({ kind: "order", intentId: intent.id })
+                      }
                     />
                   </section>
                 </div>
@@ -908,6 +921,9 @@ function App() {
               <IntentList
                 intents={data?.intents ?? []}
                 onApprove={approveOrder}
+                onOpen={(intent) =>
+                  setModal({ kind: "order", intentId: intent.id })
+                }
               />
               <div className="section-heading">
                 <h2>同意と操作の記録</h2>
@@ -1010,7 +1026,11 @@ function App() {
       {modal && (
         <ModalFrame busy={busy} onClose={() => setModal(null)}>
           <ModalContent
-            key={modal.kind + ":" + (modal.connection?.id ?? "")}
+            key={
+              modal.kind +
+              ":" +
+              (modal.connection?.id ?? modal.intentId ?? modal.orderId ?? "")
+            }
             {...{
               modal,
               setModal,
@@ -1122,7 +1142,7 @@ function ModalFrame({ busy, onClose, children }) {
     </div>
   );
 }
-function IntentList({ intents, onApprove }) {
+function IntentList({ intents, onApprove, onOpen }) {
   return (
     <div className="intent-list">
       {intents.length ? (
@@ -1147,13 +1167,10 @@ function IntentList({ intents, onApprove }) {
                 内容を確認
               </button>
             )}
-            {i.state === "confirmed" && (
-              <a
-                className="button small-button"
-                href={"/api/owner/purchases/" + i.id + "/download"}
-              >
-                資料を開く
-              </a>
+            {i.state !== "approval_required" && (
+              <button className="button small-button" onClick={() => onOpen(i)}>
+                注文を開く
+              </button>
             )}
             {i.transaction_hash && (
               <a
@@ -1236,6 +1253,10 @@ function ModalContent({
       alive = false;
     };
   }, [modal.kind, modal.connection?.id]);
+  if (modal.kind === "order")
+    return (
+      <OrderDetails {...{ modal, data, setModal, action, busy, Status }} />
+    );
   if (modal.kind === "wallet")
     return (
       <>

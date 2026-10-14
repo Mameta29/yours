@@ -16,6 +16,10 @@ export async function api(path, body, options = {}) {
   return data;
 }
 const messages = {
+  purchase_not_found:
+    "このウォレットの注文が見つかりません。購入したアカウントでログインしてください。",
+  download_unavailable:
+    "購入品の準備を確認できませんでした。時間をおいて再度お試しください。",
   activation_confirming:
     "登録の確定を待っています。しばらくして「登録を再開」から続けてください。",
   permission_draft_expired:

@@ -36,6 +36,13 @@
     "download unavailable before confirmed settlement",
     "actual purchased Markdown delivered to owner",
     "other wallet cannot download the purchase",
+    "order permalink resolves only for its owner",
+    "digital access requires confirmed settlement and owner authorization",
+    "concurrent delivery grants create one event and audit",
+    "digital fulfillment uses the official UCP order schema",
+    "updated order is delivered through the signed webhook",
+    "browser opens the actual owner order permalink",
+    "browser downloads the actual paid file",
     "second AI registration preserves shared spent and period anchor",
     "external holder presents AP2 with the official SDK",
     "external EVM agent signs its own delegation and intent",
@@ -44,8 +51,12 @@
     "agent signatures are idempotent",
     "external AI completes a real ERC-7710 transfer without hosted-agent signing",
     "both AIs share the same onchain spending budget",
-    "external AI holds no token balance"
+    "external AI holds no token balance",
+    "published external client creates and verifies its own UCP checkout over HTTP",
+    "external client presents AP2 and signs its own payment with zero hosted-key use",
+    "external client retry reconciles one transaction",
+    "owner budget update preserves shared spent and period anchor"
   ],
-  "transactionHash": "0x646343ff0be683af725ed05aff65d538addfa45be9afd68cef68d27cf8c86fc5",
-  "gate": "0xe43a72b05a6b12830555ba1dfab94117c9861066"
+  "transactionHash": "0x9d51d4846feda2f0b33819db05996d9479899388f46c73737eed1ea13b9c0fab",
+  "gate": "0x70ffff723510cf740ddc2542f5c22874893be114"
 }
