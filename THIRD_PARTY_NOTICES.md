@@ -4,4 +4,6 @@
 
 The baseline contains neither the EC database nor its deployment configuration, signing keys or customer data. It does not represent a new audit of the contracts. Unit tests using mock tokens/managers are distinguished from integration tests against deployed protocols.
 
-Dependencies retain their own licenses, including OpenZeppelin Contracts (MIT), viem (MIT), and MetaMask Smart Accounts Kit (MIT/Apache-2.0 as specified by the installed package). Consult each package's license for its terms.
+Dependencies retain their own licenses, including OpenZeppelin Contracts (MIT), viem (MIT), and MetaMask Smart Accounts Kit (MIT-0 OR Apache-2.0). Consult each package's license for its terms.
+
+`packages/ucp/vendor/ucp-2026-08-25` contains unmodified schemas and service definitions from the Universal Commerce Protocol under Apache-2.0. Its LICENSE and exact source revision/checksums are included in that directory.
