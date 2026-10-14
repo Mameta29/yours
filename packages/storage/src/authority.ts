@@ -50,7 +50,7 @@ export async function transitionIntent(tx:Tx,id:string,from:IntentState,to:Inten
 export async function pauseConnection(db:Db,accountId:string,connectionId:string){
  return transaction(db,async tx=>{
   await tx.query('SELECT id FROM accounts WHERE id=$1 FOR UPDATE',[accountId]);
-  const {rowCount}=await tx.query("UPDATE connections SET status='paused' WHERE id=$1 AND account_id=$2 AND status<>'revoked'",[connectionId,accountId]);
+  const {rowCount}=await tx.query("UPDATE connections SET status='paused',control_revision=control_revision+1 WHERE id=$1 AND account_id=$2 AND status<>'revoked'",[connectionId,accountId]);
   if(!rowCount)throw new DomainError('connection_not_found',404);
   // Signed/broadcast transactions remain reconcilable. Never report them canceled.
   await tx.query("UPDATE intents SET state='canceled',updated_at=now() WHERE account_id=$1 AND connection_id=$2 AND state IN ('prepared','approval_required','authorized')",[accountId,connectionId]);

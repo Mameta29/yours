@@ -1,0 +1,17 @@
+{
+  "scope": "Local Anvil and real PostgreSQL. Actual owner signatures, official MetaMask delegation, policy/permission registration and revocation through the API. No browser-extension or public Amoy claim.",
+  "passed": [
+    "SIWE owner login",
+    "owner-signed restricted delegation",
+    "wrong policy signer rejected",
+    "no activation from signatures alone",
+    "five confirmations required",
+    "exact registration calls verified",
+    "idempotent activation",
+    "immediate API pause",
+    "confirmed onchain revocation"
+  ],
+  "policyTransaction": "0xa9579a8f28c5ddbce5c39707c5a4ee065afb593c2120f083fcba389d64ac2144",
+  "permissionTransaction": "0x76365ac40d291db281a70a8b80a68d2678597c4f28f29b7057a463658267a080",
+  "revocationTransaction": "0xcb4bd8cafcd69bd020f3d43355f4e8b78ef24394a27a42212caa7cde3e61645c"
+}

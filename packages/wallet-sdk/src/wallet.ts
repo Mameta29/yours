@@ -2,6 +2,11 @@ import { createWalletClient, custom, maxUint256, parseAbi, type Address, type EI
 import { SIGNABLE_DELEGATION_TYPED_DATA, toDelegationStruct } from '@metamask/smart-accounts-kit/utils';
 import { hashDelegation, validatePermissionResponse, type Delegation, type GrantExpectation } from './permissions.js';
 
+/** Portable EIP-712 signing request; contains no private key or RPC side effect. */
+export function delegationTypedData(chainId:number,manager:Address,delegation:Delegation){
+ return {domain:{name:'DelegationManager',version:'1',chainId,verifyingContract:manager},types:SIGNABLE_DELEGATION_TYPED_DATA,primaryType:'Delegation' as const,message:toDelegationStruct(delegation)};
+}
+
 export function gatePermissionRequests(expectations: readonly GrantExpectation[]) {
   if (!expectations.length || expectations.length > 2 || new Set(expectations.map(e => e.token.toLowerCase())).size !== expectations.length) throw new Error('Invalid permission set');
   const first = expectations[0]!;

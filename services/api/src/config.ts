@@ -11,6 +11,7 @@ export const configSchema=z.object({
  GATE_ADDRESS:z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
  AGENT_ADDRESS:z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
  UCP_SIGNING_KEY:z.string().optional(),
+ CHAIN_MANIFEST_PATH:z.string().default('deployments/amoy.json'),
  LOCAL_KEY_DIR:z.string().default('.local/keys'),
  MANDATES_URL:z.string().url().optional(),AGENT_URL:z.string().url().optional(),
  TRUSTED_PROFILE_ORIGINS:z.string().default(''),

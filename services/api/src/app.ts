@@ -11,8 +11,10 @@ import type {Config} from './config.js';
 import {authRoutes,authenticate,owner,type Env} from './auth.js';
 import {merchantRoutes} from './merchant.js';
 import {taskRoutes} from './tasks.js';
+import {permissionRoutes} from './permissions.js';
+import type {ChainRuntime} from './chain.js';
 
-export function createApp(db:Db,config:Config,signer:P256Signer){
+export function createApp(db:Db,config:Config,signer:P256Signer,chain?:ChainRuntime){
  const app=new Hono<Env>();
  app.use('*',bodyLimit({maxSize:262144,onError:c=>c.json({error:'body_too_large'},413)}));
  app.use('*',secureHeaders({crossOriginEmbedderPolicy:false}));
@@ -26,12 +28,13 @@ export function createApp(db:Db,config:Config,signer:P256Signer){
  });
  app.get('/healthz',c=>c.json({ok:true,service:'yours-api'}));
  app.get('/readyz',async c=>{await db.query('SELECT 1');return c.json({ok:true});});
- app.get('/api/config',c=>c.json({name:'yours',chainId:config.CHAIN_ID,network:config.CHAIN_ID===80002?'Polygon Amoy':'Local test chain',ucpVersion:UCP_VERSION,merchant:{id:config.MERCHANT_ID,name:config.MERCHANT_NAME},paymentsConfigured:Boolean(config.GATE_ADDRESS&&config.JPYC_ADDRESS&&config.MERCHANT_PAY_TO),gate:config.GATE_ADDRESS,token:config.JPYC_ADDRESS,geminiConfigured:Boolean(config.AGENT_URL)}));
+ app.get('/api/config',c=>c.json({name:'yours',chainId:config.CHAIN_ID,network:config.CHAIN_ID===80002?'Polygon Amoy':'Local test chain',ucpVersion:UCP_VERSION,merchant:{id:config.MERCHANT_ID,name:config.MERCHANT_NAME},paymentsConfigured:Boolean(chain&&config.MANDATES_URL&&config.GATE_ADDRESS&&config.JPYC_ADDRESS&&config.MERCHANT_PAY_TO),gate:config.GATE_ADDRESS,token:config.JPYC_ADDRESS,geminiConfigured:Boolean(config.AGENT_URL)}));
  app.get('/.well-known/ucp',c=>c.json(profile(config.PUBLIC_ORIGIN,'platform',[signer.publicJwk],{network:'eip155:'+config.CHAIN_ID,asset:config.JPYC_ADDRESS,gate:config.GATE_ADDRESS})));
  app.route('/api/auth',authRoutes(db,config));
  app.route('/ucp',merchantRoutes(db,config,signer));
  app.use('/api/owner/*',async(c,next)=>{c.set('actor',await authenticate(c,db,config));owner(c);await next();});
  app.route('/api/owner/tasks',taskRoutes(db,config));
+ if(chain)app.route('/api/owner/permissions',permissionRoutes(db,config,chain));
  app.get('/api/owner/me',async c=>{
   const actor=owner(c);
   const {rows:connections}=await db.query('SELECT c.id,c.name,c.provider,c.agent_address,c.status,c.created_at,p.document AS permission,p.status AS permission_status FROM connections c LEFT JOIN permissions p ON p.connection_id=c.id WHERE c.account_id=$1 ORDER BY c.created_at',[actor.accountId]);
