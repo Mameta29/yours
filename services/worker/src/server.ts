@@ -1,6 +1,7 @@
 import {readFile} from 'node:fs/promises';
 import {serve} from '@hono/node-server';
 import {Hono} from 'hono';
+import {processOrderWebhook} from './webhooks.js';
 import {z} from 'zod';
 import {bodyLimit} from 'hono/body-limit';
 import {createPublicClient,http,keccak256,getAddress,type Address,type Hex} from 'viem';
@@ -31,9 +32,9 @@ for(const role of ['relayer','agent','merchant','risk'] as const){
 }
 const authority=new URL(required('MANDATES_URL'));if(authority.protocol!=='https:'||authority.pathname!=='/'||authority.search||authority.hash)throw new Error('invalid_authority_origin');
 const auth=new GoogleAuth();
-async function privatePost(path:string,body:unknown){
- const tokenClient=await auth.getIdTokenClient(authority.origin),token=await tokenClient.idTokenProvider.fetchIdToken(authority.origin);
- const response=await fetch(authority.origin+path,{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(body),redirect:'error',signal:AbortSignal.timeout(20000)});
+async function privatePost(path:string,body:unknown,origin=authority.origin){
+ const tokenClient=await auth.getIdTokenClient(origin),token=await tokenClient.idTokenProvider.fetchIdToken(origin);
+ const response=await fetch(origin+path,{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(body),redirect:'error',signal:AbortSignal.timeout(20000)});
  if(!response.ok)throw new DomainError('authority_rejected',response.status);return await response.json() as any;
 }
 const runtime:SettlementRuntime={client,chainId:80002,gate:manifest.gate,manager:manifest.manager,token:manifest.jpyc,enforcers:manifest.enforcers,merchantId:required('MERCHANT_ID'),payTo:getAddress(required('MERCHANT_PAY_TO')),origin:required('PUBLIC_ORIGIN'),signers,verifyIntent:id=>privatePost('/v1/verify-execution',{intent_id:id}),endorseIntent:id=>privatePost('/v1/endorse-order',{intent_id:id})};
@@ -45,12 +46,16 @@ app.post('/run',async c=>{
  const {intentId}=z.object({intentId:z.string().uuid().optional()}).strict().parse(await c.req.json());
  let processed=0,pending=0;
  for(let i=0;i<8;i++){
-  const item=await claimWork(db,['payment.execute','order.receipts'],180,intentId);if(!item)break;
+  const item=await claimWork(db,['payment.execute','order.receipts','order.webhook','order.webhook.received'],180,intentId);if(!item)break;
   try{
    const id=String(item.payload.intentId);
    if(item.topic==='payment.execute'){
     const result=await executePayment(db,id,runtime);
     if(['submitted','confirming','approval_required','payment_required'].includes(result.state)){await finishWork(db,item,'awaiting_'+result.state);pending++;continue;}
+   }else if(item.topic==='order.webhook.received'){
+    await processOrderWebhook(db,String(item.payload.source),String(item.payload.eventId));
+   }else if(item.topic==='order.webhook'){
+    await privatePost('/internal/webhooks/deliver',{workId:item.id,leaseToken:item.lease_token},runtime.origin);
    }else{
     const receipt=await privatePost('/v1/receipts',{intent_id:id});
     await db.query('INSERT INTO order_receipts(intent_id,document) VALUES($1,$2) ON CONFLICT(intent_id) DO NOTHING',[id,JSON.stringify(receipt)]);

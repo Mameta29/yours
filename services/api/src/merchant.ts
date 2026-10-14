@@ -3,7 +3,7 @@ import {Hono} from 'hono';
 import {z} from 'zod';
 import {DomainError} from '@yours/domain';
 import {idempotent,type Db,type Tx} from '@yours/storage';
-import {profile,negotiate,parseAgentHeader,fetchProfile,authorizeCheckout,validateSchema,validateRequest,UCP_VERSION,AP2_CAPABILITY,HANDLER,type Entity} from '@yours/ucp';
+import {profile,negotiate,signHttp,verifyHttp,parseAgentHeader,fetchProfile,authorizeCheckout,validateSchema,validateRequest,UCP_VERSION,AP2_CAPABILITY,HANDLER,type Entity} from '@yours/ucp';
 import type {P256Signer} from '@yours/signing';
 import type {Config} from './config.js';
 import {authenticate,type Env} from './auth.js';
@@ -56,8 +56,18 @@ export function merchantRoutes(db:Db,config:Config,signer:P256Signer){
   if(platform===config.PUBLIC_ORIGIN+'/.well-known/ucp'||platform===config.PUBLIC_ORIGIN+'/profiles/platform')remote=profile(config.PUBLIC_ORIGIN,'platform',[signer.publicJwk]);
   else remote=await fetchProfile(platform,new Set(config.TRUSTED_PROFILE_ORIGINS.split(',').filter(Boolean)),config.NODE_ENV!=='production');
   c.set('platform',platform);c.set('capabilities',negotiate(localProfile(),remote));
-  if(!c.req.path.includes('/catalog/'))c.set('actor',await authenticate(c,db,config));
+  if(c.req.header('Signature-Input')||c.req.header('Signature'))await verifyHttp({method:c.req.method,url:config.PUBLIC_ORIGIN+new URL(c.req.url).pathname+new URL(c.req.url).search,headers:Object.fromEntries(c.req.raw.headers)},new Uint8Array(await c.req.raw.clone().arrayBuffer()),remote.keys);
+  if(!c.req.path.includes('/catalog/')){
+   const actor=await authenticate(c,db,config);c.set('actor',actor);
+   const row=actor.kind==='agent'?(await db.query('SELECT platform_profile FROM connections WHERE id=$1',[actor.connectionId])).rows[0]:null;
+   const allowed=row?.platform_profile?[row.platform_profile]:[config.PUBLIC_ORIGIN+'/.well-known/ucp',config.PUBLIC_ORIGIN+'/profiles/platform'];
+   if(!allowed.includes(platform))throw new DomainError('profile_identity_mismatch',403);
+  }
   await next();
+  if(c.res.status<400&&c.req.path.includes('/checkout-sessions')){
+   const signed=await signHttp({status:c.res.status,headers:Object.fromEntries(c.res.headers)},new Uint8Array(await c.res.clone().arrayBuffer()),signer);
+   for(const header of ['signature','signature-input','content-digest'])c.header(header,String(signed.headers[header]));
+  }
  });
  router.post('/catalog/search',async c=>{
   const body=await c.req.json();validateSchema('shopping/catalog_search.json#/$defs/search_request',body);

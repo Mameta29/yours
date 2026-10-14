@@ -2,7 +2,7 @@ import {beforeAll,afterAll,it,expect} from 'vitest';
 import {randomUUID,randomBytes,generateKeyPairSync,sign} from 'node:crypto';
 import {createDb,migrate} from '@yours/storage';
 import {sha256} from '@yours/domain';
-import {verifyCheckout,validateSchema} from '@yours/ucp';
+import {verifyCheckout,verifyHttp,validateSchema} from '@yours/ucp';
 import {createApp} from '../src/app.js';
 import {readConfig} from '../src/config.js';
 const db=createDb(process.env.TEST_DATABASE_URL??'postgresql://localhost/yours_test');
@@ -32,6 +32,7 @@ it('serves catalog search, lookup and detail with official schemas',async()=>{
 it('creates a real signed checkout once and refuses lost updates',async()=>{
  const body={line_items:[{item:{id:'digital'},quantity:1}]},key=randomUUID();
  const responses=await Promise.all([post('/checkout-sessions',body,key),post('/checkout-sessions',body,key)]);
+ await verifyHttp({status:responses[0].status,headers:Object.fromEntries(responses[0].headers)},new Uint8Array(await responses[0].clone().arrayBuffer()),[signer.publicJwk]);
  const a=await responses[0].json(),b=await responses[1].json();expect(a).toEqual(b);expect(responses[0].status).toBe(201);
  await verifyCheckout(a,[signer.publicJwk]);
  const bad=await app.request('/ucp/checkout-sessions/'+a.id,{method:'PUT',headers:{...headers,'Idempotency-Key':randomUUID(),'If-Match':'"0"'},body:JSON.stringify(body)});
@@ -68,4 +69,12 @@ it('publishes cacheable discovery and handler schemas and standard UCP errors',a
   const response=await app.request(path);expect(response.status).toBe(200);expect(response.headers.get('cache-control')).toContain('public, max-age=');
  }
  const error=await post('/catalog/product',{id:'does-not-exist'});expect(error.status).toBe(404);validateSchema('common/types/error_response.json',await error.json());
+});
+
+it('binds the authenticated API key to its enrolled UCP platform',async()=>{
+ await db.query('UPDATE connections SET platform_profile=$2 WHERE id=$1',[connection,'https://different-platform.example/profile']);
+ try{
+  const response=await post('/carts',{line_items:[{item:{id:'digital'},quantity:1}]});
+  expect(response.status).toBe(403);expect((await response.json()).messages[0].code).toBe('profile_identity_mismatch');
+ }finally{await db.query('UPDATE connections SET platform_profile=NULL WHERE id=$1',[connection]);}
 });

@@ -133,6 +133,7 @@ async function createOrder(tx:Tx,intent:any,r:SettlementRuntime){
  const checkout={...session.document,status:'completed',order:{id,permalink_url:order.permalink_url},yours:{...session.document.yours,revision:session.revision+1,payment_status:'confirmed',transaction_hash:intent.transaction_hash}};
  delete checkout.ap2;
  await tx.query("UPDATE merchant_sessions SET status='completed',revision=revision+1,document=$2,updated_at=now() WHERE id=$1",[session.id,JSON.stringify(checkout)]);
+ await enqueue(tx,'order.webhook','order-created:'+id,{intentId:intent.id,eventId:'order-created:'+id,occurredAt:Math.floor(Date.now()/1000),platformProfile:session.platform_profile,document:order});
  await enqueue(tx,'order.receipts','receipts:'+intent.id,{intentId:intent.id});
  await audit(tx,intent.account_id,'worker','order.created',id,{intentId:intent.id,transactionHash:intent.transaction_hash});
 }

@@ -1,17 +1,19 @@
 import assert from 'node:assert/strict';
+import {serve} from '@hono/node-server';
 import {spawn} from 'node:child_process';
 import {randomUUID,generateKeyPairSync,sign} from 'node:crypto';
 import {writeFile,mkdir,rm} from 'node:fs/promises';
 import {privateKeyToAccount,generatePrivateKey} from 'viem/accounts';
 import {toHex,maxUint256,parseEther,encodePacked} from 'viem';
 import {sha256} from '@yours/domain';
-import {createDb,migrate} from '@yours/storage';
+import {createDb,migrate,claimWork,finishWork} from '@yours/storage';
 import {encodeDelegations,delegationTypedData} from '@yours/wallet-sdk';
 import {verifyCheckout,validateSchema} from '@yours/ucp';
 import {createApp} from '../dist/app.js';
 import {readConfig} from '../dist/config.js';
 import {chainRuntime} from '../dist/chain.js';
 import {executePayment} from '../../worker/dist/settlement.js';
+import {processOrderWebhook} from '../../worker/dist/webhooks.js';
 
 export async function paymentIntegration({root,client,wallet,accounts,manifest,jpyc,humanKey}){
  const db=createDb('postgresql://localhost/yours_test');await migrate(db);
@@ -19,10 +21,12 @@ export async function paymentIntegration({root,client,wallet,accounts,manifest,j
  const keydir=root+'.local/payment-e2e-'+randomUUID();await mkdir(keydir,{recursive:true,mode:0o700});
  const pair=generateKeyPairSync('ec',{namedCurve:'prime256v1'});
  const signer={kid:'ucp-merchant',publicJwk:{...pair.publicKey.export({format:'jwk'}),kid:'ucp-merchant',alg:'ES256',use:'sig'},sign:async bytes=>new Uint8Array(sign('sha256',bytes,{key:pair.privateKey,dsaEncoding:'ieee-p1363'}))};
- const authority=spawn('uv',['run','uvicorn','yours_mandates.service:from_environment','--factory','--host','127.0.0.1','--port','18813','--no-access-log'],{cwd:root+'services/mandates',env:{...process.env,UV_CACHE_DIR:root+'.local/uv-cache',DATABASE_URL:'postgresql://localhost/yours_test',CHAIN_ID:'31337',GATE_ADDRESS:manifest.gate,PUBLIC_ORIGIN:'http://localhost:8080',MERCHANT_PUBLIC_JWK:JSON.stringify(signer.publicJwk),LOCAL_KEY_DIR:keydir,LOCAL_HUMAN_PRIVATE_KEY:humanKey,ENVIRONMENT:'test'},stdio:['ignore','ignore','pipe']});
+ const authority=spawn('uv',['run','uvicorn','yours_mandates.service:from_environment','--factory','--host','127.0.0.1','--port','18813','--no-access-log'],{cwd:root+'services/mandates',env:{...process.env,UV_CACHE_DIR:root+'.local/uv-cache',DATABASE_URL:'postgresql://localhost/yours_test',CHAIN_ID:'31337',GATE_ADDRESS:manifest.gate,PUBLIC_ORIGIN:'http://127.0.0.1:18815',MERCHANT_PUBLIC_JWK:JSON.stringify(signer.publicJwk),LOCAL_KEY_DIR:keydir,LOCAL_HUMAN_PRIVATE_KEY:humanKey,ENVIRONMENT:'test'},stdio:['ignore','ignore','pipe']});
  let stderr='';authority.stderr.on('data',chunk=>{stderr=(stderr+chunk.toString()).slice(-2000);});
- const config=readConfig({NODE_ENV:'test',DATABASE_URL:'postgresql://localhost/yours_test',PUBLIC_ORIGIN:'http://localhost:8080',RPC_URL:'http://127.0.0.1:18812',CHAIN_ID:'31337',MERCHANT_PAY_TO:payTo,JPYC_ADDRESS:manifest.jpyc,GATE_ADDRESS:manifest.gate,AGENT_ADDRESS:accounts.agent.address,MANDATES_URL:'http://127.0.0.1:18813'});
- const app=createApp(db,config,signer,chainRuntime(config,manifest));let cookie='',token='';
+ const config=readConfig({NODE_ENV:'test',DATABASE_URL:'postgresql://localhost/yours_test',PUBLIC_ORIGIN:'http://127.0.0.1:18815',RPC_URL:'http://127.0.0.1:18812',CHAIN_ID:'31337',MERCHANT_PAY_TO:payTo,JPYC_ADDRESS:manifest.jpyc,GATE_ADDRESS:manifest.gate,AGENT_ADDRESS:accounts.agent.address,MANDATES_URL:'http://127.0.0.1:18813'});
+ const app=createApp(db,config,signer,chainRuntime(config,manifest));
+ const apiServer=serve({fetch:app.fetch,port:18815,hostname:'127.0.0.1'});
+ let cookie='',token='';
  async function request(path,body,{status=200,asAgent=false,method,headers={}}={}){
   const response=await app.request(path,{method:method??(body===undefined?'GET':'POST'),headers:{'Content-Type':'application/json',Origin:config.PUBLIC_ORIGIN,...(asAgent?{Authorization:'Bearer '+token,'UCP-Agent':'profile="'+config.PUBLIC_ORIGIN+'/.well-known/ucp"'}:cookie?{Cookie:cookie}:{}),...headers},...(body===undefined?{}:{body:JSON.stringify(body)})});
   const json=await response.json();assert.equal(response.status,status,JSON.stringify({path,response:json}));return {json,response};
@@ -93,6 +97,18 @@ export async function paymentIntegration({root,client,wallet,accounts,manifest,j
   const completed=(await request('/ucp/checkout-sessions/'+checkout.id,undefined,{asAgent:true})).json;assert.equal(completed.status,'completed');await verifyCheckout(completed,[signer.publicJwk]);
   const order=(await request('/ucp/orders/'+completed.order.id,undefined,{asAgent:true})).json;validateSchema('shopping/order.json',order);
   const receipts=await privatePost('/v1/receipts',{intent_id:intentId});assert.ok(receipts.payment_receipt);assert.ok(receipts.checkout_receipt);
+  const webhook=await claimWork(db,['order.webhook'],60,intentId);assert.ok(webhook);
+  const delivery=await request('/internal/webhooks/deliver',{workId:webhook.id,leaseToken:webhook.lease_token});assert.equal(delivery.json.delivered,true);
+  await request('/internal/webhooks/deliver',{workId:webhook.id,leaseToken:webhook.lease_token});
+  assert.equal((await db.query('SELECT count(*)::int AS n FROM webhook_inbox WHERE event_id=$1',[webhook.payload.eventId])).rows[0].n,1);
+  const inbox=await claimWork(db,['order.webhook.received'],60,intentId);assert.ok(inbox);
+  await processOrderWebhook(db,inbox.payload.source,inbox.payload.eventId);
+  await processOrderWebhook(db,inbox.payload.source,inbox.payload.eventId);
+  assert.equal((await db.query("SELECT count(*)::int AS n FROM audit_events WHERE action='order.notification.received' AND data->>'eventId'=$1",[webhook.payload.eventId])).rows[0].n,1);
+  await finishWork(db,inbox);
+  await finishWork(db,webhook);
+  await request('/internal/webhooks/deliver',{workId:webhook.id,leaseToken:webhook.lease_token},{status:409});
+
   const paid=await request('/api/agent/payments/'+intentId,undefined,{asAgent:true});
   assert.equal(JSON.parse(Buffer.from(paid.response.headers.get('PAYMENT-RESPONSE'),'base64').toString()).transaction,settled.transactionHash);
   const passed=['owner SIWE and real signed wallet delegation','fresh owner task consent issues AP2','signed UCP checkout and real AP2 presentation','atomic mandate consumption and budget reservation','idempotent complete','raw transaction persisted before broadcast','lost broadcast response recovered by same hash','five confirmations before order creation','idempotent chain reconciliation','inventory decremented exactly once','merchant receives 600 test JPYC','AI token balance stays zero','official UCP order schema','signed AP2 payment and checkout receipts'];
@@ -138,9 +154,10 @@ export async function paymentIntegration({root,client,wallet,accounts,manifest,j
   const foreignLogin=await request('/api/auth/verify',{nonce:foreignChallenge.nonce,signature:await stranger.signMessage({message:foreignChallenge.message})});
   const foreignCookie=foreignLogin.response.headers.get('set-cookie').split(';')[0];
   const denied=await app.request('/api/owner/purchases/'+intentId+'/download',{headers:{Cookie:foreignCookie}});assert.equal(denied.status,404);
+  passed.push('signed order webhook delivered over real HTTP','duplicate webhook persists once','durable inbox processed and audited once','completed outbox lease cannot deliver again');
   passed.push('download unavailable before confirmed settlement','actual purchased Markdown delivered to owner','other wallet cannot download the purchase');
 
   await writeFile(root+'docs/evidence/payment-pipeline.json',JSON.stringify({scope:'Local Anvil, official MetaMask contracts, test ERC20 and real PostgreSQL/AP2 HTTP authority. Production worker logic with random in-memory signing keys. No browser wallet or public Amoy purchase claim.',passed,transactionHash:settled.transactionHash,gate:manifest.gate},null,2)+'\n');
   console.log(JSON.stringify({passed:passed.length,evidence:'docs/evidence/payment-pipeline.json'}));
- }finally{authority.kill('SIGTERM');await db.end();await rm(keydir,{recursive:true,force:true});}
+ }finally{apiServer.close();authority.kill('SIGTERM');await db.end();await rm(keydir,{recursive:true,force:true});}
 }

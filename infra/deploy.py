@@ -63,6 +63,7 @@ services = {
         'MERCHANT_PAY_TO': manifest['addresses']['merchant'],
         'AGENT_URL': f'https://yours-agent-{number}.{region}.run.app',
         'WORKER_URL': f'https://yours-worker-{number}.{region}.run.app',
+        'WORKER_IDENTITY': f'yours-worker@{project}.iam.gserviceaccount.com',
         'UCP_SIGNING_KEY': key + 'ucp-merchant/cryptoKeyVersions/1', 'MANDATES_URL': mandates_url,
     },
     'worker': {

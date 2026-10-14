@@ -48,11 +48,14 @@ export async function finishWork(db:Db,item:WorkItem,error?:string):Promise<void
  : await db.query('UPDATE outbox SET completed_at=now(),lease_until=NULL WHERE id=$1 AND lease_token=$2 AND lease_until>now() AND completed_at IS NULL',[item.id,item.lease_token]);
  if(result.rowCount!==1)throw new DomainError('lost_work_lease',409);
 }
-export async function acceptWebhook(db:Db,source:string,eventId:string,payload:unknown):Promise<boolean>{
+export async function acceptWebhook(db:Db,source:string,eventId:string,payload:unknown,intentId?:string):Promise<boolean>{
  return transaction(db,async tx=>{
   const hash=digest(payload);
   const result=await tx.query('INSERT INTO webhook_inbox(source,event_id,payload_hash,payload) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING',[source,eventId,hash,JSON.stringify(payload)]);
-  if(result.rowCount===1)return true;
+  if(result.rowCount===1){
+   if(intentId)await enqueue(tx,'order.webhook.received','webhook-received:'+digest([source,eventId]),{source,eventId,intentId});
+   return true;
+  }
   const {rows:[row]}=await tx.query('SELECT payload_hash FROM webhook_inbox WHERE source=$1 AND event_id=$2',[source,eventId]);
   if(row.payload_hash!==hash)throw new DomainError('webhook_event_conflict',409);
   return false;

@@ -15,6 +15,7 @@ import {permissionRoutes} from './permissions.js';
 import {agentRoutes} from './agents.js';
 import {approvalRoutes} from './approvals.js';
 import {purchaseRoutes} from './purchases.js';
+import {webhookRoutes} from './webhooks.js';
 import {demoRoutes} from './demo.js';
 import {publicRoutes} from './public.js';
 import {runRoutes} from './runs.js';
@@ -40,6 +41,7 @@ export function createApp(db:Db,config:Config,signer:P256Signer,chain?:ChainRunt
   return failure(c,'internal_error',500);
  });
  app.route('/',publicRoutes());
+ app.route('/',webhookRoutes(db,config,signer));
  app.get('/health',c=>c.json({ok:true,service:'yours-api'}));
  app.get('/ready',async c=>{await db.query('SELECT 1');return c.json({ok:true});});
  app.get('/api/config',c=>c.json({name:'yours',chainId:config.CHAIN_ID,network:config.CHAIN_ID===80002?'Polygon Amoy':'Local test chain',ucpVersion:UCP_VERSION,merchant:{id:config.MERCHANT_ID,name:config.MERCHANT_NAME},paymentsConfigured:Boolean(chain&&config.MANDATES_URL&&config.GATE_ADDRESS&&config.JPYC_ADDRESS&&config.MERCHANT_PAY_TO),gate:config.GATE_ADDRESS,token:config.JPYC_ADDRESS,geminiConfigured:Boolean(config.AGENT_URL)}));
@@ -67,16 +69,17 @@ export function createApp(db:Db,config:Config,signer:P256Signer,chain?:ChainRunt
  });
  app.post('/api/owner/connections',async c=>{
   const actor=owner(c);
-  const body=z.object({name:z.string().trim().min(1).max(80),provider:z.enum(['gemini','external']),agentAddress:addressSchema.optional(),ap2PublicJwk:z.record(z.unknown()).optional()}).strict().parse(await c.req.json());
+  const body=z.object({name:z.string().trim().min(1).max(80),provider:z.enum(['gemini','external']),agentAddress:addressSchema.optional(),ap2PublicJwk:z.record(z.unknown()).optional(),platformProfile:z.string().url().optional()}).strict().parse(await c.req.json());
   const address=body.provider==='gemini'?config.AGENT_ADDRESS:body.agentAddress;
   if(!address)throw new DomainError('agent_key_not_configured',409);
   if(body.ap2PublicJwk&&['d','k','p','q'].some(k=>k in body.ap2PublicJwk!))throw new DomainError('private_key_forbidden',422);
+  if(body.platformProfile&&(body.provider!=='external'||!body.platformProfile.startsWith('https://')||!config.TRUSTED_PROFILE_ORIGINS.split(',').includes(new URL(body.platformProfile).origin)))throw new DomainError('profile_origin_not_allowed',403);
   const id=randomUUID(),token=randomBytes(32).toString('base64url');
   await transaction(db,async tx=>{
    await tx.query('SELECT id FROM accounts WHERE id=$1 FOR UPDATE',[actor.accountId]);
    const {rows}=await tx.query("SELECT id FROM connections WHERE account_id=$1 AND agent_address=$2 AND status<>'revoked'",[actor.accountId,address.toLowerCase()]);
    if(rows.length)throw new DomainError('agent_already_connected',409);
-   await tx.query("INSERT INTO connections(id,account_id,name,provider,agent_address,ap2_public_jwk,token_hash,status) VALUES($1,$2,$3,$4,$5,$6,$7,'pending')",[id,actor.accountId,body.name,body.provider,address.toLowerCase(),JSON.stringify(body.ap2PublicJwk??null),sha256(token)]);
+   await tx.query("INSERT INTO connections(id,account_id,name,provider,agent_address,ap2_public_jwk,token_hash,status,platform_profile) VALUES($1,$2,$3,$4,$5,$6,$7,'pending',$8)",[id,actor.accountId,body.name,body.provider,address.toLowerCase(),JSON.stringify(body.ap2PublicJwk??null),sha256(token),body.platformProfile??null]);
    await audit(tx,actor.accountId,'owner:'+actor.accountId,'connection.created',id,{provider:body.provider,agentAddress:address});
   });
   return c.json({id,name:body.name,provider:body.provider,agentAddress:address,status:'pending',agentToken:token},201);
