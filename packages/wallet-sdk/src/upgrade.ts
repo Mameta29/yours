@@ -1,5 +1,6 @@
 import { toHex, type Address, type EIP1193Provider, type Hex, type PublicClient, type WalletGetCallsStatusReturnType } from 'viem';
 import { isExpected7702Code } from './wallet.js';
+import { walletRpcError } from './wallet-rpc-error.js';
 
 type UpgradeOptions = {
   provider: EIP1193Provider;
@@ -21,16 +22,6 @@ async function sameWallet(provider: EIP1193Provider, chainId: number, owner: Add
   const accounts = await provider.request({ method: 'eth_accounts' });
   if (accounts[0]?.toLowerCase() !== owner.toLowerCase()) throw new Error('wallet_account_changed');
 }
-function rpcError(error: unknown) {
-  let cause: any = error;
-  for (let i = 0; cause && i < 8; i++, cause = cause.cause) {
-    if ([4001, 5750].includes(cause.code)) return new Error('wallet_rejected', { cause: error });
-    if (cause.code === -32002) return new Error('wallet_permission_pending', { cause: error });
-    if ([-32601, 4200, 5700, 5710, 5760].includes(cause.code)) return new Error('wallet_upgrade_unsupported', { cause: error });
-  }
-  return new Error('wallet_upgrade_request_failed', { cause: error });
-}
-
 /** Explicit-click EIP-5792 upgrade. No token approval or asset transfer is sent.
  * MetaMask chooses its implementation; we independently require the pinned one.
  * Never replace an existing, different smart-account implementation.
@@ -44,7 +35,7 @@ export async function ensureGateSmartAccount(options: UpgradeOptions): Promise<v
   if (!options.pendingBatchId && isExpected7702Code(code, implementation)) return;
   let id = options.pendingBatchId;
   if (!id) {
-    const capabilities = await provider.request({ method: 'wallet_getCapabilities', params: [owner, [toHex(chainId)]] }).catch(error => { throw rpcError(error); });
+    const capabilities = await provider.request({ method: 'wallet_getCapabilities', params: [owner, [toHex(chainId)]] }).catch(error => { throw walletRpcError(error, 'wallet_getCapabilities'); });
     const status = capabilities[toHex(chainId)]?.atomic?.status;
     if (status !== 'ready' && status !== 'supported') throw new Error('wallet_upgrade_unsupported');
     await sameWallet(provider, chainId, owner);
@@ -54,7 +45,7 @@ export async function ensureGateSmartAccount(options: UpgradeOptions): Promise<v
     const result = await provider.request({ method: 'wallet_sendCalls', params: [{
       version: '2.0.0', from: owner, chainId: toHex(chainId), atomicRequired: true,
       calls: [{ to: owner, value: '0x0', data: '0x' }, { to: owner, value: '0x0', data: '0x' }],
-    }] }).catch(error => { throw rpcError(error); });
+    }] }).catch(error => { throw walletRpcError(error, 'wallet_sendCalls'); });
     if (!result || !batchId.test(result.id)) throw new Error('wallet_upgrade_response_invalid');
     id = result.id as Hex;
     onSubmitted(id);
@@ -64,7 +55,7 @@ export async function ensureGateSmartAccount(options: UpgradeOptions): Promise<v
   const deadline = Date.now() + 180_000;
   while (Date.now() < deadline) {
     await sameWallet(provider, chainId, owner);
-    const status: WalletGetCallsStatusReturnType = await provider.request({ method: 'wallet_getCallsStatus', params: [id] }).catch(error => { throw rpcError(error); });
+    const status: WalletGetCallsStatusReturnType = await provider.request({ method: 'wallet_getCallsStatus', params: [id] }).catch(error => { throw walletRpcError(error, 'wallet_getCallsStatus'); });
     if (status.id !== id || Number(status.chainId) !== chainId || status.version !== '2.0.0') throw new Error('wallet_upgrade_response_invalid');
     if (status.status >= 300 && status.status < 600) {
       onSettled();

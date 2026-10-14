@@ -25,7 +25,14 @@ import {
   LogOut,
   Copy,
 } from "lucide-react";
-import { api, explain, short, yen, fromAtomic } from "./api";
+import {
+  api,
+  explain,
+  walletErrorDetails,
+  short,
+  yen,
+  fromAtomic,
+} from "./api";
 import OrderDetails from "./OrderDetails";
 const walletAction =
   (name) =>
@@ -65,6 +72,19 @@ const Status = ({ state }) => (
     {states[state] ?? state}
   </span>
 );
+function NoticeText({ notice }) {
+  return (
+    <div className="notice-text">
+      {notice.text}
+      {notice.details && (
+        <details className="wallet-error-details">
+          <summary>エラーの詳細</summary>
+          <pre>{notice.details}</pre>
+        </details>
+      )}
+    </div>
+  );
+}
 function App() {
   const [config, setConfig] = useState(null),
     [data, setData] = useState(null),
@@ -251,7 +271,11 @@ function App() {
       await fn();
       await refresh();
     } catch (error) {
-      setNotice({ error: true, text: explain(error) });
+      setNotice({
+        error: true,
+        text: explain(error),
+        details: walletErrorDetails(error),
+      });
     } finally {
       setBusy("");
     }
@@ -515,7 +539,7 @@ function App() {
               role="alert"
             >
               <AlertCircle size={17} />
-              {notice.text}
+              <NoticeText notice={notice} />
               <button
                 className="icon-button"
                 aria-label="通知を閉じる"
@@ -1135,7 +1159,7 @@ function App() {
               className={"notice " + (notice.error ? "error" : "")}
               role="alert"
             >
-              {notice.text}
+              <NoticeText notice={notice} />
             </div>
           )}
         </ModalFrame>

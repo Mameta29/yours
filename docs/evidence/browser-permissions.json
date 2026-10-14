@@ -5,6 +5,7 @@
     "ordinary EOA initiates EIP-5792 upgrade from the permission button",
     "two zero-value self calls apply the pinned EIP-7702 implementation",
     "interrupted upgrade status survives reload without a second batch",
+    "wallet errors show the failing method and provider reason",
     "wallet reconnect cancellation preserves the pending form",
     "same-owner reconnect restores edited limits without sending a transaction",
     "reconnected owner explicitly reviews conditions before registration",
@@ -19,15 +20,15 @@
     "account change closes the pending form and logs out without sending",
     "no JavaScript errors"
   ],
-  "upgradeTransaction": "0xf3ac7dba66faff6ed0a94594337fa9fc5385937a596987e21c508c9dcd1fb869",
+  "upgradeTransaction": "0xde489c2a45f84618e32c4a6309b459669c47b11700410ca27f652821a3379deb",
   "transactions": [
     {
       "to": "0x8c1106124cafc1064666730359b575baaee93f58",
-      "hash": "0x4e960efdd8bce7721d3b2ddedc4009d780406cabf770dda9435fe89f4c027582"
+      "hash": "0x1ed4196123dd6670b5384e55d66a2c537b70eddf276d5242ec369e1c2b48a33b"
     },
     {
       "to": "0x3241eE5772e7bDf3F0232A20C665D517342aD080",
-      "hash": "0xfb85c1815685efd9536572fa15f70d18a9520d5c90ea85f1c3eadab0c128d448"
+      "hash": "0x3d2edf1d6fc0f04cfed78be44d48bcaa44474349e0e9b4868d90496bbf3723e3"
     }
   ]
 }

@@ -48,7 +48,13 @@ const messages = {
   wallet_upgrade_confirming:
     "設定の反映を待っています。時間をおいて同じボタンから再開できます。",
   wallet_upgrade_request_failed:
-    "ウォレットとの通信を確認できませんでした。MetaMaskの状態を確認し、同じボタンから再開してください。",
+    "MetaMaskでウォレット設定を続行できませんでした。下の「エラーの詳細」で、停止した処理と理由を確認できます。",
+  wallet_permission_missing:
+    "MetaMaskが、このサイトによるアカウントへのアクセスを許可していません。ウォレットを接続し直してください。",
+  wallet_upgrade_invalid_request:
+    "MetaMaskがウォレット設定の要求を受け付けませんでした。「エラーの詳細」を共有してください。",
+  wallet_upgrade_batch_unknown:
+    "前回の設定取引をMetaMaskで見つけられませんでした。別のブラウザやウォレットで操作していないか確認してください。送信済みの可能性があるため、新しい取引は作成していません。",
   wallet_upgrade_not_applied:
     "取引は完了しましたが、必要なウォレット設定を確認できませんでした。MetaMaskのスマートアカウント設定をご確認ください。",
   wallet_upgrade_failed:
@@ -94,6 +100,25 @@ export function explain(error) {
     messages[error?.message] ??
     "処理を完了できませんでした。状態を確認してから、再度お試しください。"
   );
+}
+export function walletErrorDetails(error) {
+  const d = error?.diagnostic;
+  if (
+    !d ||
+    ![
+      "wallet_getCapabilities",
+      "wallet_sendCalls",
+      "wallet_getCallsStatus",
+    ].includes(d.method)
+  )
+    return undefined;
+  return [
+    d.method,
+    Number.isSafeInteger(d.code) ? `RPC ${d.code}` : "RPC codeなし",
+    d.message,
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 export const short = (value) =>
   value ? value.slice(0, 6) + "…" + value.slice(-4) : "";

@@ -1034,6 +1034,20 @@ footer a:hover {
 .notice > button {
   margin-left: auto;
 }
+.notice-text {
+  min-width: 0;
+}
+.wallet-error-details {
+  margin-top: 8px;
+}
+.wallet-error-details summary {
+  cursor: pointer;
+}
+.wallet-error-details pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
 .notice.error {
   border-color: #eddacb;
   background: #fff5eb;
@@ -1733,11 +1747,34 @@ footer a:hover {
   overflow-wrap: anywhere;
 }
 
-.merchant-choices { border: 0; padding: 0; margin: 18px 0; }
-.merchant-choices legend { font-size: 13px; font-weight: 600; margin-bottom: 10px; }
-.product:disabled { opacity: .55; cursor: default; }
-.product small { display: block; color: var(--muted); margin: 6px 0; }
+.merchant-choices {
+  border: 0;
+  padding: 0;
+  margin: 18px 0;
+}
+.merchant-choices legend {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.product:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.product small {
+  display: block;
+  color: var(--muted);
+  margin: 6px 0;
+}
 
-.merchant-order-note { display: block; font-size: 14px; line-height: 1.7; }
-.merchant-order-note p { margin: 8px 0; }
-.merchant-order-note small { display: block; }
+.merchant-order-note {
+  display: block;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.merchant-order-note p {
+  margin: 8px 0;
+}
+.merchant-order-note small {
+  display: block;
+}
