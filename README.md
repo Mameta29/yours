@@ -99,4 +99,4 @@ AP2のPython環境、公式MetaMask contractsを使う結合試験、Google Clou
 
 配備URL、構成図、試用手順、検証記録はこのREADMEから参照できます。約3分のデモ動画、ハッカソンDashboardのrepo連携・提出は未完了です。[要項との対応](docs/HACKATHON.md)
 
-コードの由来と第三者ライブラリの帰属は[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)と[EXTRACTION.json](EXTRACTION.json)に記録しています。
+コードの由来と第三者ライブラリの帰属は[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)と[EXTRACTION.json](docs/EXTRACTION.json)に記録しています。
