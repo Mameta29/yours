@@ -23,7 +23,7 @@
 
 Google Cloudの配備先はユーザー指定の `yours-511602`、regionは`asia-northeast1`。課金の関連付けはユーザーが完了。すべてのcloud操作でprojectを明示し、既存CLI設定の別projectには配備しない。
 
-`infra/bootstrap.sh`を実行済み。必要なAPI、Artifact Registry、サービス別アカウント、署名用途別のCloud KMS HSM鍵を作成。Cloud SQL `yours-db`（PostgreSQL 16）、専用DB利用者・Secret Managerを作成し、ユーザー承認済みの`infra/IAM.md`の権限を適用。Cloud BuildでAPI imageを構築し、Cloud Run migration job `yours-migrate-k9skl`は03:52 UTCに成功。`yours-migrate-9ngl8`でruntime DB利用者の管理者membership・CREATEDB・CREATEROLEを除去し、4項目ともfalseを実DBで検証。サービス配備は継続中。
+`infra/bootstrap.sh`を実行済み。必要なAPI、Artifact Registry、サービス別アカウント、署名用途別のCloud KMS HSM鍵を作成。Cloud SQL `yours-db`（PostgreSQL 16）、専用DB利用者・Secret Managerを作成し、ユーザー承認済みの`infra/IAM.md`の権限を適用。`yours-migrate-9ngl8`でruntime DB利用者の管理者membership・CREATEDB・CREATEROLEを除去し、4項目ともfalseを実DBで検証。`yours-migrate-rrm4g`でmigration 001〜007と実際に配布するデジタル商品のcatalogを反映。
 
 Polygon Amoyにyours専用Gate `0x42eec579df8fb1f87ae3bddbb90c6a4a9f790504` とRegistry `0xa5524081a219422ee5247afDEda40791E953eF2B`を配備。Cloud HSM relayerの実署名を使用し、5 confirmationsとblock hashを検証。txは`0x7ffe2572d92c1b32b33ec16cead5156b1a9c7ec2a0381f9e5bc5048a121664b9`。公開情報・code hashは`deployments/amoy.json`。これは配備の証拠であり、公開Amoyでの購入成功はまだ確認していない。
 
@@ -42,4 +42,19 @@ Polygon Amoyにyours専用Gate `0x42eec579df8fb1f87ae3bddbb90c6a4a9f790504` とR
 
 `PAYMENT_PIPELINE=1 node packages/wallet-sdk/scripts/local-integration.mjs`で、本人署名→AP2 private HTTP→UCP complete→x402 HTTP 402/支払署名→実ERC-7710送金→order/署名付きreceiptの24項目を検証。送信応答消失から同一hashで復旧、金額改変拒否、期間超過の本人一件同意も含む。証拠は`docs/evidence/payment-pipeline.json`。これはAnvilと試験tokenでの結合検証。
 
-Cloud Run API・mandates・workerを非公開で配備し、起動正常を確認。image tagは`payments-20261014`、Cloud Buildは`a2d45f96-1362-4458-8fdc-2636b3ec4b14`。このimageはx402 HTTPフローと一件同意の追加前。外部HTTPSの疎通、追加分の再配備を継続中。Gemini/Vertex AI、管理画面、公開Amoy実購入はまだ確認していない。
+## 公開環境での確認
+
+[管理画面/API](https://yours-api-110852561536.asia-northeast1.run.app)を公開。mandates・worker・agentは非公開のCloud Run。image tagは`console-20261014`、Cloud Buildは`ff541558-f7b0-4471-984c-47d8b972d3dd`、sourceは`26efb36`。Cloud SQL接続、HSM公開鍵とdiscoveryの一致、4サービスのhealthと公開範囲を確認（[証拠](evidence/cloud-services.json)）。後続commitは再配備するまで公開環境の成果に含めない。
+
+Google ADK → Vertex AI `gemini-3.8-flash` → 実Cloud SQL catalogの検索が公開画面のAPI経由で成功（[証拠](evidence/gemini-cloud.json)）。未接続の試用は検索専用で、決済権限を持たない。購入は本人署名・AP2・x402を経由する。
+
+管理画面は1440pxと390pxで実ブラウザ検証済み。接続、AI別権限、共有予算、停止、注文専用同意、購入品downloadを実APIへ接続。ブラウザwalletによる登録の途中復旧と、公開Amoyでの実購入は継続中。
+
+## 次に完了する事項
+
+- UCP HTTP署名・DNSを固定したprofile取得・永続webhookの検証と配備。
+- 権限登録の途中復旧（1件目のtransaction成功後に画面を閉じても継続可能にする）。
+- 外部AI自身のEVM署名による実行、外部EC adapter、複数AIの共有予算の統合試験。
+- 公開Amoyで本人の資産から実購入、Schedulerによる復旧、提出用README・試用手順・検証範囲の整理。
+
+ローカルの最新結合証拠は[決済pipeline](evidence/payment-pipeline.json)。API/SDK、Anvil、公開Google Cloud、公開Amoyの証拠はそれぞれ区別する。

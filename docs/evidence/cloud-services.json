@@ -1,0 +1,46 @@
+{
+  "project": "yours-511602",
+  "scope": "Public API/console; private AP2, worker and Gemini health; live Cloud SQL access and discovery HSM key binding. Amoy purchase is separate evidence.",
+  "services": [
+    {
+      "service": "api",
+      "url": "https://yours-api-110852561536.asia-northeast1.run.app",
+      "private": false,
+      "health": {
+        "ok": true,
+        "service": "yours-api"
+      },
+      "databaseReady": true,
+      "discoveryKeyMatchesDeployedHsm": true
+    },
+    {
+      "service": "mandates",
+      "url": "https://yours-mandates-110852561536.asia-northeast1.run.app",
+      "private": true,
+      "health": {
+        "ok": true,
+        "service": "yours-mandates"
+      }
+    },
+    {
+      "service": "worker",
+      "url": "https://yours-worker-110852561536.asia-northeast1.run.app",
+      "private": true,
+      "health": {
+        "ok": true,
+        "service": "yours-worker"
+      }
+    },
+    {
+      "service": "agent",
+      "url": "https://yours-agent-110852561536.asia-northeast1.run.app",
+      "private": true,
+      "health": {
+        "ok": true,
+        "service": "yours-agent",
+        "model": "gemini-3.8-flash",
+        "framework": "Google ADK"
+      }
+    }
+  ]
+}

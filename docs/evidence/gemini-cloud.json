@@ -1,0 +1,20 @@
+{
+  "scope": "Public Cloud Run API -> private Google ADK -> Vertex AI Gemini -> real Cloud SQL UCP catalog. Read-only search; no purchase claim.",
+  "result": {
+    "id": "7cf89cb6-f068-4f67-b024-6784276bbfd2",
+    "status": "completed",
+    "result": {
+      "text": "カタログにある商品の一覧と実際の価格は以下の通りです。\n\n- **個人プロジェクト計画キット**\n  - 価格: 1,200 JPY\n  - 在庫: あり（利用可能）\n- **旅の持ち物チェックリスト**\n  - 価格: 600 JPY\n  - 在庫: あり（利用可能）\n- **週次ふりかえりテンプレート**\n  - 価格: 300 JPY\n  - 在庫: あり（利用可能）",
+      "events": [
+        {
+          "type": "catalog.search",
+          "at": 1791955132,
+          "count": 3
+        }
+      ],
+      "model": "gemini-3.8-flash",
+      "framework": "Google ADK",
+      "readOnly": true
+    }
+  }
+}

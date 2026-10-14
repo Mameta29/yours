@@ -8,7 +8,7 @@ from pathlib import Path
 project='yours-511602'
 token=subprocess.check_output(['gcloud','auth','print-identity-token','--project='+project],text=True).strip()
 results=[]
-for service in ('api','mandates','worker'):
+for service in ('api','mandates','worker','agent'):
     origin=f'https://yours-{service}-110852561536.asia-northeast1.run.app'
     try:
         urllib.request.urlopen(origin+'/health',timeout=60)
@@ -18,7 +18,7 @@ for service in ('api','mandates','worker'):
     request=urllib.request.Request(origin+'/health',headers={'Authorization':'Bearer '+token})
     with urllib.request.urlopen(request,timeout=90) as response:
         health=json.load(response)
-    assert health['ok'] and private
+    assert health['ok'] and (private if service!='api' else not private)
     result={'service':service,'url':origin,'private':private,'health':health}
     if service=='api':
         for path in ('/ready','/.well-known/ucp'):
@@ -33,5 +33,5 @@ for service in ('api','mandates','worker'):
                 assert data['keys']==[expected]
                 result['discoveryKeyMatchesDeployedHsm']=True
     results.append(result)
-Path('docs/evidence/cloud-services.json').write_text(json.dumps({'project':project,'scope':'Private service startup, live Cloud SQL access, public HSM key binding. No public browser/Gemini/Amoy purchase claim.','services':results},indent=2)+'\n')
+Path('docs/evidence/cloud-services.json').write_text(json.dumps({'project':project,'scope':'Public API/console; private AP2, worker and Gemini health; live Cloud SQL access and discovery HSM key binding. Amoy purchase is separate evidence.','services':results},indent=2)+'\n')
 print(json.dumps({'passed':len(results),'evidence':'docs/evidence/cloud-services.json'}))
