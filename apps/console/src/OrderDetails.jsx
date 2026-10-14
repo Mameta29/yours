@@ -32,7 +32,9 @@ export default function OrderDetails({
         setError("");
         if (
           !["failed", "canceled", "approval_required"].includes(result.state) &&
-          (result.state !== "confirmed" || !result.receipts)
+          (result.state !== "confirmed" ||
+            !result.receipts ||
+            result.merchantOrder?.status === "pending")
         )
           timer = setTimeout(poll, 4000);
       } catch (e) {
@@ -107,33 +109,57 @@ export default function OrderDetails({
           ¥{yen(purchase.amount)} <small>test JPYC</small>
         </strong>
       </div>
-      {purchase.state === "confirmed" && (
-        <button
-          className="button primary full"
-          disabled={!!busy}
-          onClick={() =>
-            action("購入品を準備しています", async () => {
-              const delivery = await api(
-                `/api/owner/purchases/${purchase.id}/delivery`,
-                {},
-              );
-              setRecord({
-                accountId,
-                purchase: {
-                  ...purchase,
-                  order: delivery.order,
-                  items: delivery.order.line_items,
-                },
-              });
-              window.location.assign(
-                `/api/owner/purchases/${purchase.id}/download`,
-              );
-            })
-          }
-        >
-          購入品をダウンロード <ArrowDown size={16} />
-        </button>
-      )}
+      {purchase.state === "confirmed" &&
+        purchase.deliveryKind !== "merchant" && (
+          <button
+            className="button primary full"
+            disabled={!!busy}
+            onClick={() =>
+              action("購入品を準備しています", async () => {
+                const delivery = await api(
+                  `/api/owner/purchases/${purchase.id}/delivery`,
+                  {},
+                );
+                setRecord({
+                  accountId,
+                  purchase: {
+                    ...purchase,
+                    order: delivery.order,
+                    items: delivery.order.line_items,
+                  },
+                });
+                window.location.assign(
+                  `/api/owner/purchases/${purchase.id}/download`,
+                );
+              })
+            }
+          >
+            購入品をダウンロード <ArrowDown size={16} />
+          </button>
+        )}
+      {purchase.deliveryKind === "merchant" &&
+        purchase.state === "confirmed" && (
+          <div className="notice merchant-order-note">
+            {purchase.merchantOrder?.status === "accepted" ? (
+              <>
+                <strong>店舗で注文を受け付けました</strong>
+                <p>店舗の注文番号：{purchase.merchantOrder.order_number}</p>
+                <small>
+                  商品の案内は店舗からの注文確認メールをご確認ください。
+                </small>
+              </>
+            ) : (
+              <>
+                <strong>
+                  支払いは確定しました。店舗への注文登録を確認中です。
+                </strong>
+                <p>
+                  同じ取引で確認を続けています。再購入する必要はありません。
+                </p>
+              </>
+            )}
+          </div>
+        )}
       {purchase.transactionHash && (
         <a
           className="text-button"

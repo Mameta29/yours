@@ -33,6 +33,7 @@ const walletAction =
     import("./wallet").then((module) => module[name](...args));
 const connect = walletAction("connect"),
   typed = walletAction("typed"),
+  personal = walletAction("personal"),
   registerPermission = walletAction("registerPermission"),
   revokePermission = walletAction("revokePermission");
 import "./style.css";
@@ -610,6 +611,7 @@ function App() {
                         <button
                           key={p.id}
                           className="product"
+                          disabled={!p.variants[0].availability.available}
                           onClick={() =>
                             data && active.length
                               ? setModal({ kind: "purchase", product: p })
@@ -620,10 +622,20 @@ function App() {
                         >
                           <span className="product-art">
                             <FileText size={33} />
-                            <span>YOURS / DIGITAL</span>
+                            <span>
+                              {p.metadata?.external
+                                ? "CONNECTED / EC"
+                                : "YOURS / DIGITAL"}
+                            </span>
                           </span>
                           <div>
                             <h3>{p.title}</h3>
+                            <small>
+                              {p.metadata?.merchant_name ?? "yours Market"}
+                              {!p.variants[0].availability.available
+                                ? " · 現在は購入できません"
+                                : ""}
+                            </small>
                             <p>{p.description.plain}</p>
                             <strong>
                               ¥{yen(p.price_range.min.amount)} <span>JPYC</span>
@@ -1153,7 +1165,10 @@ function IntentList({ intents, onApprove, onOpen }) {
             </span>
             <div>
               <strong>
-                {i.merchant_id === "yours-lab" ? "yours Market" : i.merchant_id}
+                {i.merchant_name ??
+                  (i.merchant_id === "yours-lab"
+                    ? "yours Market"
+                    : i.merchant_id)}
               </strong>
               <small>{new Date(i.created_at).toLocaleString("ja-JP")}</small>
             </div>
@@ -1217,6 +1232,8 @@ function ModalContent({
     [draftLoading, setDraftLoading] = useState(modal.kind === "permission"),
     [checked, setChecked] = useState(false),
     [quantity, setQuantity] = useState(1),
+    [email, setEmail] = useState(""),
+    purchaseRequest = useRef(null),
     [purchaseConnection, setPurchaseConnection] = useState(chosen?.id ?? ""),
     [settings, setSettings] = useState({
       perOrder: modal.connection?.permission
@@ -1232,6 +1249,9 @@ function ModalContent({
         ? fromAtomic(data.policy.document.perPeriod)
         : 10000,
       days: 7,
+      merchants:
+        modal.connection?.permission?.merchants.map((m) => m.id) ??
+        (config?.merchant?.id ? [config.merchant.id] : []),
     });
   const address = data?.account.address;
   useEffect(() => {
@@ -1418,7 +1438,7 @@ function ModalContent({
               address,
               config,
               connection: modal.connection,
-              settings: { ...settings, merchants: [config.merchant.id] },
+              settings,
               progress: setBusy,
             });
             setModal(null);
@@ -1467,13 +1487,32 @@ function ModalContent({
             </label>
           ))}
         </div>
-        <label>
-          購入を許可するお店
-          <div className="read-only">
-            <Check size={17} />
-            {config.merchant.name} <span>Amoy検証ストア</span>
-          </div>
-        </label>
+        <fieldset className="merchant-choices">
+          <legend>購入を許可するお店</legend>
+          {(config.merchants ?? [config.merchant]).map((merchant) => (
+            <label className="check-label" key={merchant.id}>
+              <input
+                type="checkbox"
+                disabled={draftLoading || !!permissionDraft}
+                checked={settings.merchants?.includes(merchant.id) ?? false}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    merchants: e.target.checked
+                      ? [...(settings.merchants ?? []), merchant.id]
+                      : (settings.merchants ?? []).filter(
+                          (id) => id !== merchant.id,
+                        ),
+                  })
+                }
+              />
+              {merchant.name}
+              {merchant.adapter === "jpyc-ec"
+                ? "（外部EC・Amoy）"
+                : "（yours）"}
+            </label>
+          ))}
+        </fieldset>
         <label>
           期限
           <select
@@ -1530,23 +1569,56 @@ function ModalContent({
           e.preventDefault();
           if (!needProvider()) return;
           action("この購入への同意を準備しています", async () => {
+            const formKey = JSON.stringify({
+              connectionId: buyer.id,
+              productId: p.id,
+              quantity,
+              email,
+            });
+            if (purchaseRequest.current?.key !== formKey)
+              purchaseRequest.current = {
+                key: formKey,
+                id: crypto.randomUUID(),
+              };
             const task = await api("/api/owner/tasks/prepare", {
               connectionId: buyer.id,
-              merchantId: config.merchant.id,
+              merchantId: p.metadata?.merchant_id ?? config.merchant.id,
+              ...(p.metadata?.external
+                ? { email, requestId: purchaseRequest.current.id }
+                : {}),
               items: [{ id: p.id, quantity }],
               maxAmount: amount,
               minutes: 60,
             });
-            const signature = await typed(
-              provider,
-              address,
-              config.chainId,
-              task.typedData,
-            );
-            const approved = await api(
-              "/api/owner/tasks/" + task.id + "/approve",
-              { signature },
-            );
+            let approved;
+            if (task.authorizedMandateId)
+              approved = { id: task.authorizedMandateId };
+            else {
+              let transferSignature;
+              if (
+                task.transferAuthorization &&
+                !task.transferAuthorization.authorized
+              ) {
+                setBusy("店舗の注文予約をウォレットで確認してください");
+                transferSignature = await personal(
+                  provider,
+                  address,
+                  config.chainId,
+                  task.transferAuthorization.message,
+                );
+              }
+              setBusy("この購入をAIに任せる同意を確認してください");
+              const signature = await typed(
+                provider,
+                address,
+                config.chainId,
+                task.typedData,
+              );
+              approved = await api("/api/owner/tasks/" + task.id + "/approve", {
+                signature,
+                ...(transferSignature ? { transferSignature } : {}),
+              });
+            }
             setModal(null);
             if (buyer.provider !== "gemini") {
               setNotice({
@@ -1574,7 +1646,7 @@ function ModalContent({
         <div className="purchase-summary">
           <strong>{p.title}</strong>
           <p>{p.description.plain}</p>
-          <span>{config.merchant.name}</span>
+          <span>{p.metadata?.merchant_name ?? config.merchant.name}</span>
         </div>
         <label>
           この購入を任せるAI
@@ -1589,6 +1661,21 @@ function ModalContent({
             ))}
           </select>
         </label>
+        {p.metadata?.external && (
+          <label>
+            注文確認メールの宛先
+            <input
+              type="email"
+              required
+              maxLength="254"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={!!busy}
+            />
+            <small>この店舗へ送信します。AIへの依頼には含めません。</small>
+          </label>
+        )}
         <label>
           数量
           <input
@@ -1606,7 +1693,9 @@ function ModalContent({
           </strong>
         </div>
         <p className="small muted">
-          Amoyのテスト商品です。ウォレットでの署名後、AIが会計と支払いを進めます。
+          {p.metadata?.external
+            ? "外部ECのAmoy検証商品です。予約の本人確認とAIへの購入同意を順に確認します。実物の発送はありません。"
+            : "Amoyのテスト商品です。ウォレットでの署名後、AIが会計と支払いを進めます。"}
         </p>
         <button className="button primary full" disabled={!!busy || !buyer}>
           署名して、この購入を任せる <ArrowRight size={16} />

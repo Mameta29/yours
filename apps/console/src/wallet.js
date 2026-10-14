@@ -333,3 +333,13 @@ export async function revokePermission({
     { transactionHash: hash },
   );
 }
+
+export async function personal(provider, address, chainId, message) {
+  await ensure(provider, chainId, address);
+  const signature = await provider.request({
+    method: "personal_sign",
+    params: [toHex(message), address],
+  });
+  await ensure(provider, chainId, address);
+  return signature;
+}

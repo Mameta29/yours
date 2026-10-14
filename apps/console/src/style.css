@@ -1732,3 +1732,12 @@ footer a:hover {
 .order-id {
   overflow-wrap: anywhere;
 }
+
+.merchant-choices { border: 0; padding: 0; margin: 18px 0; }
+.merchant-choices legend { font-size: 13px; font-weight: 600; margin-bottom: 10px; }
+.product:disabled { opacity: .55; cursor: default; }
+.product small { display: block; color: var(--muted); margin: 6px 0; }
+
+.merchant-order-note { display: block; font-size: 14px; line-height: 1.7; }
+.merchant-order-note p { margin: 8px 0; }
+.merchant-order-note small { display: block; }

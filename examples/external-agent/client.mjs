@@ -26,7 +26,7 @@ async function main(){
  const origin=new URL(process.env.YOURS_ORIGIN??'https://yours-api-110852561536.asia-northeast1.run.app');
  if((localTest?origin.protocol!=='http:'||!['127.0.0.1','localhost'].includes(origin.hostname):origin.protocol!=='https:')||origin.pathname!=='/'||origin.search||origin.hash||origin.username||origin.password)throw new Error('YOURS_ORIGIN must be an HTTPS origin (loopback HTTP only for the explicit local test)');
  const token=process.env.YOURS_AGENT_TOKEN;if(!token)throw new Error('Set YOURS_AGENT_TOKEN to the token issued by your connection');
- const platform=process.env.YOURS_PLATFORM_PROFILE??origin.origin+'/profiles/platform';
+ let platform=process.env.YOURS_PLATFORM_PROFILE??origin.origin+'/profiles/platform';
  const manifest=JSON.parse(await readFile(new URL(localTest?'../../.local/local-chain.json':'../../deployments/amoy.json',import.meta.url),'utf8'));
  if(manifest.chainId!==(localTest?31337:80002))throw new Error('Only the pinned deployment for the selected environment is enabled');
  const profileResponse=await fetch(origin.origin+'/.well-known/ucp',{redirect:'error',signal:AbortSignal.timeout(20000)});
@@ -44,16 +44,21 @@ async function main(){
  const tasks=(await api('/api/agent/tasks')).data.tasks;
  if(command==='tasks'){console.log(JSON.stringify({tasks},null,2));return;}
  const task=tasks.find(t=>t.id===process.argv[3]);if(!task)throw new Error('Specify a live task that the owner approved for this connection');
+ if(task.task.checkout_id&&task.checkout_profile){
+  if(process.env.YOURS_PLATFORM_PROFILE&&platform!==task.checkout_profile)throw new Error('Use the platform profile bound to the prepared checkout');
+  platform=task.checkout_profile;
+ }
  const file=resolve(dirname(keyPath),'task-'+task.id+'.json');
  let saved={};try{saved=JSON.parse(await readFile(file,'utf8'));}catch(error){if(error.code!=='ENOENT')throw error;}
  async function save(){const tmp=file+'.'+randomUUID()+'.tmp';await writeFile(tmp,json(saved)+'\n',{flag:'wx',mode:0o600});await rename(tmp,file);}
  let intentId=task.intent_id??saved.intentId;
  if(!intentId){
   if(!saved.checkout){
-   const result=await api('/ucp/checkout-sessions',{line_items:task.task.items.map(item=>({item:{id:item.id},quantity:item.quantity}))},{key:'checkout:'+task.id});
+   const result=task.task.checkout_id?await api('/ucp/checkout-sessions/'+task.task.checkout_id):await api('/ucp/checkout-sessions',{line_items:task.task.items.map(item=>({item:{id:item.id},quantity:item.quantity}))},{key:'checkout:'+task.id});
    saved={...saved,checkout:result.data,etag:result.etag};await save();
   }
   const checkout=saved.checkout;await verifyCheckout(checkout,profile.keys);
+  if(task.task.checkout_id&&(checkout.id!==task.task.checkout_id||checkout.yours.ec?.requirements_hash!==task.task.requirements_hash))throw new Error('Reserved checkout changed');
   if(checkout.status!=='ready_for_complete'||checkout.merchant.id!==task.task.merchant_id||checkout.currency!==task.task.currency||checkout.totals.find(t=>t.type==='total').amount>task.task.max_amount)throw new Error('Checkout is outside the approved task');
   if(checkout.line_items.length!==task.task.items.length||checkout.line_items.some(line=>!task.task.items.some(item=>item.id===line.item.id&&item.quantity===line.quantity)))throw new Error('Checkout line items changed');
   if(!saved.complete){

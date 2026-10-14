@@ -59,6 +59,19 @@ const messages = {
     "注文の証拠を準備中です。少し待って再度お試しください。",
   order_expiring:
     "この注文の承認期限が近づいています。新しい購入依頼を作成してください。",
+  ec_price_changed:
+    "店舗の価格が変わりました。カタログを読み直して金額を確認してください。",
+  ec_product_unavailable:
+    "この商品は現在購入できません。店舗の在庫と販売条件をご確認ください。",
+  ec_quote_expired:
+    "店舗の予約期限が過ぎました。購入画面を閉じ、新しく商品を選んでください。",
+  ec_quote_expiring:
+    "店舗の予約期限が近づいています。時間をおいて購入画面からやり直してください。",
+  ec_owner_authorization_rejected:
+    "店舗で本人の署名を確認できませんでした。同じ購入画面から再試行してください。送金は行っていません。",
+  ec_merchant_changed: "店舗の支払い設定が変わったため、購入を停止しました。",
+  ec_settlement_pending:
+    "支払い後の店舗受付を確認中です。同じ取引で確認を続けています。",
   permission_inactive: "先にAIの権限を設定してください。",
   permission_expiring: "AIの権限を更新してください。",
   agent_rate_limit: "今しばらく待ってから、もう一度お試しください。",
