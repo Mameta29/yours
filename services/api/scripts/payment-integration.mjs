@@ -16,6 +16,7 @@ import {chainRuntime} from '../dist/chain.js';
 import {executePayment} from '../../worker/dist/settlement.js';
 import {processOrderWebhook} from '../../worker/dist/webhooks.js';
 import {externalAgentIntegration} from './external-agent-integration.mjs';
+import {startEcFixture,ecIntegration} from './ec-integration.mjs';
 
 export async function paymentIntegration({root,client,wallet,accounts,manifest,jpyc,humanKey}){
  const db=createDb('postgresql://localhost/yours_test');await migrate(db);
@@ -25,7 +26,8 @@ export async function paymentIntegration({root,client,wallet,accounts,manifest,j
  const signer={kid:'ucp-merchant',publicJwk:{...pair.publicKey.export({format:'jwk'}),kid:'ucp-merchant',alg:'ES256',use:'sig'},sign:async bytes=>new Uint8Array(sign('sha256',bytes,{key:pair.privateKey,dsaEncoding:'ieee-p1363'}))};
  const authority=spawn('uv',['run','uvicorn','yours_mandates.service:from_environment','--factory','--host','127.0.0.1','--port','18813','--no-access-log'],{cwd:root+'services/mandates',env:{...process.env,UV_CACHE_DIR:root+'.local/uv-cache',DATABASE_URL:'postgresql://localhost/yours_test',CHAIN_ID:'31337',GATE_ADDRESS:manifest.gate,PUBLIC_ORIGIN:'http://127.0.0.1:18815',MERCHANT_PUBLIC_JWK:JSON.stringify(signer.publicJwk),LOCAL_KEY_DIR:keydir,LOCAL_HUMAN_PRIVATE_KEY:humanKey,ENVIRONMENT:'test'},stdio:['ignore','ignore','pipe']});
  let stderr='';authority.stderr.on('data',chunk=>{stderr=(stderr+chunk.toString()).slice(-2000);});
- const config=readConfig({NODE_ENV:'test',DATABASE_URL:'postgresql://localhost/yours_test',PUBLIC_ORIGIN:'http://127.0.0.1:18815',RPC_URL:'http://127.0.0.1:18812',CHAIN_ID:'31337',MERCHANT_PAY_TO:payTo,JPYC_ADDRESS:manifest.jpyc,GATE_ADDRESS:manifest.gate,AGENT_ADDRESS:accounts.agent.address,MANDATES_URL:'http://127.0.0.1:18813'});
+ const fixture=await startEcFixture({client,token:manifest.jpyc,payTo:'0x0000000000000000000000000000000000000300'});
+ const config=readConfig({EC_MERCHANTS_JSON:JSON.stringify([fixture.merchant]),NODE_ENV:'test',DATABASE_URL:'postgresql://localhost/yours_test',PUBLIC_ORIGIN:'http://127.0.0.1:18815',RPC_URL:'http://127.0.0.1:18812',CHAIN_ID:'31337',MERCHANT_PAY_TO:payTo,JPYC_ADDRESS:manifest.jpyc,GATE_ADDRESS:manifest.gate,AGENT_ADDRESS:accounts.agent.address,MANDATES_URL:'http://127.0.0.1:18813'});
  const app=createApp(db,config,signer,chainRuntime(config,manifest));
  app.use('/*',serveStatic({root:'apps/console/dist'}));app.get('*',serveStatic({path:'apps/console/dist/index.html'}));
  const apiServer=serve({fetch:app.fetch,port:18815,hostname:'127.0.0.1'});
@@ -186,9 +188,15 @@ export async function paymentIntegration({root,client,wallet,accounts,manifest,j
    passed.push('browser opens the actual owner order permalink','browser downloads the actual paid file');
   }
 
-  await externalAgentIntegration({root,db,request,send,client,owner,manifest,runtime,productId,signer,passed});
+  await externalAgentIntegration({root,db,request,send,client,owner,manifest,runtime,productId,signer,fixture,passed});
+  const externalOrder=await ecIntegration({db,request,send,client,owner,manifest,runtime,connection,signer,fixture,passed});
+  if(process.env.BROWSER_PURCHASE==='1'){
+   const {verifyEcPurchaseBrowser}=await import('./purchase-browser.mjs');
+   await verifyEcPurchaseBrowser({origin:config.PUBLIC_ORIGIN,cookie,orderId:externalOrder});
+   passed.push('browser distinguishes external order acceptance from digital downloads');
+  }
 
-  await writeFile(root+'docs/evidence/payment-pipeline.json',JSON.stringify({scope:'Local Anvil, official MetaMask contracts, test ERC20 and real PostgreSQL/AP2 HTTP authority. Production worker logic with random in-memory signing keys. No browser wallet or public Amoy purchase claim.',passed,transactionHash:settled.transactionHash,gate:manifest.gate},null,2)+'\n');
+  await writeFile(root+'docs/evidence/payment-pipeline.json',JSON.stringify({scope:'Local Anvil, official MetaMask contracts, test ERC20 and real PostgreSQL/AP2 HTTP authority. Production worker logic with random in-memory signing keys. Legacy EC uses a controlled HTTP fixture with real owner signatures and ERC20 receipt verification. No public MetaMask or public Amoy/EC purchase claim.',passed,transactionHash:settled.transactionHash,gate:manifest.gate},null,2)+'\n');
   console.log(JSON.stringify({passed:passed.length,evidence:'docs/evidence/payment-pipeline.json'}));
- }finally{apiServer.close();authority.kill('SIGTERM');await db.end();await rm(keydir,{recursive:true,force:true});}
+ }finally{await fixture.close();apiServer.close();authority.kill('SIGTERM');await db.end();await rm(keydir,{recursive:true,force:true});}
 }

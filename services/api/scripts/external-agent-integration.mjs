@@ -8,7 +8,7 @@ import {encodeDelegations,delegationTypedData,externalPaymentTypedData} from '@y
 import {verifyCheckout} from '@yours/ucp';
 import {executePayment} from '../../worker/dist/settlement.js';
 
-export async function externalAgentIntegration({root,db,request,send,client,owner,manifest,runtime,productId,signer,passed}){
+export async function externalAgentIntegration({root,db,request,send,client,owner,manifest,runtime,productId,signer,fixture,passed}){
  const agentKey=generatePrivateKey(),agent=privateKeyToAccount(agentKey);
  const holder=generateKeyPairSync('ec',{namedCurve:'prime256v1'});
  const publicJwk={...holder.publicKey.export({format:'jwk'}),kid:'external-holder',alg:'ES256'};
@@ -94,8 +94,8 @@ export async function externalAgentIntegration({root,db,request,send,client,owne
   await client.request({method:'anvil_mine',params:['0x1','0x0']});
   await new Promise(resolve=>setTimeout(resolve,250));
  }}catch(error){pumpError=error;}})();
- const runCli=()=>new Promise((resolve,reject)=>{
-  const child=spawn('node',[root+'examples/external-agent/client.mjs','run',cliMandate.id],{cwd:root,env:{...process.env,NODE_ENV:'test',YOURS_LOCAL_TEST:'1',YOURS_ORIGIN:runtime.origin,YOURS_AGENT_KEY_FILE:keyFile,YOURS_AGENT_TOKEN:connection.agentToken},stdio:['ignore','pipe','pipe']});
+ const runCli=(mandateId=cliMandate.id)=>new Promise((resolve,reject)=>{
+  const child=spawn('node',[root+'examples/external-agent/client.mjs','run',mandateId],{cwd:root,env:{...process.env,NODE_ENV:'test',YOURS_LOCAL_TEST:'1',YOURS_ORIGIN:runtime.origin,YOURS_AGENT_KEY_FILE:keyFile,YOURS_AGENT_TOKEN:connection.agentToken},stdio:['ignore','pipe','pipe']});
   let stdout='',stderr='';child.stdout.on('data',chunk=>{stdout+=chunk.toString();});child.stderr.on('data',chunk=>{stderr=(stderr+chunk.toString()).slice(-4000);});
   const timeout=setTimeout(()=>child.kill('SIGTERM'),120000);
   child.on('error',error=>{clearTimeout(timeout);reject(error);});
@@ -108,6 +108,11 @@ export async function externalAgentIntegration({root,db,request,send,client,owne
   assert.equal((await db.query('SELECT count(*)::int AS n FROM signed_transactions WHERE intent_id=$1',[consumed.intent_id])).rows[0].n,1);
   assert.equal((await request('/api/owner/me')).json.usage.accountSpent,parseEther('2400').toString());
   assert.equal((await request('/api/owner/me')).json.policy.document.periodStart,before.policy.document.periodStart);
+  const ecTask=(await request('/api/owner/tasks/prepare',{requestId:randomUUID(),connectionId:connection.id,merchantId:fixture.merchant.id,items:[{id:fixture.merchant.id+'/'+fixture.productId,quantity:1}],email:'buyer@example.test',maxAmount:800,minutes:60},{status:201})).json;
+  const ecMandate=(await request('/api/owner/tasks/'+ecTask.id+'/approve',{signature:await owner.signTypedData(ecTask.typedData),transferSignature:await owner.signMessage({message:ecTask.transferAuthorization.message})})).json;
+  const ecResult=await runCli(ecMandate.id);assert.equal(ecResult.state,'approval_required');
+  assert.equal((await db.query('SELECT count(*)::int AS n FROM signed_transactions WHERE intent_id=$1',[ecResult.intentId])).rows[0].n,0);
+  passed.push('published external client verifies a prepared EC checkout and stops for missing owner permission');
   if(pumpError)throw pumpError;
   passed.push('published external client creates and verifies its own UCP checkout over HTTP','external client presents AP2 and signs its own payment with zero hosted-key use','external client retry reconciles one transaction','owner budget update preserves shared spent and period anchor');
  }finally{pumping=false;await pump;await rm(directory,{recursive:true,force:true});}
