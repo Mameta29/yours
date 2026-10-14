@@ -14,8 +14,13 @@
     "merchant receives 600 test JPYC",
     "AI token balance stays zero",
     "official UCP order schema",
-    "signed AP2 payment and checkout receipts"
+    "signed AP2 payment and checkout receipts",
+    "x402 HTTP 402 requirements",
+    "no transaction before payment acceptance",
+    "altered x402 amount rejected",
+    "real ERC-7710 PAYMENT-SIGNATURE accepted",
+    "PAYMENT-RESPONSE only after settlement"
   ],
-  "transactionHash": "0x776cdd33f199bf322f82b0a05949ddc29a16c8fcbbd5fc1e761ae1dc2250284e",
-  "gate": "0x3d43acff25a755645c14506356d9f564b3ae4868"
+  "transactionHash": "0x00f744113877bd80ca9246a721c186b654c2b4dc6b252163af5190dc56cfea58",
+  "gate": "0x744c7cebfdfedbca044191edda0b7201237047c8"
 }

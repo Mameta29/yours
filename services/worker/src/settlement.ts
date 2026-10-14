@@ -4,6 +4,7 @@ import {DomainError,digest as snapshotDigest} from '@yours/domain';
 import {claimTransaction,saveSignedTransaction,markBroadcast,recordChainReceipt,transaction,audit,enqueue,type Db,type Tx} from '@yours/storage';
 import {yoursPurchaseGateAbi,decodeDelegations,validateParents,verifyParentSignatures,buildPaymentLeaf,delegationTypedData,hashDelegation,encodeDelegations,gateDomain,gateTypes,digest,structHash,requirementsHash,basketCommitment,evidenceDigest,emptyFunding,emptyPrice,emptyApproval,type ExecutionEnvelope,type Enforcers} from '@yours/wallet-sdk';
 import {validateSchema,UCP_VERSION} from '@yours/ucp';
+import {paymentPayload,parseEnvelope} from '@yours/wallet-sdk';
 
 export interface SettlementRuntime {
  client:PublicClient;chainId:number;gate:Address;manager:Address;token:Address;enforcers:Enforcers;
@@ -17,7 +18,7 @@ async function loadIntent(db:Db,id:string){
  const {rows:[row]}=await db.query(`SELECT i.*,a.address,c.agent_address,c.status AS connection_status,p.document AS policy,p.revision AS policy_revision,g.context,g.document AS grant FROM intents i JOIN accounts a ON a.id=i.account_id JOIN connections c ON c.id=i.connection_id JOIN policies p ON p.account_id=i.account_id JOIN wallet_grants g ON g.connection_id=i.connection_id AND g.token_address=p.token_address WHERE i.id=$1`,[id]);
  if(!row)throw new DomainError('payment_not_found',404);return row;
 }
-async function prepare(db:Db,id:string,r:SettlementRuntime){
+async function prepareEnvelope(db:Db,id:string,r:SettlementRuntime){
  const row=await loadIntent(db,id),now=Math.floor(Date.now()/1000);
  if(row.state!=='authorized'||row.connection_status!=='active')throw new DomainError('intent_not_authorized',409);
  if(new Date(row.expires_at).getTime()<=Date.now())throw new DomainError('payment_expired',409);
@@ -38,6 +39,15 @@ async function prepare(db:Db,id:string,r:SettlementRuntime){
  const risk={intentHash,riskDigest:evidenceDigest({snapshotHash:row.snapshot_hash,ap2Transaction:verified.transaction_id,policyVersion:row.policy_revision,merchant:row.merchant_id,payTo:r.payTo,token:r.token,rules:'verified-ap2-and-enrolled-merchant-v1'}),rulesHash:policy.riskRulesHash,reasonMask:0,checkedAt:BigInt(now),validUntil:BigInt(Math.min(now+60,Number(expiry)))};
  const signatures={merchant:await r.signers.merchant.signTypedData({domain,types:gateTypes,primaryType:'PurchaseOrder',message:order}),agent:await r.signers.agent.signTypedData({domain,types:gateTypes,primaryType:'ExecutionIntent',message:intent}),risk:await r.signers.risk.signTypedData({domain,types:gateTypes,primaryType:'RiskStamp',message:risk}),price:'0x' as Hex,human:'0x' as Hex};
  const envelope:ExecutionEnvelope={order,funding:emptyFunding,intent,paymentContext:encodeDelegations([leaf,...parents]),fundingContext:'0x',risk,price:emptyPrice,human:emptyApproval,signatures,route:'0x'};
+ return envelope;
+}
+async function transactionTerms(id:string,r:SettlementRuntime,envelope:ExecutionEnvelope){
+ const verified=await r.verifyIntent(id),now=Math.floor(Date.now()/1000);
+ if(verified.expires_at<=now||envelope.order.validUntil<=now)throw new DomainError('mandate_expired',409);
+ // A human or an agent can spend time inspecting the quote. Keep the order and
+ // risk digest immutable, refreshing only the short-lived risk attestation.
+ envelope.risk={...envelope.risk,checkedAt:BigInt(now),validUntil:BigInt(Math.min(now+60,Number(envelope.order.validUntil)))};
+ envelope.signatures.risk=await r.signers.risk.signTypedData({domain:gateDomain(r.chainId,r.gate),types:gateTypes,primaryType:'RiskStamp',message:envelope.risk});
  await r.client.simulateContract({address:r.gate,abi:yoursPurchaseGateAbi,functionName:'executePurchase',args:args(envelope),account:r.signers.relayer.address});
  const data=encodeFunctionData({abi:yoursPurchaseGateAbi,functionName:'executePurchase',args:args(envelope)});
  const gas=await r.client.estimateGas({account:r.signers.relayer.address,to:r.gate,data});
@@ -57,7 +67,15 @@ export async function executePayment(db:Db,id:string,r:SettlementRuntime){
    await releaseUnpaid(db,id);return {state:'failed'};
   }
   if(row.state==='approval_required')return {state:'approval_required'};
-  const unsigned=await prepare(db,id,r);
+  let {rows:[prepared]}=await db.query('SELECT * FROM payment_envelopes WHERE intent_id=$1',[id]);
+  if(!prepared){
+   const envelope=await prepareEnvelope(db,id,r);
+   const payload=paymentPayload(envelope,r.chainId,r.gate,r.manager,r.origin+'/api/agent/payments/'+id,keccak256(stringToHex(id)));
+   await db.query('INSERT INTO payment_envelopes(intent_id,envelope,payload,payload_hash) VALUES($1,$2,$3,$4) ON CONFLICT(intent_id) DO NOTHING',[id,JSON.stringify(safe(envelope)),JSON.stringify(payload),snapshotDigest(payload)]);
+   ({rows:[prepared]}=await db.query('SELECT * FROM payment_envelopes WHERE intent_id=$1',[id]));
+  }
+  if(!prepared.accepted_at)return {state:'payment_required'};
+  const unsigned=await transactionTerms(id,r,parseEnvelope(prepared.envelope));
   journal=await claimTransaction(db,{intentId:id,chainId:r.chainId,signer:r.signers.relayer.address,pendingNonce:await r.client.getTransactionCount({address:r.signers.relayer.address,blockTag:'pending'}),unsigned});
  }else if(!journal.raw_transaction){
   journal=await claimTransaction(db,{intentId:id,chainId:r.chainId,signer:r.signers.relayer.address,pendingNonce:0,unsigned:{}});

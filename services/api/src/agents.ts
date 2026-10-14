@@ -7,6 +7,7 @@ import type {P256Signer} from '@yours/signing';
 import type {Config} from './config.js';
 import {authenticate,type Env} from './auth.js';
 import {internalPost} from './internal.js';
+import {x402Routes} from './x402.js';
 
 export function agentRoutes(db:Db,config:Config,signer:P256Signer){
  const router=new Hono<Env>();
@@ -25,5 +26,6 @@ export function agentRoutes(db:Db,config:Config,signer:P256Signer){
   const result=await internalPost(config,config.MANDATES_URL,'/v1/present',{mandate_id:body.mandateId,checkout_id:body.checkoutId,checkout_jwt:checkoutJwt});
   return c.json({mandates:result,instrumentId:mandate.task.instrument_id});
  });
+ x402Routes(router,db,config);
  return router;
 }

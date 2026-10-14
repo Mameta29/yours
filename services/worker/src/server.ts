@@ -48,7 +48,7 @@ app.post('/run',async c=>{
    const id=String(item.payload.intentId);
    if(item.topic==='payment.execute'){
     const result=await executePayment(db,id,runtime);
-    if(['submitted','confirming','approval_required'].includes(result.state)){await finishWork(db,item,'awaiting_'+result.state);pending++;continue;}
+    if(['submitted','confirming','approval_required','payment_required'].includes(result.state)){await finishWork(db,item,'awaiting_'+result.state);pending++;continue;}
    }else{
     const receipt=await privatePost('/v1/receipts',{intent_id:id});
     await db.query('INSERT INTO order_receipts(intent_id,document) VALUES($1,$2) ON CONFLICT(intent_id) DO NOTHING',[id,JSON.stringify(receipt)]);

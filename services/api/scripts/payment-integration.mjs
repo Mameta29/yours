@@ -67,6 +67,14 @@ export async function paymentIntegration({root,client,wallet,accounts,manifest,j
   assert.equal((await db.query('SELECT count(*)::int AS n FROM mandate_consumptions WHERE mandate_id=$1',[mandate.id])).rows[0].n,1);
   const merchantBefore=await client.readContract({...jpyc,functionName:'balanceOf',args:[payTo]});
   const runtime={client:new Proxy(client,{get(target,key){if(key==='sendRawTransaction')return async params=>{await target.sendRawTransaction(params);throw new Error('Injected lost broadcast response');};return target[key];}}),chainId:31337,gate:manifest.gate,manager:manifest.manager,token:manifest.jpyc,enforcers:manifest.enforcers,merchantId:'yours-lab',payTo,origin:config.PUBLIC_ORIGIN,signers:{relayer:accounts.relayer,agent:accounts.agent,merchant:accounts.merchantSigner,risk:accounts.riskSigner},verifyIntent:id=>privatePost('/v1/verify-execution',{intent_id:id})};
+  const prepared=await executePayment(db,intentId,runtime);assert.equal(prepared.state,'payment_required');
+  assert.equal((await db.query('SELECT count(*)::int AS n FROM signed_transactions WHERE intent_id=$1',[intentId])).rows[0].n,0);
+  const required=await request('/api/agent/payments/'+intentId,undefined,{asAgent:true,status:402});
+  assert.equal(JSON.parse(Buffer.from(required.response.headers.get('PAYMENT-REQUIRED'),'base64').toString()).accepts[0].amount,parseEther('600').toString());
+  const authorization=(await request('/api/agent/payments/'+intentId+'/authorization',undefined,{asAgent:true})).json.paymentPayload;
+  const altered=structuredClone(authorization);altered.accepted.amount='1';
+  await request('/api/agent/payments/'+intentId,{}, {asAgent:true,status:422,headers:{'PAYMENT-SIGNATURE':Buffer.from(JSON.stringify(altered)).toString('base64')}});
+  await request('/api/agent/payments/'+intentId,{}, {asAgent:true,status:202,headers:{'PAYMENT-SIGNATURE':Buffer.from(JSON.stringify(authorization)).toString('base64')}});
   const submitted=await executePayment(db,intentId,runtime);assert.equal(submitted.state,'submitted');
   const journal=(await db.query('SELECT * FROM signed_transactions WHERE intent_id=$1',[intentId])).rows[0];assert.ok(journal.raw_transaction);assert.equal(journal.transaction_hash,submitted.transactionHash);
   const confirming=await executePayment(db,intentId,runtime);assert.equal(confirming.state,'confirming');
@@ -80,7 +88,10 @@ export async function paymentIntegration({root,client,wallet,accounts,manifest,j
   const completed=(await request('/ucp/checkout-sessions/'+checkout.id,undefined,{asAgent:true})).json;assert.equal(completed.status,'completed');await verifyCheckout(completed,[signer.publicJwk]);
   const order=(await request('/ucp/orders/'+completed.order.id,undefined,{asAgent:true})).json;validateSchema('shopping/order.json',order);
   const receipts=await privatePost('/v1/receipts',{intent_id:intentId});assert.ok(receipts.payment_receipt);assert.ok(receipts.checkout_receipt);
+  const paid=await request('/api/agent/payments/'+intentId,undefined,{asAgent:true});
+  assert.equal(JSON.parse(Buffer.from(paid.response.headers.get('PAYMENT-RESPONSE'),'base64').toString()).transaction,settled.transactionHash);
   const passed=['owner SIWE and real signed wallet delegation','fresh owner task consent issues AP2','signed UCP checkout and real AP2 presentation','atomic mandate consumption and budget reservation','idempotent complete','raw transaction persisted before broadcast','lost broadcast response recovered by same hash','five confirmations before order creation','idempotent chain reconciliation','inventory decremented exactly once','merchant receives 600 test JPYC','AI token balance stays zero','official UCP order schema','signed AP2 payment and checkout receipts'];
+  passed.push('x402 HTTP 402 requirements','no transaction before payment acceptance','altered x402 amount rejected','real ERC-7710 PAYMENT-SIGNATURE accepted','PAYMENT-RESPONSE only after settlement');
   await writeFile(root+'docs/evidence/payment-pipeline.json',JSON.stringify({scope:'Local Anvil, official MetaMask contracts, test ERC20 and real PostgreSQL/AP2 HTTP authority. Production worker logic with random in-memory signing keys. No browser wallet or public Amoy purchase claim.',passed,transactionHash:settled.transactionHash,gate:manifest.gate},null,2)+'\n');
   console.log(JSON.stringify({passed:passed.length,evidence:'docs/evidence/payment-pipeline.json'}));
  }finally{authority.kill('SIGTERM');await db.end();await rm(keydir,{recursive:true,force:true});}

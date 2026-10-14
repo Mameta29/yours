@@ -7,3 +7,4 @@ export * from './wallet.js';
 export * from './agent-permissions.js';
 export * from './agent-registry-abi.js';
 export * from './yours-gate-abi.js';
+export * from './x402.js';
