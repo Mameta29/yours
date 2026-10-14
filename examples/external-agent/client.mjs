@@ -22,12 +22,13 @@ async function main(){
  }
  if(!['tasks','run'].includes(command))throw new Error('Usage: pnpm --filter @yours/external-agent-example init|tasks|run <approved-mandate-id>');
  const keys=JSON.parse(await readFile(keyPath,'utf8')),agent=privateKeyToAccount(keys.evm);
+ const localTest=process.env.NODE_ENV==='test'&&process.env.YOURS_LOCAL_TEST==='1';
  const origin=new URL(process.env.YOURS_ORIGIN??'https://yours-api-110852561536.asia-northeast1.run.app');
- if(origin.protocol!=='https:'||origin.pathname!=='/'||origin.search||origin.hash||origin.username||origin.password)throw new Error('YOURS_ORIGIN must be an HTTPS origin');
+ if((localTest?origin.protocol!=='http:'||!['127.0.0.1','localhost'].includes(origin.hostname):origin.protocol!=='https:')||origin.pathname!=='/'||origin.search||origin.hash||origin.username||origin.password)throw new Error('YOURS_ORIGIN must be an HTTPS origin (loopback HTTP only for the explicit local test)');
  const token=process.env.YOURS_AGENT_TOKEN;if(!token)throw new Error('Set YOURS_AGENT_TOKEN to the token issued by your connection');
  const platform=process.env.YOURS_PLATFORM_PROFILE??origin.origin+'/profiles/platform';
- const manifest=JSON.parse(await readFile(new URL('../../deployments/amoy.json',import.meta.url),'utf8'));
- if(manifest.chainId!==80002)throw new Error('Only the checked-in Polygon Amoy deployment is enabled');
+ const manifest=JSON.parse(await readFile(new URL(localTest?'../../.local/local-chain.json':'../../deployments/amoy.json',import.meta.url),'utf8'));
+ if(manifest.chainId!==(localTest?31337:80002))throw new Error('Only the pinned deployment for the selected environment is enabled');
  const profileResponse=await fetch(origin.origin+'/.well-known/ucp',{redirect:'error',signal:AbortSignal.timeout(20000)});
  if(!profileResponse.ok)throw new Error('Discovery unavailable');
  const profile=await profileResponse.json();validateSchema('profile.json',profile);
@@ -66,13 +67,14 @@ async function main(){
  for(let attempt=0;attempt<90;attempt++){
   const result=await api('/api/agent/payments/'+intentId,undefined,{allow:[402,409]});
   if(result.data.state==='confirmed'){console.log(JSON.stringify(result.data,null,2));return;}
+  if(result.data.state==='approval_required'){console.log(JSON.stringify({state:'approval_required',intentId,reviewUrl:origin.origin}));return;}
   if(['failed','canceled'].includes(result.data.state))throw new Error('Payment '+result.data.state+'; no new transfer is attempted');
   const auth=(await api('/api/agent/payments/'+intentId+'/authorization')).data;
   if(auth.signingRequest){
    const request=auth.signingRequest,checkout=saved.checkout;
    if(!checkout)throw new Error('The local checkout journal is required to verify this payment before signing');
    const owner=task.task.instrument_id.split(':')[2];
-   const typed=externalPaymentTypedData(request.envelope,{chainId:80002,gate:manifest.gate,manager:manifest.manager,owner,agent:agent.address,token:manifest.jpyc,payTo:checkout.yours.pay_to,amount:BigInt(checkout.totals.find(t=>t.type==='total').amount)*10n**18n,enforcers:manifest.enforcers});
+   const typed=externalPaymentTypedData(request.envelope,{chainId:manifest.chainId,gate:manifest.gate,manager:manifest.manager,owner,agent:agent.address,token:manifest.jpyc,payTo:checkout.yours.pay_to,amount:BigInt(checkout.totals.find(t=>t.type==='total').amount)*10n**18n,enforcers:manifest.enforcers});
    if(!saved.proof||saved.proof.challenge!==request.challenge){saved.proof={challenge:request.challenge,leaf:await agent.signTypedData(typed.leaf),intent:await agent.signTypedData(typed.intent)};await save();}
    auth.paymentPayload=(await api('/api/agent/payments/'+intentId+'/authorization',saved.proof)).data.paymentPayload;
   }

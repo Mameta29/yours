@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {randomUUID,generateKeyPairSync} from 'node:crypto';
-import {execFileSync} from 'node:child_process';
+import {execFileSync,spawn} from 'node:child_process';
+import {mkdir,writeFile,rm} from 'node:fs/promises';
 import {generatePrivateKey,privateKeyToAccount} from 'viem/accounts';
 import {toHex,maxUint256,parseEther,encodePacked} from 'viem';
 import {encodeDelegations,delegationTypedData,externalPaymentTypedData} from '@yours/wallet-sdk';
@@ -8,7 +9,7 @@ import {verifyCheckout} from '@yours/ucp';
 import {executePayment} from '../../worker/dist/settlement.js';
 
 export async function externalAgentIntegration({root,db,request,send,client,owner,manifest,runtime,productId,signer,passed}){
- const agent=privateKeyToAccount(generatePrivateKey());
+ const agentKey=generatePrivateKey(),agent=privateKeyToAccount(agentKey);
  const holder=generateKeyPairSync('ec',{namedCurve:'prime256v1'});
  const publicJwk={...holder.publicKey.export({format:'jwk'}),kid:'external-holder',alg:'ES256'};
  const privateJwk={...holder.privateKey.export({format:'jwk'}),kid:'external-holder',alg:'ES256'};
@@ -16,7 +17,8 @@ export async function externalAgentIntegration({root,db,request,send,client,owne
  assert.equal(before.usage.accountSpent,parseEther('1200').toString());
  const {json:connection}=await request('/api/owner/connections',{provider:'external',name:'Independent AI',agentAddress:agent.address,ap2PublicJwk:publicJwk},{status:201});
  const agentRequest=(path,body,options={})=>request(path,body,{...options,asAgent:true,headers:{...options.headers,Authorization:'Bearer '+connection.agentToken}});
- const {json:draft}=await request(`/api/owner/permissions/connections/${connection.id}/prepare`,{perOrder:1000,perPeriod:4000,globalPerOrder:2000,globalPerPeriod:2000,days:7,merchants:['yours-lab']},{status:201});
+ async function configure(globalPerPeriod){
+ const {json:draft}=await request(`/api/owner/permissions/connections/${connection.id}/prepare`,{perOrder:1000,perPeriod:4000,globalPerOrder:2000,globalPerPeriod,days:7,merchants:['yours-lab']},{status:201});
  const e=draft.expectation;
  const parent={delegate:agent.address,delegator:owner.address,authority:toHex(maxUint256,{size:32}),salt:toHex(7n),signature:'0x',caveats:[
   {enforcer:manifest.enforcers.periodic,terms:encodePacked(['address','uint256','uint256','uint256'],[manifest.jpyc,maxUint256,maxUint256,BigInt(e.startTime)]),args:'0x'},
@@ -30,6 +32,8 @@ export async function externalAgentIntegration({root,db,request,send,client,owne
  const calls=(await request(base+'/transactions',{policy:await owner.signTypedData(terms.policy),permission:await owner.signTypedData(terms.permission)})).json.calls;
  const policy=await send(calls[0]),permission=await send(calls[1]);await client.request({method:'anvil_mine',params:['0x5']});
  await request(base+'/activate',{policy,permission});
+ }
+ await configure(2000);
  const updated=(await request('/api/owner/me')).json;
  assert.equal(updated.usage.accountSpent,before.usage.accountSpent);assert.equal(updated.policy.document.periodStart,before.policy.document.periodStart);
  assert.equal(updated.connections.filter(c=>c.status==='active').length,2);
@@ -73,4 +77,38 @@ export async function externalAgentIntegration({root,db,request,send,client,owne
  const held=(await db.query('SELECT reasons FROM intents WHERE id=$1',[blocked])).rows[0];assert.deepEqual(held.reasons,['period_budget']);
  assert.equal((await db.query('SELECT count(*)::int AS n FROM signed_transactions WHERE intent_id=$1',[blocked])).rows[0].n,0);
  passed.push('second AI registration preserves shared spent and period anchor','external holder presents AP2 with the official SDK','external EVM agent signs its own delegation and intent','wrong signer and changed challenge rejected','unsigned external payload cannot be accepted','agent signatures are idempotent','external AI completes a real ERC-7710 transfer without hosted-agent signing','both AIs share the same onchain spending budget','external AI holds no token balance');
+
+ // Exercise the published CLI itself over real HTTP, including its own
+ // checkout, official AP2 presentation and EVM signing. Only test AI keys are
+ // written to this temporary directory; owner keys remain in memory.
+ await configure(3000);
+ assert.equal((await request('/api/owner/me')).json.usage.accountSpent,parseEther('1800').toString());
+ const {json:cliTask}=await request('/api/owner/tasks/prepare',{connectionId:connection.id,merchantId:'yours-lab',items:[{id:productId,quantity:1}],maxAmount:650},{status:201});
+ const {json:cliMandate}=await request('/api/owner/tasks/'+cliTask.id+'/approve',{signature:await owner.signTypedData(cliTask.typedData)});
+ const directory=root+'.local/external-cli-'+randomUUID();await mkdir(directory,{mode:0o700});
+ const keyFile=directory+'/keys.json';await writeFile(keyFile,JSON.stringify({evm:agentKey,ap2:privateJwk}),{mode:0o600,flag:'wx'});
+ let pumping=true,pumpError;
+ const pump=(async()=>{try{while(pumping){
+  const {rows}=await db.query("SELECT id FROM intents WHERE connection_id=$1 AND state IN ('authorized','signing','submitted') ORDER BY created_at",[connection.id]);
+  for(const row of rows)await executePayment(db,row.id,isolatedRuntime);
+  await client.request({method:'anvil_mine',params:['0x1','0x0']});
+  await new Promise(resolve=>setTimeout(resolve,250));
+ }}catch(error){pumpError=error;}})();
+ const runCli=()=>new Promise((resolve,reject)=>{
+  const child=spawn('node',[root+'examples/external-agent/client.mjs','run',cliMandate.id],{cwd:root,env:{...process.env,NODE_ENV:'test',YOURS_LOCAL_TEST:'1',YOURS_ORIGIN:runtime.origin,YOURS_AGENT_KEY_FILE:keyFile,YOURS_AGENT_TOKEN:connection.agentToken},stdio:['ignore','pipe','pipe']});
+  let stdout='',stderr='';child.stdout.on('data',chunk=>{stdout+=chunk.toString();});child.stderr.on('data',chunk=>{stderr=(stderr+chunk.toString()).slice(-4000);});
+  const timeout=setTimeout(()=>child.kill('SIGTERM'),120000);
+  child.on('error',error=>{clearTimeout(timeout);reject(error);});
+  child.on('close',code=>{clearTimeout(timeout);if(code!==0){reject(new Error('External client failed: '+stderr));return;}try{resolve(JSON.parse(stdout));}catch(error){reject(error);}});
+ });
+ try{
+  const paid=await runCli();assert.equal(paid.state,'confirmed');
+  const replay=await runCli();assert.equal(replay.payment.transaction,paid.payment.transaction);
+  const consumed=(await db.query('SELECT intent_id FROM mandate_consumptions WHERE mandate_id=$1',[cliMandate.id])).rows[0];
+  assert.equal((await db.query('SELECT count(*)::int AS n FROM signed_transactions WHERE intent_id=$1',[consumed.intent_id])).rows[0].n,1);
+  assert.equal((await request('/api/owner/me')).json.usage.accountSpent,parseEther('2400').toString());
+  assert.equal((await request('/api/owner/me')).json.policy.document.periodStart,before.policy.document.periodStart);
+  if(pumpError)throw pumpError;
+  passed.push('published external client creates and verifies its own UCP checkout over HTTP','external client presents AP2 and signs its own payment with zero hosted-key use','external client retry reconciles one transaction','owner budget update preserves shared spent and period anchor');
+ }finally{pumping=false;await pump;await rm(directory,{recursive:true,force:true});}
 }
