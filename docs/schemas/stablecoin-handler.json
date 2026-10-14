@@ -1,0 +1,18 @@
+{
+ "$schema":"https://json-schema.org/draft/2020-12/schema",
+ "title":"yours Stablecoin Payment Handler",
+ "description":"UCP 2026-08-25, AP2 v0.2 and x402 v2 exact/erc7710 with the yours.purchase extension.",
+ "type":"object",
+ "required":["id","version"],
+ "properties":{
+  "id":{"const":"yours-stablecoin"},
+  "version":{"const":"2026-08-25"},
+  "config":{"$ref":"#/$defs/config"}
+ },
+ "$defs":{
+  "config":{"type":"object","properties":{"network":{"type":"string","pattern":"^eip155:[0-9]+$"},"asset":{"$ref":"#/$defs/address"},"gate":{"$ref":"#/$defs/address"}}},
+  "address":{"type":"string","pattern":"^0x[0-9a-fA-F]{40}$"},
+  "credential":{"type":"object","required":["type","mandate_id"],"additionalProperties":false,"properties":{"type":{"const":"yours_ap2"},"mandate_id":{"type":"string","format":"uuid"}}},
+  "instrument":{"type":"object","required":["id","handler_id","type","selected","credential"],"properties":{"id":{"type":"string","minLength":1},"handler_id":{"const":"yours-stablecoin"},"type":{"const":"stablecoin"},"selected":{"const":true},"credential":{"$ref":"#/$defs/credential"}}}
+ }
+}

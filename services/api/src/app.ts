@@ -5,7 +5,7 @@ import {secureHeaders} from 'hono/secure-headers';
 import {z,ZodError} from 'zod';
 import {DomainError,sha256,addressSchema,periodIndex} from '@yours/domain';
 import {transaction,audit,pauseConnection,budgetUsage,type Db} from '@yours/storage';
-import {profile,UCP_VERSION} from '@yours/ucp';
+import {profile,UCP_VERSION,validateSchema} from '@yours/ucp';
 import type {P256Signer} from '@yours/signing';
 import type {Config} from './config.js';
 import {authRoutes,authenticate,owner,type Env} from './auth.js';
@@ -14,6 +14,9 @@ import {taskRoutes} from './tasks.js';
 import {permissionRoutes} from './permissions.js';
 import {agentRoutes} from './agents.js';
 import {approvalRoutes} from './approvals.js';
+import {purchaseRoutes} from './purchases.js';
+import {demoRoutes} from './demo.js';
+import {publicRoutes} from './public.js';
 import {runRoutes} from './runs.js';
 import type {ChainRuntime} from './chain.js';
 
@@ -22,21 +25,34 @@ export function createApp(db:Db,config:Config,signer:P256Signer,chain?:ChainRunt
  app.use('*',bodyLimit({maxSize:262144,onError:c=>c.json({error:'body_too_large'},413)}));
  app.use('*',secureHeaders({crossOriginEmbedderPolicy:false}));
  app.use('*',async(c,next)=>{const id=randomUUID();c.header('X-Request-Id',id);c.header('Cache-Control','no-store');await next();});
+ const failure=(c:any,code:string,status:number,details?:unknown)=>{
+  if(c.req.path.startsWith('/ucp/')){
+   const result={ucp:{version:UCP_VERSION,status:'error'},messages:[{type:'error',code,content:code,content_type:'plain',severity:status===401||status===403?'requires_buyer_input':status===409||status===412?'recoverable':'unrecoverable'}]};
+   validateSchema('common/types/error_response.json',result);return c.json(result,status);
+  }
+  return c.json({error:code,...(details?{details}:{})},status);
+ };
  app.onError((error,c)=>{
-  if(error instanceof ZodError)return c.json({error:'invalid_request',issues:error.issues.map(e=>({path:e.path,message:e.message}))},422);
-  if(error instanceof DomainError)return c.json({error:error.code,details:error.details},error.status as 400);
-  if(error instanceof SyntaxError)return c.json({error:'invalid_json'},400);
+  if(error instanceof ZodError)return failure(c,'invalid_request',422,error.issues.map(e=>({path:e.path,message:e.message})));
+  if(error instanceof DomainError)return failure(c,error.code,error.status,error.details);
+  if(error instanceof SyntaxError)return failure(c,'invalid_json',400);
   console.error(JSON.stringify({severity:'ERROR',event:'request_failed',requestId:c.res.headers.get('X-Request-Id'),error:error instanceof Error?error.name:'unknown'}));
-  return c.json({error:'internal_error'},500);
+  return failure(c,'internal_error',500);
  });
+ app.route('/',publicRoutes());
  app.get('/health',c=>c.json({ok:true,service:'yours-api'}));
  app.get('/ready',async c=>{await db.query('SELECT 1');return c.json({ok:true});});
  app.get('/api/config',c=>c.json({name:'yours',chainId:config.CHAIN_ID,network:config.CHAIN_ID===80002?'Polygon Amoy':'Local test chain',ucpVersion:UCP_VERSION,merchant:{id:config.MERCHANT_ID,name:config.MERCHANT_NAME},paymentsConfigured:Boolean(chain&&config.MANDATES_URL&&config.GATE_ADDRESS&&config.JPYC_ADDRESS&&config.MERCHANT_PAY_TO),gate:config.GATE_ADDRESS,token:config.JPYC_ADDRESS,geminiConfigured:Boolean(config.AGENT_URL)}));
- app.get('/.well-known/ucp',c=>c.json(profile(config.PUBLIC_ORIGIN,'platform',[signer.publicJwk],{network:'eip155:'+config.CHAIN_ID,asset:config.JPYC_ADDRESS,gate:config.GATE_ADDRESS})));
+ for(const path of ['/.well-known/ucp','/profiles/platform'])app.get(path,c=>{
+  const document=profile(config.PUBLIC_ORIGIN,'platform',[signer.publicJwk],{network:'eip155:'+config.CHAIN_ID,asset:config.JPYC_ADDRESS,gate:config.GATE_ADDRESS});
+  c.header('Cache-Control','public, max-age=300');c.header('ETag','"'+sha256(JSON.stringify(document))+'"');return c.json(document);
+ });
+ app.route('/api/demo',demoRoutes(db,config));
  app.route('/api/auth',authRoutes(db,config));
  app.route('/ucp',merchantRoutes(db,config,signer));
  app.route('/api/agent',agentRoutes(db,config,signer));
  app.use('/api/owner/*',async(c,next)=>{c.set('actor',await authenticate(c,db,config));owner(c);await next();});
+ app.route('/api/owner/purchases',purchaseRoutes(db,config));
  app.route('/api/owner/tasks',taskRoutes(db,config));
  app.route('/api/owner/approvals',approvalRoutes(db,config));
  app.route('/api/owner/runs',runRoutes(db,config));

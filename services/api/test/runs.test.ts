@@ -180,3 +180,10 @@ it("does not issue spending credentials for read-only conversations or foreign c
     ).status,
   ).toBe(403);
 });
+
+it('public trial cannot receive an agent credential and enforces same-origin requests',async()=>{
+ const response=await app.request('/api/demo/runs',{method:'POST',headers:{'Content-Type':'application/json',Origin:'http://localhost:8080','X-Forwarded-For':randomUUID()},body:JSON.stringify({message:'商品を探して'})});
+ expect(response.status).toBe(200);expect((await response.json()).result.readOnly).toBe(true);expect(lastToken).toBe(null);
+ const foreign=await app.request('/api/demo/runs',{method:'POST',headers:{'Content-Type':'application/json',Origin:'https://evil.example'},body:JSON.stringify({message:'商品を探して'})});expect(foreign.status).toBe(403);
+ const injected=await app.request('/api/demo/runs',{method:'POST',headers,body:JSON.stringify({message:'商品を探して',agent_token:'must-not-be-forwarded'})});expect(injected.status).toBe(422);
+});

@@ -62,3 +62,10 @@ it('requires a complete destination and selected shipping option before completi
  expect(response.status).toBe(200);const result=await response.json();expect(result.status).toBe('ready_for_complete');expect(result.totals.at(-1).amount).toBe(850);
  await verifyCheckout(result,[signer.publicJwk]);
 });
+
+it('publishes cacheable discovery and handler schemas and standard UCP errors',async()=>{
+ for(const path of ['/.well-known/ucp','/schemas/stablecoin-handler.json','/payment-handler']){
+  const response=await app.request(path);expect(response.status).toBe(200);expect(response.headers.get('cache-control')).toContain('public, max-age=');
+ }
+ const error=await post('/catalog/product',{id:'does-not-exist'});expect(error.status).toBe(404);validateSchema('common/types/error_response.json',await error.json());
+});

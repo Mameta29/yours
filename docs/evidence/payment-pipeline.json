@@ -28,8 +28,11 @@
     "shared usage includes approved excess",
     "used exception cannot be authorized again",
     "Gemini task-scoped token cannot access another payment or presentation",
-    "expired Gemini run token is rejected"
+    "expired Gemini run token is rejected",
+    "download unavailable before confirmed settlement",
+    "actual purchased Markdown delivered to owner",
+    "other wallet cannot download the purchase"
   ],
-  "transactionHash": "0xda624fa388406f59b008a789e6a0f69d343e5271fe6056eb69c9fb4eab08d82b",
-  "gate": "0x68d3d0f58d6a1c8c1682f82c41dcdf1229da2a7d"
+  "transactionHash": "0x2d40169bdecf16a96952bb16cf999d490456569583457f5d17eb43fb666c532f",
+  "gate": "0x87f1498bc13ac7514d6ff5cfb76b07396fb9769d"
 }

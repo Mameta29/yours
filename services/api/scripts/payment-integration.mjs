@@ -53,7 +53,7 @@ export async function paymentIntegration({root,client,wallet,accounts,manifest,j
   const hashes=[];for(const call of calls.calls)hashes.push(await send(call));await client.request({method:'anvil_mine',params:['0x5']});
   await request(base+'/activate',{policy:hashes[0],permission:hashes[1]});
   await client.waitForTransactionReceipt({hash:await wallet.writeContract({...jpyc,functionName:'mint',args:[owner.address,parseEther('5000')]})});
-  const productId='e2e-'+randomUUID();await db.query("INSERT INTO merchant_products(merchant_id,id,title,description,currency,amount_minor,stock) VALUES('yours-lab',$1,'yours integration item','Anvil test only','JPY',600,5)",[productId]);
+  const productId='e2e-'+randomUUID();await db.query("INSERT INTO merchant_products(merchant_id,id,title,description,currency,amount_minor,stock,attributes) VALUES('yours-lab',$1,'yours integration item','Anvil test only','JPY',600,5,'{\"download\":\"weekly-review.md\"}')",[productId]);
   const {json:task}=await request('/api/owner/tasks/prepare',{connectionId:connection.id,merchantId:'yours-lab',items:[{id:productId,quantity:1}],maxAmount:650},{status:201});
   const {json:mandate}=await request('/api/owner/tasks/'+task.id+'/approve',{signature:await owner.signTypedData(task.typedData)});
   const {json:checkout}=await request('/ucp/checkout-sessions',{line_items:[{item:{id:productId},quantity:1}]},{asAgent:true,status:201,headers:{'Idempotency-Key':randomUUID()}});
@@ -67,6 +67,7 @@ export async function paymentIntegration({root,client,wallet,accounts,manifest,j
   const replay=await request('/ucp/checkout-sessions/'+checkout.id+'/complete',body,{asAgent:true,status:202,headers});assert.deepEqual(replay.json,pending);
   const intentId=pending.yours.intent_id;
   assert.equal((await db.query('SELECT count(*)::int AS n FROM mandate_consumptions WHERE mandate_id=$1',[mandate.id])).rows[0].n,1);
+  await request('/api/owner/purchases/'+intentId+'/download',undefined,{status:409});
   const merchantBefore=await client.readContract({...jpyc,functionName:'balanceOf',args:[payTo]});
   const runtime={client:new Proxy(client,{get(target,key){if(key==='sendRawTransaction')return async params=>{await target.sendRawTransaction(params);throw new Error('Injected lost broadcast response');};return target[key];}}),chainId:31337,gate:manifest.gate,manager:manifest.manager,token:manifest.jpyc,enforcers:manifest.enforcers,merchantId:'yours-lab',payTo,origin:config.PUBLIC_ORIGIN,signers:{relayer:accounts.relayer,agent:accounts.agent,merchant:accounts.merchantSigner,risk:accounts.riskSigner},verifyIntent:id=>privatePost('/v1/verify-execution',{intent_id:id})};
   const prepared=await executePayment(db,intentId,runtime);assert.equal(prepared.state,'payment_required');
@@ -130,6 +131,15 @@ export async function paymentIntegration({root,client,wallet,accounts,manifest,j
   await db.query("UPDATE agent_runs SET expires_at=now()-interval '1 second' WHERE id=$1",[runId]);
   await request('/api/agent/tasks',undefined,{asAgent:true,status:401});token=fullToken;
   passed.push('Gemini task-scoped token cannot access another payment or presentation','expired Gemini run token is rejected');
+  const download=await app.request('/api/owner/purchases/'+intentId+'/download',{headers:{Cookie:cookie}});
+  assert.equal(download.status,200);assert.match(await download.text(),/週次ふりかえりテンプレート/);
+  const stranger=privateKeyToAccount(generatePrivateKey());
+  const foreignChallenge=(await request('/api/auth/challenge',{address:stranger.address})).json;
+  const foreignLogin=await request('/api/auth/verify',{nonce:foreignChallenge.nonce,signature:await stranger.signMessage({message:foreignChallenge.message})});
+  const foreignCookie=foreignLogin.response.headers.get('set-cookie').split(';')[0];
+  const denied=await app.request('/api/owner/purchases/'+intentId+'/download',{headers:{Cookie:foreignCookie}});assert.equal(denied.status,404);
+  passed.push('download unavailable before confirmed settlement','actual purchased Markdown delivered to owner','other wallet cannot download the purchase');
+
   await writeFile(root+'docs/evidence/payment-pipeline.json',JSON.stringify({scope:'Local Anvil, official MetaMask contracts, test ERC20 and real PostgreSQL/AP2 HTTP authority. Production worker logic with random in-memory signing keys. No browser wallet or public Amoy purchase claim.',passed,transactionHash:settled.transactionHash,gate:manifest.gate},null,2)+'\n');
   console.log(JSON.stringify({passed:passed.length,evidence:'docs/evidence/payment-pipeline.json'}));
  }finally{authority.kill('SIGTERM');await db.end();await rm(keydir,{recursive:true,force:true});}
