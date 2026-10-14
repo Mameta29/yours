@@ -30,7 +30,7 @@ export type GateAction =
 export function parseGateAction(input: unknown): GateAction {
   const common = { nonce: uint64, validUntil: uint64, signature: hexSchema(65).refine(v => v.length === 132, '65-byte owner signature required') };
   const policy = { ...common, policy: structSchema('Policy'), merchants: z.array(structSchema('Merchant')).max(32),
-    assets: z.array(structSchema('AssetLimit')).max(1), grants: z.array(structSchema('GrantBinding')).min(1).max(2),
+    assets: z.array(structSchema('AssetLimit')).max(1), grants: z.array(structSchema('GrantBinding')).min(1).max(16),
     relayers: z.array(addressSchema).min(1).max(4) };
   return z.discriminatedUnion('kind', [
     z.object({ kind: z.literal('register'), ...policy }).strict(), z.object({ kind: z.literal('update'), ...policy }).strict(),

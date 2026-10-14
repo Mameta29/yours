@@ -12,7 +12,7 @@ const app=createApp(db,config,signer);
 const wallet=privateKeyToAccount(generatePrivateKey());
 const headers={'Content-Type':'application/json',Origin:config.PUBLIC_ORIGIN};
 beforeAll(()=>migrate(db));afterAll(()=>db.end());
-async function login(){
+async function login(wallet=privateKeyToAccount(generatePrivateKey())){
  const challenge=await (await app.request('/api/auth/challenge',{method:'POST',headers,body:JSON.stringify({address:wallet.address})})).json();
  const signature=await wallet.signMessage({message:challenge.message});
  const response=await app.request('/api/auth/verify',{method:'POST',headers,body:JSON.stringify({nonce:challenge.nonce,signature})});
@@ -20,7 +20,7 @@ async function login(){
  return {cookie:response.headers.get('set-cookie')!.split(';')[0],challenge,signature};
 }
 it('authenticates an actual wallet signature and consumes the challenge once',async()=>{
- const session=await login();
+ const session=await login(wallet);
  const me=await app.request('/api/owner/me',{headers:{Cookie:session.cookie}});
  expect(me.status).toBe(200);expect((await me.json()).account.address).toBe(wallet.address.toLowerCase());
  const replay=await app.request('/api/auth/verify',{method:'POST',headers,body:JSON.stringify({nonce:session.challenge.nonce,signature:session.signature})});
@@ -40,4 +40,31 @@ it('rejects private key material in API requests',async()=>{
  const session=await login();
  const response=await app.request('/api/owner/connections',{method:'POST',headers:{...headers,Cookie:session.cookie},body:JSON.stringify({name:'Bad key',provider:'external',agentAddress:'0x'+randomBytes(20).toString('hex'),ap2PublicJwk:{d:'secret'}})});
  expect(response.status).toBe(422);
+});
+it('only lets the owner rotate an external AI token and invalidates the old token immediately',async()=>{
+ const session=await login(),other=await login();
+ const created=await app.request('/api/owner/connections',{method:'POST',headers:{...headers,Cookie:session.cookie},body:JSON.stringify({name:'External',provider:'external',agentAddress:privateKeyToAccount(generatePrivateKey()).address,ap2PublicJwk:signer.publicJwk})});
+ expect(created.status).toBe(201);const connection=await created.json();
+ await db.query("UPDATE connections SET status='active' WHERE id=$1",[connection.id]);
+ const path='/api/owner/connections/'+connection.id+'/token';
+ expect((await app.request('/api/agent/tasks',{headers:{Authorization:'Bearer '+connection.agentToken}})).status).toBe(200);
+ expect((await app.request(path,{method:'POST',headers:{...headers,Authorization:'Bearer '+connection.agentToken}})).status).toBe(403);
+ expect((await app.request(path,{method:'POST',headers:{...headers,Cookie:other.cookie}})).status).toBe(404);
+ const response=await app.request(path,{method:'POST',headers:{...headers,Cookie:session.cookie}});
+ expect(response.status).toBe(200);const rotated=await response.json();
+ expect(rotated.agentToken).not.toBe(connection.agentToken);
+ expect((await app.request('/api/agent/tasks',{headers:{Authorization:'Bearer '+connection.agentToken}})).status).toBe(401);
+ expect((await app.request('/api/agent/tasks',{headers:{Authorization:'Bearer '+rotated.agentToken}})).status).toBe(200);
+ expect((await db.query('SELECT status FROM connections WHERE id=$1',[connection.id])).rows[0].status).toBe('active');
+});
+it('rejects invalid public AP2 keys and an owner address used as an AI address',async()=>{
+ const session=await login(wallet);
+ for(const body of [
+  {agentAddress:wallet.address,ap2PublicJwk:signer.publicJwk},
+  {agentAddress:privateKeyToAccount(generatePrivateKey()).address,ap2PublicJwk:{kty:'EC',crv:'P-256',x:'invalid',y:'invalid'}},
+  {agentAddress:privateKeyToAccount(generatePrivateKey()).address,ap2PublicJwk:{...signer.publicJwk,crv:'secp256k1'}},
+ ]){
+  const response=await app.request('/api/owner/connections',{method:'POST',headers:{...headers,Cookie:session.cookie},body:JSON.stringify({name:'Invalid',provider:'external',...body})});
+  expect(response.status).toBe(422);
+ }
 });

@@ -3,6 +3,7 @@ import {Hono} from 'hono';
 import {bodyLimit} from 'hono/body-limit';
 import {secureHeaders} from 'hono/secure-headers';
 import {z,ZodError} from 'zod';
+import {importJWK} from 'jose';
 import {DomainError,sha256,addressSchema,periodIndex} from '@yours/domain';
 import {transaction,audit,pauseConnection,budgetUsage,type Db} from '@yours/storage';
 import {profile,UCP_VERSION,validateSchema} from '@yours/ucp';
@@ -79,16 +80,33 @@ export function createApp(db:Db,config:Config,signer:P256Signer,chain?:ChainRunt
   const address=body.provider==='gemini'?config.AGENT_ADDRESS:body.agentAddress;
   if(!address)throw new DomainError('agent_key_not_configured',409);
   if(body.ap2PublicJwk&&['d','k','p','q'].some(k=>k in body.ap2PublicJwk!))throw new DomainError('private_key_forbidden',422);
+  if(address.toLowerCase()===actor.address.toLowerCase()||/^0x0{40}$/i.test(address))throw new DomainError('agent_address_invalid',422);
+  if(body.ap2PublicJwk){
+   const key=body.ap2PublicJwk;
+   if(key.kty!=='EC'||key.crv!=='P-256'||key.alg&&key.alg!=='ES256'||key.use&&key.use!=='sig')throw new DomainError('ap2_public_key_invalid',422);
+   try{await importJWK(key,'ES256');}catch{throw new DomainError('ap2_public_key_invalid',422);}
+  }
   if(body.platformProfile&&(body.provider!=='external'||!body.platformProfile.startsWith('https://')||!config.TRUSTED_PROFILE_ORIGINS.split(',').includes(new URL(body.platformProfile).origin)))throw new DomainError('profile_origin_not_allowed',403);
   const id=randomUUID(),token=randomBytes(32).toString('base64url');
   await transaction(db,async tx=>{
    await tx.query('SELECT id FROM accounts WHERE id=$1 FOR UPDATE',[actor.accountId]);
+   if((await tx.query("SELECT count(*)::int AS n FROM connections WHERE account_id=$1 AND status<>'revoked'",[actor.accountId])).rows[0].n>=16)throw new DomainError('connection_limit',409);
    const {rows}=await tx.query("SELECT id FROM connections WHERE account_id=$1 AND agent_address=$2 AND status<>'revoked'",[actor.accountId,address.toLowerCase()]);
    if(rows.length)throw new DomainError('agent_already_connected',409);
    await tx.query("INSERT INTO connections(id,account_id,name,provider,agent_address,ap2_public_jwk,token_hash,status,platform_profile) VALUES($1,$2,$3,$4,$5,$6,$7,'pending',$8)",[id,actor.accountId,body.name,body.provider,address.toLowerCase(),JSON.stringify(body.ap2PublicJwk??null),sha256(token),body.platformProfile??null]);
    await audit(tx,actor.accountId,'owner:'+actor.accountId,'connection.created',id,{provider:body.provider,agentAddress:address});
   });
   return c.json({id,name:body.name,provider:body.provider,agentAddress:address,status:'pending',agentToken:token},201);
+ });
+ app.post('/api/owner/connections/:id/token',async c=>{
+  const actor=owner(c),id=z.string().uuid().parse(c.req.param('id')),token=randomBytes(32).toString('base64url');
+  await transaction(db,async tx=>{
+   await tx.query('SELECT id FROM accounts WHERE id=$1 FOR UPDATE',[actor.accountId]);
+   const {rowCount}=await tx.query("UPDATE connections SET token_hash=$3 WHERE id=$1 AND account_id=$2 AND provider='external' AND status<>'revoked'",[id,actor.accountId,sha256(token)]);
+   if(!rowCount)throw new DomainError('connection_not_found',404);
+   await audit(tx,actor.accountId,'owner:'+actor.accountId,'connection.token_rotated',id);
+  });
+  return c.json({id,agentToken:token});
  });
  app.post('/api/owner/connections/:id/pause',async c=>{
   const actor=owner(c);const id=z.string().uuid().parse(c.req.param('id'));
