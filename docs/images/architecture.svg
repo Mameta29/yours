@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="890" viewBox="0 0 1280 890" role="img" aria-labelledby="title desc">
+<title id="title">yours — Google Cloud architecture</title><desc id="desc">Users approve bounded AI permissions. Gemini on Vertex AI uses typed tools through a public Cloud Run API. Private mandate and payment services verify consent, persist transactions, and use Cloud HSM. Polygon Amoy contracts enforce budgets before spending from the user's wallet.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#6d8175"/></marker></defs>
+<style>text{font-family:Arial,'Hiragino Kaku Gothic ProN',sans-serif;fill:#233f35}.title{font-size:32px;font-weight:700}.h{font-size:19px;font-weight:700}.b{font-size:15px}.s{font-size:13px;fill:#62756c}.box{fill:#fff;stroke:#d4dfd7;stroke-width:1.5;rx:14}.line{fill:none;stroke:#6d8175;stroke-width:2;marker-end:url(#arrow)}</style>
+<rect width="1280" height="890" fill="#f6f8f2"/><text x="40" y="55" class="title">yours</text><text x="166" y="54" class="h">AI works for you.</text><text x="40" y="87" class="b">本人が決めた範囲で、AIが購入する。資産と最終的な決定権は本人に。</text>
+<rect x="34" y="122" width="270" height="126" class="box"/><text x="55" y="154" class="h">本人のブラウザ・wallet</text><text x="55" y="186" class="b">AI / 店舗 / 上限 / 期限を承認</text><text x="55" y="216" class="s">SIWE・EIP-712 / owner秘密鍵を保持</text>
+<rect x="34" y="295" width="270" height="112" class="box"/><text x="55" y="329" class="h">外部のAIサービス</text><text x="55" y="358" class="b">UCP client + AP2 holder</text><text x="55" y="384" class="s">AI独自の署名鍵 / ownerの鍵は不要</text>
+<rect x="348" y="118" width="896" height="550" rx="20" fill="#eef4ff" stroke="#b9cbe7"/><text x="374" y="151" class="h">Google Cloud · yours-511602</text><text x="942" y="151" class="s">Cloud Run / asia-northeast1</text>
+<rect x="374" y="175" width="315" height="147" class="box"/><text x="397" y="206" class="h">Public API / Console</text><text x="397" y="237" class="b">UCP discovery → checkout → order</text><text x="397" y="265" class="b">本人認証・共有予算・監査履歴</text><text x="397" y="294" class="s">HTTP署名 / webhook / x402</text>
+<rect x="880" y="175" width="337" height="147" class="box"/><text x="903" y="206" class="h">Gemini + Google ADK</text><text x="903" y="237" class="b">Vertex AI / gemini-3.8-flash</text><text x="903" y="266" class="b">商品検索・承認済み購入の実行</text><text x="903" y="294" class="s">Private Run · DB・署名鍵にアクセスなし</text>
+<path class="line" d="M304 184H374"/><path class="line" d="M304 349H330V277H374"/>
+<path class="line" d="M690 209H878"/><text x="714" y="195" class="s">IAM認証付き呼出</text><path class="line" d="M880 278H690"/><text x="710" y="268" class="s">scope付きtool API</text>
+<rect x="374" y="369" width="250" height="118" class="box"/><text x="397" y="401" class="h">AP2 Mandates</text><text x="397" y="430" class="b">同意・制約・署名の検証</text><text x="397" y="461" class="s">Private Run / 公式AP2 SDK</text>
+<rect x="670" y="369" width="282" height="118" class="box"/><text x="693" y="401" class="h">Payment Worker</text><text x="693" y="430" class="b">raw tx保存 → 送信 → 確定照合</text><text x="693" y="461" class="s">Private Run / 同じhashで復旧</text>
+<rect x="1000" y="380" width="217" height="96" class="box"/><text x="1019" y="414" class="h">Cloud Scheduler</text><text x="1019" y="446" class="s">1分ごとに未処理を再開</text>
+<path class="line" d="M488 322V368"/><path class="line" d="M648 322V341H812V368"/><path class="line" d="M670 427H625"/><path class="line" d="M1000 427H953"/>
+<rect x="374" y="553" width="359" height="88" class="box"/><text x="397" y="586" class="h">Cloud SQL · PostgreSQL</text><text x="397" y="617" class="s">権限 / 同意 / 予算予約 / journal / outbox</text>
+<rect x="788" y="553" width="429" height="88" class="box"/><text x="811" y="586" class="h">Cloud KMS / HSM + Secret Manager</text><text x="811" y="617" class="s">役割別の非export署名鍵 / DB資格情報</text>
+<path class="line" d="M494 487V552"/><path class="line" d="M751 487V519H658V552"/><path class="line" d="M866 487V519H989V552"/>
+<rect x="34" y="444" width="270" height="223" rx="14" fill="#eaf1dc"/><text x="55" y="477" class="h">4つの役割を分離</text><text x="55" y="517" class="b">UCP：商品・会計・注文</text><text x="55" y="552" class="b">AP2：本人同意の証拠</text><text x="55" y="587" class="b">x402：HTTP上の支払連携</text><text x="55" y="622" class="b">Gate：chain上の強制</text>
+<rect x="34" y="714" width="1210" height="139" rx="20" fill="#eef5e8" stroke="#c8d8b8"/><text x="55" y="747" class="h">Polygon Amoy · 80002</text>
+<rect x="58" y="771" width="292" height="59" class="box"/><text x="78" y="807" class="b">本人wallet · test JPYCを保持</text>
+<rect x="430" y="765" width="498" height="70" class="box"/><text x="450" y="794" class="h">YoursPurchaseGate + AgentPermissionRegistry</text><text x="450" y="820" class="s">AI別上限・共有予算・店舗・期限・一件同意を同時に検証</text>
+<rect x="1010" y="771" width="211" height="59" class="box"/><text x="1030" y="807" class="b">加盟店の受取wallet</text>
+<path class="line" d="M350 800H429"/><path class="line" d="M928 800H1009"/>
+<path class="line" d="M751 519V687H812V763"/><text x="828" y="697" class="s">HSM署名 / ERC-7710 / 5 confirmations</text>
+</svg>

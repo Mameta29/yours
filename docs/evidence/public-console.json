@@ -1,0 +1,19 @@
+{
+  "checkedAt": "2026-10-14T06:30:15.933Z",
+  "origin": "https://yours-api-110852561536.asia-northeast1.run.app",
+  "scope": "Public Cloud Run console read-only checks. Actual MetaMask signatures and public Amoy purchase are separate.",
+  "checks": [
+    "deployed HTML references the locally verified build assets",
+    "real catalog renders",
+    "wallet selection opens and closes",
+    "1440px and 390px screenshots",
+    "no horizontal overflow",
+    "no JavaScript errors"
+  ],
+  "chunks": [
+    "/assets/index-Dd1hlBqE.js",
+    "/assets/react-C2KYkj3z.js",
+    "/assets/wallet-Dw9dHSWU.js",
+    "/assets/index-DWW_bwFI.css"
+  ]
+}
