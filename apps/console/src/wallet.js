@@ -3,15 +3,15 @@ import {
   createWalletClient,
   custom,
   http,
-  maxUint256,
   toHex,
-  encodePacked,
 } from "viem";
 import { polygonAmoy, foundry } from "viem/chains";
 import {
   ensureGateSmartAccount,
   encodeDelegations,
-  delegationTypedData,
+  probeGatePermissions,
+  requestGatePermissions,
+  signOwnerTypedData,
 } from "@yours/wallet-sdk";
 import { api } from "./api";
 const serialize = (value) =>
@@ -62,11 +62,7 @@ export async function connect(provider, config) {
   return address;
 }
 export async function typed(provider, address, chainId, data) {
-  await ensure(provider, chainId, address);
-  return provider.request({
-    method: "eth_signTypedData_v4",
-    params: [address, serialize(data)],
-  });
+  return signOwnerTypedData(provider, chainId, address, data);
 }
 function clients(provider, config, address) {
   const chain = config.chainId === 80002 ? polygonAmoy : foundry;
@@ -131,8 +127,13 @@ export async function registerPermission({
     ...(draft?.hashes ?? {}),
     ...(saved && draft && saved.id === draft.id ? saved.hashes : {}),
   };
+  let context =
+    draft?.context ?? (saved?.id === draft?.id ? saved?.context : undefined);
   const persist = () =>
-    localStorage.setItem(storageKey, serialize({ id: draft.id, hashes }));
+    localStorage.setItem(
+      storageKey,
+      serialize({ id: draft.id, hashes, context }),
+    );
   const wait = async (key, hash) => {
     progress("送信済みの登録を確認しています");
     const receipt = await publicClient.waitForTransactionReceipt({
@@ -177,6 +178,7 @@ export async function registerPermission({
       settings,
     );
     hashes = {};
+    context = undefined;
     persist();
   }
   const e = {
@@ -184,66 +186,24 @@ export async function registerPermission({
     expiry: BigInt(draft.expectation.expiry),
     startTime: BigInt(draft.expectation.startTime),
   };
-  let context = draft.context;
   if (!context) {
-    progress("ウォレットで購入権限を承認してください");
-    const nonce = await publicClient.readContract({
-      address: e.enforcers.nonce,
-      abi: [
-        {
-          type: "function",
-          name: "currentNonce",
-          stateMutability: "view",
-          inputs: [
-            { name: "manager", type: "address" },
-            { name: "delegator", type: "address" },
-          ],
-          outputs: [{ type: "uint256" }],
-        },
-      ],
-      functionName: "currentNonce",
-      args: [e.manager, address],
-    });
-    const parent = {
-      delegate: e.agent,
-      delegator: address,
-      authority: toHex(maxUint256, { size: 32 }),
-      salt: toHex(crypto.getRandomValues(new Uint8Array(32))),
-      signature: "0x",
-      caveats: [
-        {
-          enforcer: e.enforcers.periodic,
-          terms: encodePacked(
-            ["address", "uint256", "uint256", "uint256"],
-            [e.token, maxUint256, maxUint256, e.startTime],
-          ),
-          args: "0x",
-        },
-        { enforcer: e.enforcers.redeemer, terms: e.gate, args: "0x" },
-        {
-          enforcer: e.enforcers.timestamp,
-          terms: encodePacked(["uint128", "uint128"], [0n, e.expiry]),
-          args: "0x",
-        },
-        {
-          enforcer: e.enforcers.value,
-          terms: toHex(0n, { size: 32 }),
-          args: "0x",
-        },
-        {
-          enforcer: e.enforcers.nonce,
-          terms: toHex(nonce, { size: 32 }),
-          args: "0x",
-        },
-      ],
-    };
-    parent.signature = await typed(
+    progress("ウォレットの購入権限への対応を確認しています");
+    const capability = await probeGatePermissions(
       provider,
-      address,
       config.chainId,
-      delegationTypedData(config.chainId, e.manager, parent),
+      address,
+      e.funding,
     );
-    context = encodeDelegations([parent]);
+    if (!capability.canRequest)
+      throw new Error("wallet_permission_unsupported");
+    progress("MetaMaskで購入権限の条件を確認してください");
+    // MetaMask intentionally blocks raw owner Delegation signatures. Let its
+    // ERC-7715 permission UI create the grant, then validate every restriction.
+    const { grants } = await requestGatePermissions(provider, [e]);
+    context = encodeDelegations(grants[0].parents);
+    // Keep an approved grant if the subsequent API request loses its response.
+    // The server still verifies its signature, nonce and exact immutable scope.
+    persist();
   }
   const base = "/api/owner/permissions/drafts/" + draft.id;
   let terms = draft.typedData

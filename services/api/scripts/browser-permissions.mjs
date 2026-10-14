@@ -6,13 +6,14 @@ import {randomUUID,generateKeyPairSync,sign} from 'node:crypto';
 import {chromium,expect} from '@playwright/test';
 import {serve} from '@hono/node-server';
 import {serveStatic} from '@hono/node-server/serve-static';
-import {createPublicClient,createWalletClient,http,toHex,parseEther,encodeFunctionData,encodeAbiParameters,parseAbi} from 'viem';
+import {createPublicClient,createWalletClient,http,toHex,parseEther,encodeFunctionData,encodeAbiParameters,encodePacked,maxUint256,parseAbi} from 'viem';
 import {generatePrivateKey,privateKeyToAccount} from 'viem/accounts';
 import {foundry} from 'viem/chains';
 import {createDb,migrate} from '@yours/storage';
 import {createApp} from '../dist/app.js';
 import {readConfig} from '../dist/config.js';
 import {chainRuntime} from '../dist/chain.js';
+import {delegationTypedData,encodeDelegations} from '@yours/wallet-sdk';
 
 const rpc='http://127.0.0.1:18812',origin='http://localhost:18816';
 const client=createPublicClient({chain:foundry,transport:http(rpc)});
@@ -36,14 +37,43 @@ try{
  browser=await chromium.launch({channel:'chrome',headless:true});
  const page=await browser.newPage({viewport:{width:1440,height:1100}});page.setDefaultTimeout(30000);
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
- let rejectSecond=true,loseUpgradeStatus=true,upgradeHash,upgradeRequests=0;
+ let rejectSecond=true,loseUpgradeStatus=true,loseParentSubmit=true,upgradeHash,upgradeRequests=0,permissionRequests=0;
  let visibleAccounts=true,selectedOwner=owner,rejectLogin=false,accountRequests=0,loginSignatures=0;
  const transactions=[];
+ const typedSignatures=[];
+ await page.route('**/api/owner/permissions/drafts/*/parents',async route=>{
+  if(loseParentSubmit){loseParentSubmit=false;await route.abort('failed');return;}
+  await route.continue();
+ });
  await page.exposeFunction('yoursTestProvider',async({method,params=[]})=>{
   if(method==='eth_requestAccounts'){accountRequests++;visibleAccounts=true;return [selectedOwner.address];}
   if(method==='eth_accounts')return visibleAccounts?[selectedOwner.address]:[];
   if(method==='eth_chainId')return toHex(31337);
   if(method==='wallet_getCapabilities')return {[toHex(31337)]:{atomic:{status:'ready'}}};
+  if(method==='wallet_getSupportedExecutionPermissions')return {'erc20-token-allowance':{chainIds:[toHex(31337)],ruleTypes:['expiry','redeemer']}};
+  if(method==='wallet_requestExecutionPermissions'){
+   assert.equal(params.length,1);const request=params[0];
+   assert.equal(request.from.toLowerCase(),owner.address.toLowerCase());assert.equal(request.chainId,toHex(31337));
+   assert.equal(request.to.toLowerCase(),m.addresses.agent.toLowerCase());
+   assert.equal(request.permission.type,'erc20-token-allowance');assert.equal(request.permission.isAdjustmentAllowed,false);
+   assert.equal(request.permission.data.tokenAddress.toLowerCase(),m.jpyc.toLowerCase());
+   assert.equal(BigInt(request.permission.data.allowanceAmount),maxUint256);
+   assert.deepEqual(request.rules.map(r=>r.type).sort(),['expiry','redeemer']);
+   const expiry=request.rules.find(r=>r.type==='expiry').data.timestamp;
+   assert.deepEqual(request.rules.find(r=>r.type==='redeemer').data.addresses.map(a=>a.toLowerCase()),[m.gate.toLowerCase()]);
+   const nonce=await client.readContract({address:m.enforcers.nonce,abi:parseAbi(['function currentNonce(address,address) view returns(uint256)']),functionName:'currentNonce',args:[m.manager,owner.address]});
+   // This test wallet constructs and signs the grant behind ERC-7715. The
+   // browser is never allowed to request a raw owner Delegation signature.
+   const parent={delegate:request.to,delegator:owner.address,authority:toHex(maxUint256,{size:32}),salt:toHex(permissionRequests+1,{size:32}),signature:'0x',caveats:[
+    {enforcer:m.enforcers.periodic,terms:encodePacked(['address','uint256','uint256','uint256'],[m.jpyc,maxUint256,maxUint256,BigInt(request.permission.data.startTime)]),args:'0x'},
+    {enforcer:m.enforcers.value,terms:toHex(0,{size:32}),args:'0x'},
+    {enforcer:m.enforcers.nonce,terms:toHex(nonce,{size:32}),args:'0x'},
+    {enforcer:m.enforcers.redeemer,terms:m.gate,args:'0x'},
+    {enforcer:m.enforcers.timestamp,terms:encodePacked(['uint128','uint128'],[0n,BigInt(expiry)]),args:'0x'},
+   ]};
+   parent.signature=await owner.signTypedData(delegationTypedData(31337,m.manager,parent));permissionRequests++;
+   return [{...request,delegationManager:m.manager,context:encodeDelegations([parent]),dependencies:[]}];
+  }
   if(method==='wallet_sendCalls'){
    const batch=params[0];
    assert.equal(batch.from.toLowerCase(),owner.address.toLowerCase());assert.equal(batch.chainId,toHex(31337));assert.equal(batch.atomicRequired,true);
@@ -63,7 +93,14 @@ try{
    if(rejectLogin){rejectLogin=false;throw new Error('User rejected request');}
    loginSignatures++;return selectedOwner.signMessage({message:{raw:params[0]}});
   }
-  if(method==='eth_signTypedData_v4'){assert.equal(params[0].toLowerCase(),owner.address.toLowerCase());return owner.signTypedData(JSON.parse(params[1]));}
+  if(method==='eth_signTypedData_v4'){
+   assert.equal(params[0].toLowerCase(),owner.address.toLowerCase());const data=JSON.parse(params[1]);
+   // MetaMask 13.48 signature-controller validation rejects raw delegations.
+   if(data.primaryType==='Delegation')throw new Error('External signature requests cannot sign delegations for internal accounts.');
+   assert.deepEqual(data.types.EIP712Domain,[{name:'name',type:'string'},{name:'version',type:'string'},{name:'chainId',type:'uint256'},{name:'verifyingContract',type:'address'}]);
+   assert.equal(Number(data.domain.chainId),31337);typedSignatures.push(data.primaryType);
+   return owner.signTypedData(data);
+  }
   if(method==='eth_sendTransaction'){
    const tx=params[0];assert.equal(tx.from.toLowerCase(),owner.address.toLowerCase());
    assert.ok([m.gate,m.registry].some(to=>to.toLowerCase()===tx.to.toLowerCase()));
@@ -109,8 +146,14 @@ try{
  assert.equal(transactions.length,0);assert.equal(upgradeRequests,1);
  await page.getByLabel('この条件で購入を任せることを確認しました').check();
  await page.getByRole('button',{name:'ウォレットで承認する'}).click();
+ await expect(page.getByRole('dialog')).toContainText('処理を完了できませんでした。',{timeout:60000});
+ assert.equal(permissionRequests,1);assert.equal(transactions.length,0);
+ await page.reload();
+ await page.getByRole('button',{name:'登録を再開',exact:true}).first().click();
+ await page.getByLabel('この条件で購入を任せることを確認しました').check();
+ await page.getByRole('button',{name:'残りの登録を進める'}).click();
  await expect(page.getByRole('dialog')).toContainText('ウォレットでの操作をキャンセルしました。',{timeout:60000});
- assert.equal(transactions.length,1);assert.equal(upgradeRequests,1);
+ assert.equal(transactions.length,1);assert.equal(upgradeRequests,1);assert.equal(permissionRequests,1);
  assert.equal((await client.getCode({address:owner.address})).toLowerCase(),'0xef0100'+m.accountImplementation.slice(2).toLowerCase());
  // A different account must never inherit the original owner's pending action.
  visibleAccounts=false;await page.reload();
@@ -137,6 +180,7 @@ try{
  await expect(page.getByRole('alert')).toContainText('購入権限を登録しました');
  assert.equal(transactions.length,2);assert.equal(transactions[0].to.toLowerCase(),m.gate.toLowerCase());assert.equal(transactions[1].to.toLowerCase(),m.registry.toLowerCase());
  assert.equal(accountRequests,requestsBeforeReload);assert.equal(loginSignatures,signaturesBeforeReload);
+ assert.equal(permissionRequests,1);assert.deepEqual(typedSignatures,['PolicyRegistration','AgentPermission']);
  assert.deepEqual(errors,[]);
  const state=await page.evaluate(()=>fetch('/api/owner/me').then(r=>r.json()));
  assert.equal(state.connections[0].status,'active');assert.equal(state.connections[0].pending_draft,null);
@@ -150,6 +194,6 @@ try{
  await expect.poll(()=>page.evaluate(()=>fetch('/api/owner/me').then(r=>r.status))).toBe(401);
  assert.equal(transactions.length,2);
  assert.deepEqual(errors,[]);
- const evidence={scope:'Headless Chrome with a disposable EIP-1193 test provider. Real EIP-7702 owner upgrade, EIP-712 signatures, real HTTP API/PostgreSQL and official MetaMask contracts on local Anvil. No wallet-extension or public Amoy claim.',passed:['browser SIWE login','ordinary EOA initiates EIP-5792 upgrade from the permission button','two zero-value self calls apply the pinned EIP-7702 implementation','interrupted upgrade status survives reload without a second batch','wallet errors show the failing method and provider reason','wallet reconnect cancellation preserves the pending form','same-owner reconnect restores edited limits without sending a transaction','reconnected owner explicitly reviews conditions before registration','different-wallet login discards the previous owner action without sending','reload passively restores an authorized account without new login signatures','actual policy transaction succeeds','second wallet transaction intentionally canceled','reloaded page restores the same permission conditions','only the missing registry transaction is sent','five confirmations activate the AI','same account and chain notifications keep the session','account change closes the pending form and logs out without sending','no JavaScript errors'],upgradeTransaction:upgradeHash,transactions};
+ const evidence={scope:'Headless Chrome with a disposable EIP-1193 test provider that rejects raw owner Delegation signatures. ERC-7715 requests, real EIP-7702 owner upgrade, EIP-712 signatures, real HTTP API/PostgreSQL and official MetaMask contracts on local Anvil. No wallet-extension or public Amoy claim.',passed:['browser SIWE login','ordinary EOA initiates EIP-5792 upgrade from the permission button','two zero-value self calls apply the pinned EIP-7702 implementation','interrupted upgrade status survives reload without a second batch','wallet errors show the failing method and provider reason','wallet reconnect cancellation preserves the pending form','same-owner reconnect restores edited limits without sending a transaction','reconnected owner explicitly reviews conditions before registration','ERC-7715 grant keeps the exact token, Gate redeemer and expiry','no raw owner Delegation signature request','approved permission survives HTTP failure and reload without another permission request','policy and registry signatures include the explicit EIP712Domain','different-wallet login discards the previous owner action without sending','reload passively restores an authorized account without new login signatures','actual policy transaction succeeds','second wallet transaction intentionally canceled','reloaded page restores the same permission conditions','only the missing registry transaction is sent','five confirmations activate the AI','same account and chain notifications keep the session','account change closes the pending form and logs out without sending','no JavaScript errors'],upgradeTransaction:upgradeHash,transactions};
  await writeFile('docs/evidence/browser-permissions.json',JSON.stringify(evidence,null,2)+'\n');console.log(JSON.stringify({passed:evidence.passed.length,evidence:'docs/evidence/browser-permissions.json'}));
 }finally{clearInterval(mine);await browser?.close();await new Promise(resolve=>server.close(resolve));await db.end();}

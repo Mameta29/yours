@@ -35,7 +35,23 @@ const messages = {
     "ウォレットのアカウントが変わりました。もう一度接続してください。",
   wallet_chain_mismatch: "Polygon Amoyへ切り替えてください。",
   wallet_permission_unsupported:
-    "このウォレットではAmoyの委任権限に対応していません。対応するMetaMask拡張、または設定済みのスマートアカウントを使ってください。",
+    "このウォレットではAmoyで必要な購入権限と実行先の制限を確認できませんでした。対応するMetaMask拡張でお試しください。",
+  wallet_permission_probe_failed:
+    "MetaMaskの購入権限への対応を確認できませんでした。「エラーの詳細」で理由を確認できます。",
+  wallet_permission_request_failed:
+    "MetaMaskで購入権限の承認を続行できませんでした。「エラーの詳細」で理由を確認できます。",
+  wallet_permission_invalid_request:
+    "MetaMaskが購入権限の要求を受け付けませんでした。「エラーの詳細」を共有してください。",
+  wallet_permission_validation_failed:
+    "ウォレットが返した購入権限が指定の条件と一致しないため、登録を停止しました。",
+  wallet_signature_request_failed:
+    "MetaMaskで条件の署名を続行できませんでした。「エラーの詳細」で理由を確認できます。",
+  wallet_signature_invalid_request:
+    "MetaMaskが条件の署名要求を受け付けませんでした。「エラーの詳細」を共有してください。",
+  wallet_signature_unsupported:
+    "このウォレットは条件の署名に対応していません。MetaMask拡張でお試しください。",
+  wallet_permission_request_required:
+    "この委任にはMetaMaskの購入権限の確認が必要です。画面を再読み込みして登録を再開してください。",
   wallet_upgrade_required:
     "ウォレットの設定を確認できませんでした。もう一度登録を進めてください。",
   wallet_rejected: "ウォレットでの操作をキャンセルしました。",
@@ -47,6 +63,8 @@ const messages = {
     "このアカウントには別のスマートアカウント設定があります。既存の設定を確認するか、別のアカウントで接続してください。",
   wallet_upgrade_confirming:
     "設定の反映を待っています。時間をおいて同じボタンから再開できます。",
+  wallet_upgrade_response_invalid:
+    "MetaMaskからの設定取引の応答を確認できませんでした。取引は再送せず、保存済みの状態から確認を再開できます。",
   wallet_upgrade_request_failed:
     "MetaMaskでウォレット設定を続行できませんでした。下の「エラーの詳細」で、停止した処理と理由を確認できます。",
   wallet_permission_missing:
@@ -109,6 +127,9 @@ export function walletErrorDetails(error) {
       "wallet_getCapabilities",
       "wallet_sendCalls",
       "wallet_getCallsStatus",
+      "wallet_getSupportedExecutionPermissions",
+      "wallet_requestExecutionPermissions",
+      "eth_signTypedData_v4",
     ].includes(d.method)
   )
     return undefined;
