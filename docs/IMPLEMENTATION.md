@@ -32,7 +32,7 @@ Polygon Amoyにyours専用Gate `0x42eec579df8fb1f87ae3bddbb90c6a4a9f790504` とR
 初期状態は空repo。親ECの未コミット作業と他worktreeを保持し、独立cloneで作業する。抽出元のrevisionとファイル一覧はEXTRACTION.jsonに保存した。
 
 - SDK: 型付きowner同意、委任検証、生成ABI。buildと48テスト通過。
-- 権限API: 本人署名・公式MetaMask委任・5 confirmations後の有効化・即時pause・onchain revokeを実装。実PostgreSQL/Anvilで9項目通過（`docs/evidence/permissions-api.json`）。ブラウザ拡張の操作は未検証。
+- 権限API: 本人署名・公式MetaMask委任・5 confirmations後の有効化・即時pause・onchain revokeを実装。実PostgreSQL/Anvilで14項目通過（`docs/evidence/permissions-api.json`）。中断した登録のhashを保持し、確定済みpolicyの期間を保ったまま2件目だけ新しい本人署名で再開。実Chromeと試験用EIP-1193 providerによる7項目も通過（`docs/evidence/browser-permissions.json`）。実MetaMask拡張は別途確認する。
 - Solidity: AI接続別の権限と共有予算を同一transactionで強制。36テスト（fuzzを含む）通過、EIP-170サイズ制限内。公式MetaMask DelegationManager・EIP-7702とのローカル統合12件通過（`docs/evidence/local-chain.json`）。公開Amoy配備済み。
 - Domain: 単位の厳密変換、期限・共有予算・AI別予算をfail-closedで判定。7テスト通過。
 - PostgreSQL: owner署名認証、idempotency、outbox、予算予約、署名済みtransactionを送信前に保存するjournal。実PostgreSQLで6件の同時実行・復旧試験通過。
@@ -44,17 +44,19 @@ Polygon Amoyにyours専用Gate `0x42eec579df8fb1f87ae3bddbb90c6a4a9f790504` とR
 
 ## 公開環境での確認
 
-[管理画面/API](https://yours-api-110852561536.asia-northeast1.run.app)を公開。mandates・worker・agentは非公開のCloud Run。image tagは`console-20261014`、Cloud Buildは`ff541558-f7b0-4471-984c-47d8b972d3dd`、sourceは`26efb36`。Cloud SQL接続、HSM公開鍵とdiscoveryの一致、4サービスのhealthと公開範囲を確認（[証拠](evidence/cloud-services.json)）。後続commitは再配備するまで公開環境の成果に含めない。
+[管理画面/API](https://yours-api-110852561536.asia-northeast1.run.app)を公開。mandates・worker・agentは非公開のCloud Run。現在のimage tagは`recovery-20261014`、Cloud Buildは`671dec84-21a3-4172-977d-364dc77f73d2`、sourceは`d2b327e`。migration job `yours-migrate-x7gdw`で001〜008を反映。Cloud SQL接続、HSM公開鍵とdiscoveryの一致、4サービスのhealthと公開範囲を確認（[証拠](evidence/cloud-services.json)）。後続commitは再配備するまで公開環境の成果に含めない。
 
 Google ADK → Vertex AI `gemini-3.8-flash` → 実Cloud SQL catalogの検索が公開画面のAPI経由で成功（[証拠](evidence/gemini-cloud.json)）。未接続の試用は検索専用で、決済権限を持たない。購入は本人署名・AP2・x402を経由する。
 
-管理画面は1440pxと390pxで実ブラウザ検証済み。接続、AI別権限、共有予算、停止、注文専用同意、購入品downloadを実APIへ接続。ブラウザwalletによる登録の途中復旧と、公開Amoyでの実購入は継続中。
+管理画面は1440pxと390pxで実ブラウザ検証済み。接続、AI別権限、共有予算、停止、注文専用同意、購入品downloadを実APIへ接続。公開Amoyでの実購入は本人のwallet操作を依頼中。
+
+UCP RFC 9421署名、API keyとplatform profileの結び付け、DNSを固定したprofile取得、order webhookのoutbox・inbox・重複排除・非同期auditを実装・配備。非公開workerへの1分間隔のScheduler `yours-outbox`を設定済み。
+
+外部AIのP-256 AP2 holderとEVM agentを分離して実装。注文専用leafとintentを外部AI自身が署名し、yours側は署名の検証とrelayを行う。公式AP2 SDKによる外部holderの提示、実ERC-7710送金、別AIを追加しても共有消費が維持されること、共有予算超過で送信前に止まることを含む44項目のローカル結合検証が成功。外部署名の追加は上記の公開imageにはまだ含まれない。
 
 ## 次に完了する事項
 
-- UCP HTTP署名・DNSを固定したprofile取得・永続webhookの検証と配備。
-- 権限登録の途中復旧（1件目のtransaction成功後に画面を閉じても継続可能にする）。
-- 外部AI自身のEVM署名による実行、外部EC adapter、複数AIの共有予算の統合試験。
-- 公開Amoyで本人の資産から実購入、Schedulerによる復旧、提出用README・試用手順・検証範囲の整理。
+- 外部AI用のclient例と公開配備、外部EC adapter、注文・返金の照合。
+- 公開Amoyで本人の資産から実購入、提出用README・試用手順・検証範囲の整理。
 
 ローカルの最新結合証拠は[決済pipeline](evidence/payment-pipeline.json)。API/SDK、Anvil、公開Google Cloud、公開Amoyの証拠はそれぞれ区別する。
