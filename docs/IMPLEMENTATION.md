@@ -37,11 +37,11 @@ Polygon Amoyにyours専用Gate `0x42eec579df8fb1f87ae3bddbb90c6a4a9f790504` とR
 - Solidity: AI接続別の権限と共有予算を同一transactionで強制。36テスト（fuzzを含む）通過、EIP-170サイズ制限内。公式MetaMask DelegationManager・EIP-7702とのローカル統合12件通過（`docs/evidence/local-chain.json`）。公開Amoy配備済み。
 - Domain: 単位の厳密変換、期限・共有予算・AI別予算をfail-closedで判定。7テスト通過。
 - PostgreSQL: owner署名認証、idempotency、outbox、予算予約、署名済みtransactionを送信前に保存するjournal。実PostgreSQLで6件の同時実行・復旧試験通過。
-- UCP: stable 2026-08-25のschemaを固定。discovery、商品検索、cart、配送・署名付きcheckout、在庫予約、AP2付きcomplete、決済後のorder、HTTP署名、webhookを実装。UCPパッケージ12件・API16件のテスト通過。外部EC adapterは未実装。
+- UCP: stable 2026-08-25のschemaを固定。discovery、商品検索、cart、配送・署名付きcheckout、在庫予約、AP2付きcomplete、決済後のorder、HTTP署名、webhookを実装。UCPパッケージ12件・API16件のテスト通過。既存EC adapterを追加。公開カタログは2店舗・4商品を読み取り確認し、注文予約から送金・注文復旧はローカル結合試験で確認。
 - KMS: 非export鍵のEVM/P-256署名adapter、CRC・署名復元検証。ローカル暗号試験2件通過。Cloud HSMの実EVM/P-256署名を検証済み（`docs/evidence/cloud-kms.json`）。
-- AP2: 固定した公式v0.2 SDKでopen→closed mandate、制約・署名検証、receiptを実装。実署名・公式SDK・本人の新しいEIP-712同意とprivate issuerの18件通過。Cloud Run配備と、mandateの一回消費・実決済receiptへの束縛を実装済み。上流仕様との差異は`docs/design/INTEROPERABILITY.md`。
+- AP2: 固定した公式v0.2 SDKでopen→closed mandate、制約・署名検証、receiptを実装。実署名・公式SDK・本人の新しいEIP-712同意とprivate issuerの19件通過。Cloud Run配備と、mandateの一回消費・実決済receiptへの束縛を実装済み。上流仕様との差異は`docs/design/INTEROPERABILITY.md`。
 
-`PAYMENT_PIPELINE=1 node packages/wallet-sdk/scripts/local-integration.mjs`で、本人署名→AP2 private HTTP→UCP complete→x402 HTTP 402/支払署名→実ERC-7710送金→order/署名付きreceiptの55項目を検証。送信応答消失から同一hashで復旧、金額改変拒否、期間超過の本人一件同意も含む。証拠は`docs/evidence/payment-pipeline.json`。これはAnvilと試験tokenでの結合検証。
+`PAYMENT_PIPELINE=1 node packages/wallet-sdk/scripts/local-integration.mjs`で、本人署名→AP2 private HTTP→UCP complete→x402 HTTP 402/支払署名→実ERC-7710送金→order/署名付きreceiptの68項目を検証。送信応答消失から同一hashで復旧、金額改変拒否、期間超過の本人一件同意も含む。証拠は`docs/evidence/payment-pipeline.json`。これはAnvilと試験tokenでの結合検証。
 
 ## 公開環境での確認
 
@@ -53,14 +53,22 @@ Google ADK → Vertex AI `gemini-3.8-flash` → 実Cloud SQL catalogの検索が
 
 UCP RFC 9421署名、API keyとplatform profileの結び付け、DNSを固定したprofile取得、order webhookのoutbox・inbox・重複排除・非同期auditを実装・配備。非公開workerへの1分間隔のScheduler `yours-outbox`を設定済み。
 
-外部AIのP-256 AP2 holderとEVM agentを分離して実装・配備。注文専用leafとintentを外部AI自身が署名し、yours側は署名の検証とrelayを行う。公式AP2 SDKによる外部holderの提示、実ERC-7710送金、別AIを追加しても共有消費が維持されること、共有予算超過で送信前に止まることと外部client単体の実行を含む55項目のローカル結合検証が成功。外部AI向けclient例、購入するAIの選択、本人だけができるtoken再発行を追加。client単体の公開決済は未確認。
+外部AIのP-256 AP2 holderとEVM agentを分離して実装・配備。注文専用leafとintentを外部AI自身が署名し、yours側は署名の検証とrelayを行う。公式AP2 SDKによる外部holderの提示、実ERC-7710送金、別AIを追加しても共有消費が維持されること、共有予算超過で送信前に止まることと外部client単体の実行を含む68項目のローカル結合検証が成功。外部AI向けclient例、購入するAIの選択、本人だけができるtoken再発行を追加。client単体の公開決済は未確認。
 
-本人限定の注文詳細ページと実ファイルのdownloadを実装・配備。受け取り操作は一つのdigital fulfillment eventと署名付きwebhookにまとめ、同時再試行でも重複しない。実Chromeで注文リンクから実ファイルを受け取る試験を55項目に含めた。GitHub CI [38527935512](https://github.com/Mameta29/yours/actions/runs/38527935512)も全項目成功。提出用README・構成図・試用手順を公開済み。
+本人限定の注文詳細ページと実ファイルのdownloadを実装・配備。受け取り操作は一つのdigital fulfillment eventと署名付きwebhookにまとめ、同時再試行でも重複しない。実Chromeで注文リンクから実ファイルを受け取る試験を68項目に含めた。GitHub CI [38527935512](https://github.com/Mameta29/yours/actions/runs/38527935512)も全項目成功。提出用README・構成図・試用手順を公開済み。
+
+## 既存ECの接続（今回の追加・配備前）
+
+`adapters/jpyc-ec`を新設。登録済みのorigin・店舗ID・送金先だけを使い、実ECの予約・personal_sign・transfer照合を接続する。migration 010で予約の冪等キーとcheckout/AP2の結び付きを永続化。本人の署名・同意を得るまではAP2を発行せず、メールの宛先をAIへ渡さない。workerは確定後に同じtx hashでEC注文を照合し、応答消失から復旧する。
+
+adapter境界の12テスト、AP2 authorityの19テスト、実Chromeを含む68項目のpipeline、権限API14項目、wallet登録10項目が通過。ECのHTTP境界はfixtureで、本人署名と実ERC20 receiptを検証している。実ECの[公開catalogの読み取り](evidence/ec-public-catalog.json)とは区別する。公開ECでの本人購入は未確認。
+
+注文の受付を配達完了とは扱わない。外部ECの商品は本人が準備・同意したcheckoutを使用し、yours Marketのcart/create-checkoutを直接流用しない。配送先・variant・必須追加optionのある商品、返金処理は対象外。
 
 ## 次に完了する事項
 
 - 公開Amoyで本人の資産から実購入。外部AI client単体はローカルの実HTTP・実送金で確認済み、公開Amoyは未確認。
-- 外部EC adapterと返金の照合。
+- 既存EC adapterを含む最新commitをCloud Runへ配備・公開確認。返金処理は未実装。
 - 実処理のデモ動画とDashboard提出。
 
 ローカルの最新結合証拠は[決済pipeline](evidence/payment-pipeline.json)。API/SDK、Anvil、公開Google Cloud、公開Amoyの証拠はそれぞれ区別する。

@@ -16,7 +16,7 @@
     "old signature and substituted transaction hash rejected",
     "renewal preserves shared period anchor"
   ],
-  "policyTransaction": "0x3c60c50d01cdff1ab77712a3e2d5167b99102c34c27281da1af540671121c83e",
-  "permissionTransaction": "0x9db7bc17dc42d5ecb37fa2dd7db7c34d397cfcc0c456c22cc1af36766be7f4cd",
-  "revocationTransaction": "0xf797c63ed918bc0d780098ab29c64c9c3b15e6405a24cd3553eefbb0c22d4b6a"
+  "policyTransaction": "0x8f497f4ccafdea0086bef96a92bfa0f4f687b8423dfa2750b99d8edde11107f1",
+  "permissionTransaction": "0x23718e8ed712968a57c8fc1cb25895c79ea9f5333ff58c71c4733529caf76a45",
+  "revocationTransaction": "0x7abeea1e9b32860f0f411ba2df85a940b379a3faf7e9bf92b75f9bd6938a227d"
 }

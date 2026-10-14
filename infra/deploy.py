@@ -42,6 +42,7 @@ gcloud('run', 'jobs', 'execute', 'yours-migrate', '--wait')
 if args.migrate_only:
     raise SystemExit(0)
 common = {'CHAIN_ID': 80002, 'GATE_ADDRESS': manifest['gate'], 'PUBLIC_ORIGIN': origin}
+ec_merchants = json.dumps(json.loads(Path('deployments/ec-merchants-amoy.json').read_text()))
 services = {
     'mandates': {
         'ENVIRONMENT': 'production', **common,
@@ -57,6 +58,7 @@ services = {
     },
     'api': {
         'NODE_ENV': 'production', **common,
+        'EC_MERCHANTS_JSON': ec_merchants,
         'RPC_URL': 'https://polygon-amoy-bor-rpc.publicnode.com',
         'JPYC_ADDRESS': manifest['jpyc'], 'AGENT_ADDRESS': manifest['addresses']['agent'],
         'MERCHANT_ID': 'yours-lab', 'MERCHANT_NAME': 'yours Market',
@@ -68,6 +70,7 @@ services = {
     },
     'worker': {
         'NODE_ENV': 'production', **common,
+        'EC_MERCHANTS_JSON': ec_merchants,
         'RPC_URL': 'https://polygon-amoy-bor-rpc.publicnode.com',
         'MERCHANT_ID': 'yours-lab', 'MERCHANT_PAY_TO': manifest['addresses']['merchant'],
         'MANDATES_URL': mandates_url,

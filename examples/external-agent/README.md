@@ -25,4 +25,6 @@ pnpm --filter @yours/external-agent-example run <本人が承認したtaskのid>
 
 公開profileがあるサービスはowner登録APIの `platformProfile` を使い、同じURLを `YOURS_PLATFORM_PROFILE` に指定できます。サーバ側でoperatorがoriginを登録する必要があります。省略時はyoursのplatform identityに束縛したAPI tokenで接続します。任意のURLへtokenを転送したり、未登録originを自動的に許可したりしません。
 
-サーバ側の相互運用検証は[44項目の結合試験](../../docs/evidence/payment-pipeline.json)。公開配備と実MetaMaskでの状況は[実装記録](../../docs/IMPLEMENTATION.md)を参照してください。
+既存ECの注文では、本人が事前に同意した`checkout_id`と`checkout_profile`を使います。商品・金額に加えて予約の`requirements_hash`を検証し、別のcheckoutを作り直しません。
+
+サーバ側の相互運用検証は[68項目の結合試験](../../docs/evidence/payment-pipeline.json)。公開配備と実MetaMaskでの状況は[実装記録](../../docs/IMPLEMENTATION.md)を参照してください。

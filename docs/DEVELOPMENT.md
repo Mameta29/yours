@@ -40,12 +40,12 @@ anvil --host 127.0.0.1 --port 18812 --chain-id 31337 --hardfork prague --silent
 以下は**順に**実行する。期限試験はAnvilの時刻を変更するため、同じchainに対して並列実行しない。
 
 ```sh
-PAYMENT_PIPELINE=1 node packages/wallet-sdk/scripts/local-integration.mjs
+PAYMENT_PIPELINE=1 BROWSER_PURCHASE=1 node packages/wallet-sdk/scripts/local-integration.mjs
 node services/api/scripts/permissions-integration.mjs
 node services/api/scripts/browser-permissions.mjs
 ```
 
-最初のscriptはloopback・Anvil・chain ID・framework commitを確認した上で、公式account/Manager/enforcerとyours contractsを配備する。使い捨てのowner/AI署名鍵、試験token、HTTPのAPI/AP2 authorityを使い、実送金・改変拒否・二重送信防止・外部AIを検証する。起動したAPI/AP2 processは終了時に閉じる。ブラウザ試験にはChromeが必要。
+最初のscriptはloopback・Anvil・chain ID・framework commitを確認した上で、公式account/Manager/enforcerとyours contractsを配備する。使い捨てのowner/AI署名鍵、試験token、HTTPのAPI/AP2 authorityを使い、実送金・改変拒否・二重送信防止・外部AIを検証する。起動したAPI/AP2 processは終了時に閉じる。ブラウザ試験にはChromeが必要。既存ECのHTTP境界は制御可能なfixtureを使用し、本人署名とERC20の実receiptを検証する。公開ECへ試験注文は送らない。
 
 公開鍵・transaction hash・試験範囲を `docs/evidence/` に出力する。秘密鍵を証拠やGitへ保存しない。ローカルtrialを公開Amoyや実MetaMask拡張の結果として扱わない。
 
@@ -73,3 +73,7 @@ python3 infra/smoke.py
 ```
 
 Gateの公開配備先と17件のcode/proxy pinは `deployments/amoy.json`。アプリ更新のたびにGateを再配備しない。productionの秘密鍵はCloud HSMに保持し、owner鍵・AI鍵の環境変数をブラウザへ埋め込まない。
+
+## 外部ECの登録
+
+`deployments/ec-merchants-amoy.json`のorigin・店舗ID・slug・送金先を固定し、`infra/deploy.py`がAPIとworkerへ同一の`EC_MERCHANTS_JSON`を設定する。実行環境へ任意originを登録する公開APIは設けない。ローカルHTTPは`NODE_ENV=test`でのみ使用できる。公開catalogは60秒のキャッシュ、購入時は毎回実ECで価格・在庫・予約を確認する。[接続の設計](design/EC-ADAPTER.md)

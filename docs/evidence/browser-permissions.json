@@ -12,15 +12,15 @@
     "five confirmations activate the AI",
     "no JavaScript errors"
   ],
-  "upgradeTransaction": "0xfe1d43b25da400aaf35969c1d36a297dba0cf25ac8bf6f17390a1b402bc16742",
+  "upgradeTransaction": "0x1bcd34e581a18b632335bc77eb0974ff156199017e52d8081099003870c0bf57",
   "transactions": [
     {
-      "to": "0xe43a72b05a6b12830555ba1dfab94117c9861066",
-      "hash": "0xb42935fe9b4087e5576c0281c2cd428f934eea75caa5e2f6f3ab75f94521ace7"
+      "to": "0x8c1106124cafc1064666730359b575baaee93f58",
+      "hash": "0x9a56808fadb73594e6b4c5373c39fde0d7ed093d50fb03416e1276e33f530da0"
     },
     {
-      "to": "0x2Cb3a7E379e163e72d5BfAa7D123441B6D91790a",
-      "hash": "0x22da3f289d5778d96f3db3cb26a8402d488da57755818bad509fc1a5313a7033"
+      "to": "0x3241eE5772e7bDf3F0232A20C665D517342aD080",
+      "hash": "0x258c581b71ceba9f22c01263ac87a2444bfeacb42ec409df48148576e3f826e3"
     }
   ]
 }
