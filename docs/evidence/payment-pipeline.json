@@ -15,6 +15,8 @@
     "AI token balance stays zero",
     "official UCP order schema",
     "signed AP2 payment and checkout receipts",
+    "simultaneous complete retries return one committed response",
+    "altered x402 retry rejected after acceptance",
     "x402 HTTP 402 requirements",
     "no transaction before payment acceptance",
     "altered x402 amount rejected",
@@ -24,8 +26,10 @@
     "wrong wallet cannot approve an exception",
     "fresh owner proof permits exactly one 600 JPYC exception",
     "shared usage includes approved excess",
-    "used exception cannot be authorized again"
+    "used exception cannot be authorized again",
+    "Gemini task-scoped token cannot access another payment or presentation",
+    "expired Gemini run token is rejected"
   ],
-  "transactionHash": "0x49cd41f5bf43c47fe93ced7912a29622782d273c52e9ada66c1897900c236cef",
-  "gate": "0x1b95cde6e2141263e03feb263c1b287b3a1efcbe"
+  "transactionHash": "0xda624fa388406f59b008a789e6a0f69d343e5271fe6056eb69c9fb4eab08d82b",
+  "gate": "0x68d3d0f58d6a1c8c1682f82c41dcdf1229da2a7d"
 }

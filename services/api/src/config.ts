@@ -13,7 +13,7 @@ export const configSchema=z.object({
  UCP_SIGNING_KEY:z.string().optional(),
  CHAIN_MANIFEST_PATH:z.string().default('deployments/amoy.json'),
  LOCAL_KEY_DIR:z.string().default('.local/keys'),
- MANDATES_URL:z.string().url().optional(),AGENT_URL:z.string().url().optional(),
+ WORKER_URL:z.string().url().optional(),MANDATES_URL:z.string().url().optional(),AGENT_URL:z.string().url().optional(),
  TRUSTED_PROFILE_ORIGINS:z.string().default(''),
 });
 export type Config=z.infer<typeof configSchema>;

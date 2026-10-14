@@ -4,6 +4,7 @@ import {randomUUID,generateKeyPairSync,sign} from 'node:crypto';
 import {writeFile,mkdir,rm} from 'node:fs/promises';
 import {privateKeyToAccount,generatePrivateKey} from 'viem/accounts';
 import {toHex,maxUint256,parseEther,encodePacked} from 'viem';
+import {sha256} from '@yours/domain';
 import {createDb,migrate} from '@yours/storage';
 import {encodeDelegations,delegationTypedData} from '@yours/wallet-sdk';
 import {verifyCheckout,validateSchema} from '@yours/ucp';
@@ -60,7 +61,8 @@ export async function paymentIntegration({root,client,wallet,accounts,manifest,j
   const {json:presentation}=await request('/api/agent/present',{mandateId:mandate.id,checkoutId:checkout.id},{asAgent:true});
   const body={payment:{instruments:[{id:presentation.instrumentId,handler_id:'yours-stablecoin',type:'stablecoin',selected:true,credential:{type:'yours_ap2',mandate_id:mandate.id}}]},ap2:presentation.mandates};
   const headers={'Idempotency-Key':randomUUID(),'If-Match':'"1"'};
-  const {json:pending}=await request('/ucp/checkout-sessions/'+checkout.id+'/complete',body,{asAgent:true,status:202,headers});
+  const simultaneous=await Promise.all([request('/ucp/checkout-sessions/'+checkout.id+'/complete',body,{asAgent:true,status:202,headers}),request('/ucp/checkout-sessions/'+checkout.id+'/complete',body,{asAgent:true,status:202,headers})]);
+  const pending=simultaneous[0].json;assert.deepEqual(simultaneous[1].json,pending);
   assert.equal(pending.status,'complete_in_progress');
   const replay=await request('/ucp/checkout-sessions/'+checkout.id+'/complete',body,{asAgent:true,status:202,headers});assert.deepEqual(replay.json,pending);
   const intentId=pending.yours.intent_id;
@@ -75,6 +77,7 @@ export async function paymentIntegration({root,client,wallet,accounts,manifest,j
   const altered=structuredClone(authorization);altered.accepted.amount='1';
   await request('/api/agent/payments/'+intentId,{}, {asAgent:true,status:422,headers:{'PAYMENT-SIGNATURE':Buffer.from(JSON.stringify(altered)).toString('base64')}});
   await request('/api/agent/payments/'+intentId,{}, {asAgent:true,status:202,headers:{'PAYMENT-SIGNATURE':Buffer.from(JSON.stringify(authorization)).toString('base64')}});
+  await request('/api/agent/payments/'+intentId,{}, {asAgent:true,status:422,headers:{'PAYMENT-SIGNATURE':Buffer.from(JSON.stringify(altered)).toString('base64')}});
   runtime.endorseIntent=id=>privatePost('/v1/endorse-order',{intent_id:id});
   const submitted=await executePayment(db,intentId,runtime);assert.equal(submitted.state,'submitted');
   const journal=(await db.query('SELECT * FROM signed_transactions WHERE intent_id=$1',[intentId])).rows[0];assert.ok(journal.raw_transaction);assert.equal(journal.transaction_hash,submitted.transactionHash);
@@ -92,7 +95,7 @@ export async function paymentIntegration({root,client,wallet,accounts,manifest,j
   const paid=await request('/api/agent/payments/'+intentId,undefined,{asAgent:true});
   assert.equal(JSON.parse(Buffer.from(paid.response.headers.get('PAYMENT-RESPONSE'),'base64').toString()).transaction,settled.transactionHash);
   const passed=['owner SIWE and real signed wallet delegation','fresh owner task consent issues AP2','signed UCP checkout and real AP2 presentation','atomic mandate consumption and budget reservation','idempotent complete','raw transaction persisted before broadcast','lost broadcast response recovered by same hash','five confirmations before order creation','idempotent chain reconciliation','inventory decremented exactly once','merchant receives 600 test JPYC','AI token balance stays zero','official UCP order schema','signed AP2 payment and checkout receipts'];
-  passed.push('x402 HTTP 402 requirements','no transaction before payment acceptance','altered x402 amount rejected','real ERC-7710 PAYMENT-SIGNATURE accepted','PAYMENT-RESPONSE only after settlement');
+  passed.push('simultaneous complete retries return one committed response','altered x402 retry rejected after acceptance','x402 HTTP 402 requirements','no transaction before payment acceptance','altered x402 amount rejected','real ERC-7710 PAYMENT-SIGNATURE accepted','PAYMENT-RESPONSE only after settlement');
   const {json:secondTask}=await request('/api/owner/tasks/prepare',{connectionId:connection.id,merchantId:'yours-lab',items:[{id:productId,quantity:1}],maxAmount:650},{status:201});
   const {json:secondMandate}=await request('/api/owner/tasks/'+secondTask.id+'/approve',{signature:await owner.signTypedData(secondTask.typedData)});
   const {json:secondCheckout}=await request('/ucp/checkout-sessions',{line_items:[{item:{id:productId},quantity:1}]},{asAgent:true,status:201,headers:{'Idempotency-Key':randomUUID()}});
@@ -115,6 +118,18 @@ export async function paymentIntegration({root,client,wallet,accounts,manifest,j
   assert.equal((await client.readContract({...jpyc,functionName:'balanceOf',args:[payTo]}))-merchantBefore,parseEther('1200'));
   await request('/api/owner/approvals/'+approval.id+'/approve',{signature:ownerSignature},{status:403});
   passed.push('agent period-budget excess waits without broadcasting','wrong wallet cannot approve an exception','fresh owner proof permits exactly one 600 JPYC exception','shared usage includes approved excess','used exception cannot be authorized again');
+  const fullToken=token;token=randomUUID()+randomUUID();
+  const runId=randomUUID();
+  await db.query("INSERT INTO agent_runs(id,account_id,connection_id,mandate_id,client_request_id,token_hash,message,status,expires_at) VALUES($1,$2,$3,$4,$5,$6,'scope test','running',now()+interval '5 minutes')",[runId,login.json.id,connection.id,mandate.id,randomUUID(),sha256(token)]);
+  const visible=(await request('/api/agent/tasks',undefined,{asAgent:true})).json.tasks;
+  assert.deepEqual(visible.map(t=>t.id),[mandate.id]);
+  await request('/api/agent/payments/'+intentId,undefined,{asAgent:true});
+  await request('/api/agent/payments/'+secondId,undefined,{asAgent:true,status:403});
+  await request('/api/agent/payments/'+secondId+'/authorization',undefined,{asAgent:true,status:403});
+  await request('/api/agent/present',{mandateId:secondMandate.id,checkoutId:secondCheckout.id},{asAgent:true,status:403});
+  await db.query("UPDATE agent_runs SET expires_at=now()-interval '1 second' WHERE id=$1",[runId]);
+  await request('/api/agent/tasks',undefined,{asAgent:true,status:401});token=fullToken;
+  passed.push('Gemini task-scoped token cannot access another payment or presentation','expired Gemini run token is rejected');
   await writeFile(root+'docs/evidence/payment-pipeline.json',JSON.stringify({scope:'Local Anvil, official MetaMask contracts, test ERC20 and real PostgreSQL/AP2 HTTP authority. Production worker logic with random in-memory signing keys. No browser wallet or public Amoy purchase claim.',passed,transactionHash:settled.transactionHash,gate:manifest.gate},null,2)+'\n');
   console.log(JSON.stringify({passed:passed.length,evidence:'docs/evidence/payment-pipeline.json'}));
  }finally{authority.kill('SIGTERM');await db.end();await rm(keydir,{recursive:true,force:true});}

@@ -8,7 +8,7 @@ import {addressSchema,DomainError,sha256} from '@yours/domain';
 import {transaction,audit,type Db} from '@yours/storage';
 import type {Config} from './config.js';
 
-export type Actor={kind:'owner';accountId:string;address:Address;authenticatedAt:Date}|{kind:'agent';accountId:string;connectionId:string};
+export type Actor={kind:'owner';accountId:string;address:Address;authenticatedAt:Date}|{kind:'agent';accountId:string;connectionId:string;mandateId?:string};
 export type Env={Variables:{actor:Actor}};
 export function requireOrigin(c:Context,config:Config){
  if(c.req.header('origin')!==new URL(config.PUBLIC_ORIGIN).origin)throw new DomainError('origin_mismatch',403);
@@ -18,8 +18,10 @@ export async function authenticate(c:Context,db:Db,config:Config):Promise<Actor>
  if(authorization?.startsWith('Bearer ')){
   const token=authorization.slice(7);if(token.length>256)throw new DomainError('unauthorized',401);
   const {rows:[row]}=await db.query("SELECT id,account_id FROM connections WHERE token_hash=$1 AND status='active'",[sha256(token)]);
-  if(!row)throw new DomainError('unauthorized',401);
-  return {kind:'agent',accountId:row.account_id,connectionId:row.id};
+  if(row)return {kind:'agent',accountId:row.account_id,connectionId:row.id};
+  const {rows:[run]}=await db.query("SELECT r.account_id,r.connection_id,r.mandate_id FROM agent_runs r JOIN connections c ON c.id=r.connection_id WHERE r.token_hash=$1 AND r.status='running' AND r.expires_at>now() AND c.status='active'",[sha256(token)]);
+  if(!run)throw new DomainError('unauthorized',401);
+  return {kind:'agent',accountId:run.account_id,connectionId:run.connection_id,...(run.mandate_id?{mandateId:run.mandate_id}:{})};
  }
  const token=getCookie(c,'yours_session');if(!token)throw new DomainError('unauthorized',401);
  if(!['GET','HEAD','OPTIONS'].includes(c.req.method))requireOrigin(c,config);

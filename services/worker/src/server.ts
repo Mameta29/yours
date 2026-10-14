@@ -1,6 +1,7 @@
 import {readFile} from 'node:fs/promises';
 import {serve} from '@hono/node-server';
 import {Hono} from 'hono';
+import {z} from 'zod';
 import {bodyLimit} from 'hono/body-limit';
 import {createPublicClient,http,keccak256,getAddress,type Address,type Hex} from 'viem';
 import {polygonAmoy} from 'viem/chains';
@@ -39,11 +40,12 @@ const runtime:SettlementRuntime={client,chainId:80002,gate:manifest.gate,manager
 const app=new Hono();
 app.use('*',bodyLimit({maxSize:4096}));
 app.get('/health',c=>c.json({ok:true,service:'yours-worker'}));
-// This service has no allUsers invoker binding. Only the scheduler can call it.
+// This service has no allUsers invoker binding. Only the API and scheduler can wake persisted, authorized work.
 app.post('/run',async c=>{
+ const {intentId}=z.object({intentId:z.string().uuid().optional()}).strict().parse(await c.req.json());
  let processed=0,pending=0;
  for(let i=0;i<8;i++){
-  const item=await claimWork(db,['payment.execute','order.receipts'],180);if(!item)break;
+  const item=await claimWork(db,['payment.execute','order.receipts'],180,intentId);if(!item)break;
   try{
    const id=String(item.payload.intentId);
    if(item.topic==='payment.execute'){

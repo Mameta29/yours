@@ -3,8 +3,8 @@ import {Hono} from 'hono';
 import {bodyLimit} from 'hono/body-limit';
 import {secureHeaders} from 'hono/secure-headers';
 import {z,ZodError} from 'zod';
-import {DomainError,sha256,addressSchema} from '@yours/domain';
-import {transaction,audit,pauseConnection,type Db} from '@yours/storage';
+import {DomainError,sha256,addressSchema,periodIndex} from '@yours/domain';
+import {transaction,audit,pauseConnection,budgetUsage,type Db} from '@yours/storage';
 import {profile,UCP_VERSION} from '@yours/ucp';
 import type {P256Signer} from '@yours/signing';
 import type {Config} from './config.js';
@@ -14,6 +14,7 @@ import {taskRoutes} from './tasks.js';
 import {permissionRoutes} from './permissions.js';
 import {agentRoutes} from './agents.js';
 import {approvalRoutes} from './approvals.js';
+import {runRoutes} from './runs.js';
 import type {ChainRuntime} from './chain.js';
 
 export function createApp(db:Db,config:Config,signer:P256Signer,chain?:ChainRuntime){
@@ -38,13 +39,15 @@ export function createApp(db:Db,config:Config,signer:P256Signer,chain?:ChainRunt
  app.use('/api/owner/*',async(c,next)=>{c.set('actor',await authenticate(c,db,config));owner(c);await next();});
  app.route('/api/owner/tasks',taskRoutes(db,config));
  app.route('/api/owner/approvals',approvalRoutes(db,config));
+ app.route('/api/owner/runs',runRoutes(db,config));
  if(chain)app.route('/api/owner/permissions',permissionRoutes(db,config,chain));
  app.get('/api/owner/me',async c=>{
   const actor=owner(c);
   const {rows:connections}=await db.query('SELECT c.id,c.name,c.provider,c.agent_address,c.status,c.created_at,p.document AS permission,p.status AS permission_status FROM connections c LEFT JOIN permissions p ON p.connection_id=c.id WHERE c.account_id=$1 ORDER BY c.created_at',[actor.accountId]);
   const {rows:[policy]}=await db.query('SELECT document,gate_address,token_address,currency,activation_tx FROM policies WHERE account_id=$1',[actor.accountId]);
   const {rows:intents}=await db.query('SELECT id,connection_id,merchant_id,currency,amount_minor,amount_atomic,state,reasons,transaction_hash,created_at FROM intents WHERE account_id=$1 ORDER BY created_at DESC LIMIT 50',[actor.accountId]);
-  return c.json({account:{id:actor.accountId,address:actor.address,chainId:config.CHAIN_ID},connections,policy:policy??null,intents});
+  const usage=policy?await transaction(db,tx=>budgetUsage(tx,actor.accountId,connections[0]?.id??'00000000-0000-0000-0000-000000000000',periodIndex(policy.document,Math.floor(Date.now()/1000)))):null;
+  return c.json({account:{id:actor.accountId,address:actor.address,chainId:config.CHAIN_ID},connections,policy:policy??null,intents,usage});
  });
  app.post('/api/owner/connections',async c=>{
   const actor=owner(c);

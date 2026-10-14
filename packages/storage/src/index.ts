@@ -34,9 +34,9 @@ export async function enqueue(tx:Tx,topic:string,dedupeKey:string,payload:unknow
  await tx.query('INSERT INTO outbox(id,topic,dedupe_key,payload) VALUES($1,$2,$3,$4) ON CONFLICT(dedupe_key) DO NOTHING',[randomUUID(),topic,dedupeKey,JSON.stringify(payload)]);
 }
 export interface WorkItem {id:string;topic:string;payload:Record<string,unknown>;lease_token:string;attempts:number}
-export async function claimWork(db:Db,topics:string[],leaseSeconds=60):Promise<WorkItem|null>{
+export async function claimWork(db:Db,topics:string[],leaseSeconds=60,intentId?:string):Promise<WorkItem|null>{
  return transaction(db,async tx=>{
-  const {rows:[row]}=await tx.query(`SELECT id FROM outbox WHERE topic=ANY($1) AND completed_at IS NULL AND available_at<=now() AND (lease_until IS NULL OR lease_until<now()) ORDER BY available_at,id FOR UPDATE SKIP LOCKED LIMIT 1`,[topics]);
+  const {rows:[row]}=await tx.query(`SELECT id FROM outbox WHERE topic=ANY($1) AND ($2::text IS NULL OR payload->>'intentId'=$2) AND completed_at IS NULL AND available_at<=now() AND (lease_until IS NULL OR lease_until<now()) ORDER BY available_at,id FOR UPDATE SKIP LOCKED LIMIT 1`,[topics,intentId??null]);
   if(!row)return null;
   const {rows:[claimed]}=await tx.query('UPDATE outbox SET lease_token=$2,lease_until=now()+($3::int*interval \'1 second\'),attempts=attempts+1 WHERE id=$1 RETURNING *',[row.id,randomUUID(),leaseSeconds]);
   return claimed;

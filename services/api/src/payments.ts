@@ -5,7 +5,7 @@ import {idempotent,preparePurchaseTx,type Db} from '@yours/storage';
 import {verifyCheckout,validateRequest,validateSchema,authorizeCheckout} from '@yours/ucp';
 import type {P256Signer} from '@yours/signing';
 import type {Config} from './config.js';
-import {internalPost} from './internal.js';
+import {internalPost,wakeSettlement} from './internal.js';
 
 const requestSchema=z.object({
  payment:z.object({instruments:z.array(z.object({id:z.string(),handler_id:z.literal('yours-stablecoin'),type:z.literal('stablecoin'),selected:z.literal(true),credential:z.object({type:z.literal('yours_ap2'),mandate_id:z.string().uuid()}).strict()}).strict()).length(1)}).strict(),
@@ -19,22 +19,18 @@ export function paymentRoutes(router:Hono<any>,db:Db,config:Config,signer:P256Si
   const id=z.string().uuid().parse(c.req.param('id'));
   const raw=await c.req.json();validateRequest('checkout','complete',raw);const body=requestSchema.parse(raw);
   const instrument=body.payment.instruments[0],mandateId=instrument.credential.mandate_id;
+  if(actor.mandateId&&actor.mandateId!==mandateId)throw new DomainError('task_outside_run',403);
   const key=c.req.header('Idempotency-Key')??'',etag=c.req.header('If-Match')??null;
   const scope='agent:'+actor.connectionId+':complete:'+id,request={body,etag};
-  // Replay a committed response before asking an authority to verify a checkout
-  // which has already advanced. The transaction below resolves concurrent calls.
-  const {rows:[cached]}=await db.query('SELECT * FROM idempotency WHERE scope=$1 AND key=$2',[scope,key]);
-  if(cached){
-   if(cached.request_hash!==digest(request))throw new DomainError('idempotency_conflict',409);
-   if(cached.status!==null){c.header('ETag','"'+cached.response.yours.revision+'"');return c.json(cached.response,cached.status);}
-  }
-  const {rows:[checkout]}=await db.query("SELECT * FROM merchant_sessions WHERE id=$1 AND kind='checkout' AND actor=$2 AND platform_profile=$3",[id,'agent:'+actor.connectionId,c.get('platform')]);
+  const result=await idempotent(db,scope,key,request,async tx=>{
+   // Serialize retries before verifying a checkout which advances on commit.
+   await tx.query("SET LOCAL idle_in_transaction_session_timeout='30000'");
+  const {rows:[checkout]}=await tx.query("SELECT * FROM merchant_sessions WHERE id=$1 AND kind='checkout' AND actor=$2 AND platform_profile=$3",[id,'agent:'+actor.connectionId,c.get('platform')]);
   if(!checkout)throw new DomainError('session_not_found',404);
   if(checkout.status!=='ready_for_complete'||new Date(checkout.expires_at).getTime()<=Date.now())throw new DomainError('checkout_not_ready',409);
   if(etag!=='"'+checkout.revision+'"')throw new DomainError('revision_conflict',412);
   const jwt=await verifyCheckout(checkout.document,[signer.publicJwk]);
   const verified=await internalPost<any>(config,config.MANDATES_URL,'/v1/verify',{mandate_id:mandateId,checkout_id:id,checkout_jwt:jwt,mandates:body.ap2});
-  const result=await idempotent(db,scope,key,request,async tx=>{
    await tx.query('SELECT id FROM accounts WHERE id=$1 FOR UPDATE',[actor.accountId]);
    const {rows:[current]}=await tx.query('SELECT * FROM merchant_sessions WHERE id=$1 FOR UPDATE',[id]);
    if(current.status!=='ready_for_complete'||current.revision!==checkout.revision||digest(current.document)!==digest(checkout.document))throw new DomainError('checkout_changed',409);
@@ -55,6 +51,7 @@ export function paymentRoutes(router:Hono<any>,db:Db,config:Config,signer:P256Si
    await tx.query("UPDATE merchant_sessions SET status='complete_in_progress',revision=revision+1,document=$2,updated_at=now() WHERE id=$1",[id,JSON.stringify(document)]);
    return {status:202,body:document};
   });
+  await wakeSettlement(config,result.body.yours.intent_id);
   c.header('ETag','"'+result.body.yours.revision+'"');return c.json(result.body,result.status as 202);
  });
 }
