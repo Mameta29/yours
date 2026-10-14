@@ -58,7 +58,7 @@ export function createApp(db:Db,config:Config,signer:P256Signer,chain?:ChainRunt
  app.route('/api/demo',demoRoutes(db,config));
  app.route('/api/auth',authRoutes(db,config));
  app.route('/ucp',merchantRoutes(db,config,signer));
- app.route('/api/agent',agentRoutes(db,config,signer));
+ app.route('/api/agent',agentRoutes(db,config,signer,chain));
  app.use('/api/owner/*',async(c,next)=>{c.set('actor',await authenticate(c,db,config));owner(c);await next();});
  app.route('/api/owner/purchases',purchaseRoutes(db,config));
  app.route('/api/owner/tasks',taskRoutes(db,config));

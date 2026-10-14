@@ -14,6 +14,7 @@ import {readConfig} from '../dist/config.js';
 import {chainRuntime} from '../dist/chain.js';
 import {executePayment} from '../../worker/dist/settlement.js';
 import {processOrderWebhook} from '../../worker/dist/webhooks.js';
+import {externalAgentIntegration} from './external-agent-integration.mjs';
 
 export async function paymentIntegration({root,client,wallet,accounts,manifest,jpyc,humanKey}){
  const db=createDb('postgresql://localhost/yours_test');await migrate(db);
@@ -156,6 +157,8 @@ export async function paymentIntegration({root,client,wallet,accounts,manifest,j
   const denied=await app.request('/api/owner/purchases/'+intentId+'/download',{headers:{Cookie:foreignCookie}});assert.equal(denied.status,404);
   passed.push('signed order webhook delivered over real HTTP','duplicate webhook persists once','durable inbox processed and audited once','completed outbox lease cannot deliver again');
   passed.push('download unavailable before confirmed settlement','actual purchased Markdown delivered to owner','other wallet cannot download the purchase');
+
+  await externalAgentIntegration({root,db,request,send,client,owner,manifest,runtime,productId,signer,passed});
 
   await writeFile(root+'docs/evidence/payment-pipeline.json',JSON.stringify({scope:'Local Anvil, official MetaMask contracts, test ERC20 and real PostgreSQL/AP2 HTTP authority. Production worker logic with random in-memory signing keys. No browser wallet or public Amoy purchase claim.',passed,transactionHash:settled.transactionHash,gate:manifest.gate},null,2)+'\n');
   console.log(JSON.stringify({passed:passed.length,evidence:'docs/evidence/payment-pipeline.json'}));

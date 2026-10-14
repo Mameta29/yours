@@ -51,7 +51,7 @@ app.post('/run',async c=>{
    const id=String(item.payload.intentId);
    if(item.topic==='payment.execute'){
     const result=await executePayment(db,id,runtime);
-    if(['submitted','confirming','approval_required','payment_required'].includes(result.state)){await finishWork(db,item,'awaiting_'+result.state);pending++;continue;}
+    if(['submitted','confirming','approval_required','payment_required','agent_signature_required'].includes(result.state)){await finishWork(db,item,'awaiting_'+result.state);pending++;continue;}
    }else if(item.topic==='order.webhook.received'){
     await processOrderWebhook(db,String(item.payload.source),String(item.payload.eventId));
    }else if(item.topic==='order.webhook'){

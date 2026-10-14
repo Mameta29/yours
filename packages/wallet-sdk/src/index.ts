@@ -8,3 +8,4 @@ export * from './agent-permissions.js';
 export * from './agent-registry-abi.js';
 export * from './yours-gate-abi.js';
 export * from './x402.js';
+export * from './external-payment.js';

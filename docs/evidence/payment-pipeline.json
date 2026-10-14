@@ -35,8 +35,17 @@
     "completed outbox lease cannot deliver again",
     "download unavailable before confirmed settlement",
     "actual purchased Markdown delivered to owner",
-    "other wallet cannot download the purchase"
+    "other wallet cannot download the purchase",
+    "second AI registration preserves shared spent and period anchor",
+    "external holder presents AP2 with the official SDK",
+    "external EVM agent signs its own delegation and intent",
+    "wrong signer and changed challenge rejected",
+    "unsigned external payload cannot be accepted",
+    "agent signatures are idempotent",
+    "external AI completes a real ERC-7710 transfer without hosted-agent signing",
+    "both AIs share the same onchain spending budget",
+    "external AI holds no token balance"
   ],
-  "transactionHash": "0xb41b14e5d2450c363ceaab1703290abbba0d31f6fe6972bb44ab2ae22420ce41",
-  "gate": "0x0da595379b22d7567d84fba888b805f6cb7c3799"
+  "transactionHash": "0x646343ff0be683af725ed05aff65d538addfa45be9afd68cef68d27cf8c86fc5",
+  "gate": "0xe43a72b05a6b12830555ba1dfab94117c9861066"
 }

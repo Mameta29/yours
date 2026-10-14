@@ -8,8 +8,9 @@ import type {Config} from './config.js';
 import {authenticate,type Env} from './auth.js';
 import {internalPost} from './internal.js';
 import {x402Routes} from './x402.js';
+import type {ChainRuntime} from './chain.js';
 
-export function agentRoutes(db:Db,config:Config,signer:P256Signer){
+export function agentRoutes(db:Db,config:Config,signer:P256Signer,chain?:ChainRuntime){
  const router=new Hono<Env>();
  router.use('*',async(c,next)=>{const actor=await authenticate(c,db,config);if(actor.kind!=='agent')throw new DomainError('agent_required',403);c.set('actor',actor);await next();});
  router.get('/tasks',async c=>{
@@ -27,6 +28,6 @@ export function agentRoutes(db:Db,config:Config,signer:P256Signer){
   const result=await internalPost(config,config.MANDATES_URL,'/v1/present',{mandate_id:body.mandateId,checkout_id:body.checkoutId,checkout_jwt:checkoutJwt});
   return c.json({mandates:result,instrumentId:mandate.task.instrument_id});
  });
- x402Routes(router,db,config);
+ x402Routes(router,db,config,chain);
  return router;
 }

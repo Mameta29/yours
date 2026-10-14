@@ -16,7 +16,7 @@ export interface SettlementRuntime {
 const safe=(value:unknown)=>JSON.parse(JSON.stringify(value,(_k,v)=>typeof v==='bigint'?v.toString():v));
 const args=(e:ExecutionEnvelope)=>[e.order,e.funding,e.intent,e.paymentContext,e.fundingContext,e.risk,e.price,e.human,e.signatures,e.route] as const;
 async function loadIntent(db:Db,id:string){
- const {rows:[row]}=await db.query(`SELECT i.*,a.address,c.agent_address,c.status AS connection_status,p.document AS policy,p.revision AS policy_revision,g.context,g.document AS grant FROM intents i JOIN accounts a ON a.id=i.account_id JOIN connections c ON c.id=i.connection_id JOIN policies p ON p.account_id=i.account_id JOIN wallet_grants g ON g.connection_id=i.connection_id AND g.token_address=p.token_address WHERE i.id=$1`,[id]);
+ const {rows:[row]}=await db.query(`SELECT i.*,a.address,c.agent_address,c.provider,c.status AS connection_status,p.document AS policy,p.revision AS policy_revision,g.context,g.document AS grant FROM intents i JOIN accounts a ON a.id=i.account_id JOIN connections c ON c.id=i.connection_id JOIN policies p ON p.account_id=i.account_id JOIN wallet_grants g ON g.connection_id=i.connection_id AND g.token_address=p.token_address WHERE i.id=$1`,[id]);
  if(!row)throw new DomainError('payment_not_found',404);return row;
 }
 async function prepareEnvelope(db:Db,id:string,r:SettlementRuntime){
@@ -27,18 +27,19 @@ async function prepareEnvelope(db:Db,id:string,r:SettlementRuntime){
  const verified=await r.verifyIntent(id);
  if(verified.expires_at<=now)throw new DomainError('mandate_expired',409);
  const checkout=row.snapshot.checkout,amount=BigInt(row.amount_atomic),policy=row.policy.chainPolicy;
- if(row.merchant_id!==r.merchantId||checkout.yours.pay_to.toLowerCase()!==r.payTo.toLowerCase()||checkout.yours.asset.toLowerCase()!==r.token.toLowerCase()||row.agent_address!==r.signers.agent.address.toLowerCase())throw new DomainError('unsupported_payment_binding',422);
+ const hosted=row.provider==='gemini',agent=row.agent_address as Address;
+ if(row.merchant_id!==r.merchantId||checkout.yours.pay_to.toLowerCase()!==r.payTo.toLowerCase()||checkout.yours.asset.toLowerCase()!==r.token.toLowerCase()||hosted&&row.agent_address!==r.signers.agent.address.toLowerCase())throw new DomainError('unsupported_payment_binding',422);
  for(const [role,field] of [['merchant','merchantSigner'],['risk','riskSigner']] as const)if(policy[field].toLowerCase()!==r.signers[role].address.toLowerCase())throw new DomainError('signer_binding_changed',409);
  const expiry=BigInt(Math.min(now+120,verified.expires_at,Math.floor(new Date(row.expires_at).getTime()/1000)));
  const e={...row.grant.expectation,expiry:BigInt(row.grant.expectation.expiry),startTime:BigInt(row.grant.expectation.startTime)};
  const {parents}=validateParents(row.context,e);await verifyParentSignatures(r.client,parents,e);
- const leaf=buildPaymentLeaf(parents,{agent:r.signers.agent.address,gate:r.gate,token:r.token,enforcers:r.enforcers},amount,r.payTo,expiry,BigInt('0x'+randomBytes(32).toString('hex')));
- leaf.signature=await r.signers.agent.signTypedData(delegationTypedData(r.chainId,r.manager,leaf));
- const order={orderId:keccak256(stringToHex(id)),revisionId:keccak256(stringToHex(row.revision+':'+row.snapshot_hash)),policyId:policy.policyId,policyVersion:BigInt(row.policy_revision),periodIndex:BigInt(row.period_index),account:row.address,agent:r.signers.agent.address,shopIdHash:keccak256(stringToHex(row.merchant_id)),payTo:r.payTo,settlementToken:r.token,settlementAmount:amount,basketCommitment:basketCommitment(checkout,('0x'+randomBytes(32).toString('hex')) as Hex),fundingHash:structHash('Funding',emptyFunding),requirementsHash:requirementsHash(r.chainId,r.gate,{settlementToken:r.token,payTo:r.payTo,settlementAmount:amount}),validUntil:expiry};
+ const leaf=buildPaymentLeaf(parents,{agent,gate:r.gate,token:r.token,enforcers:r.enforcers},amount,r.payTo,expiry,BigInt('0x'+randomBytes(32).toString('hex')));
+ if(hosted)leaf.signature=await r.signers.agent.signTypedData(delegationTypedData(r.chainId,r.manager,leaf));
+ const order={orderId:keccak256(stringToHex(id)),revisionId:keccak256(stringToHex(row.revision+':'+row.snapshot_hash)),policyId:policy.policyId,policyVersion:BigInt(row.policy_revision),periodIndex:BigInt(row.period_index),account:row.address,agent,shopIdHash:keccak256(stringToHex(row.merchant_id)),payTo:r.payTo,settlementToken:r.token,settlementAmount:amount,basketCommitment:basketCommitment(checkout,('0x'+randomBytes(32).toString('hex')) as Hex),fundingHash:structHash('Funding',emptyFunding),requirementsHash:requirementsHash(r.chainId,r.gate,{settlementToken:r.token,payTo:r.payTo,settlementAmount:amount}),validUntil:expiry};
  const domain=gateDomain(r.chainId,r.gate),orderHash=digest(domain,'PurchaseOrder',order);
  const intent={orderHash,paymentLeafHash:hashDelegation(leaf),fundingLeafHash:zeroHash,validUntil:expiry},intentHash=digest(domain,'ExecutionIntent',intent);
  const risk={intentHash,riskDigest:evidenceDigest({snapshotHash:row.snapshot_hash,ap2Transaction:verified.transaction_id,policyVersion:row.policy_revision,merchant:row.merchant_id,payTo:r.payTo,token:r.token,rules:'verified-ap2-and-enrolled-merchant-v1'}),rulesHash:policy.riskRulesHash,reasonMask:0,checkedAt:BigInt(now),validUntil:BigInt(Math.min(now+60,Number(expiry)))};
- const signatures={merchant:await r.signers.merchant.signTypedData({domain,types:gateTypes,primaryType:'PurchaseOrder',message:order}),agent:await r.signers.agent.signTypedData({domain,types:gateTypes,primaryType:'ExecutionIntent',message:intent}),risk:await r.signers.risk.signTypedData({domain,types:gateTypes,primaryType:'RiskStamp',message:risk}),price:'0x' as Hex,human:'0x' as Hex};
+ const signatures={merchant:await r.signers.merchant.signTypedData({domain,types:gateTypes,primaryType:'PurchaseOrder',message:order}),agent:hosted?await r.signers.agent.signTypedData({domain,types:gateTypes,primaryType:'ExecutionIntent',message:intent}):'0x' as Hex,risk:await r.signers.risk.signTypedData({domain,types:gateTypes,primaryType:'RiskStamp',message:risk}),price:'0x' as Hex,human:'0x' as Hex};
  const envelope:ExecutionEnvelope={order,funding:emptyFunding,intent,paymentContext:encodeDelegations([leaf,...parents]),fundingContext:'0x',risk,price:emptyPrice,human:emptyApproval,signatures,route:'0x'};
  return envelope;
 }
@@ -77,10 +78,11 @@ export async function executePayment(db:Db,id:string,r:SettlementRuntime){
   if(!prepared){
    const envelope=await prepareEnvelope(db,id,r);
    const payload=paymentPayload(envelope,r.chainId,r.gate,r.manager,r.origin+'/api/agent/payments/'+id,keccak256(stringToHex(id)));
-   await db.query('INSERT INTO payment_envelopes(intent_id,envelope,payload,payload_hash) VALUES($1,$2,$3,$4) ON CONFLICT(intent_id) DO NOTHING',[id,JSON.stringify(safe(envelope)),JSON.stringify(payload),snapshotDigest(payload)]);
+   await db.query('INSERT INTO payment_envelopes(intent_id,envelope,payload,payload_hash,signing_challenge) VALUES($1,$2,$3,$4,$4) ON CONFLICT(intent_id) DO NOTHING',[id,JSON.stringify(safe(envelope)),JSON.stringify(payload),snapshotDigest(payload)]);
    ({rows:[prepared]}=await db.query('SELECT * FROM payment_envelopes WHERE intent_id=$1',[id]));
   }
   if(row.state==='approval_required')return {state:'approval_required'};
+  if(prepared.envelope.signatures.agent==='0x')return {state:'agent_signature_required'};
   if(!prepared.accepted_at)return {state:'payment_required'};
   const unsigned=await transactionTerms(db,id,r,parseEnvelope(prepared.envelope));
   journal=await claimTransaction(db,{intentId:id,chainId:r.chainId,signer:r.signers.relayer.address,pendingNonce:await r.client.getTransactionCount({address:r.signers.relayer.address,blockTag:'pending'}),unsigned});
