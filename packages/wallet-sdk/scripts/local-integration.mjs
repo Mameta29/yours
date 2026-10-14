@@ -128,3 +128,8 @@ await writeFile(root + 'docs/evidence/local-chain.json', JSON.stringify(evidence
 await mkdir(root + '.local', { recursive: true });
 await writeFile(root + '.local/local-chain.json', JSON.stringify({chainId,gate:gate.address,registry:registry.address,manager:manager.address,accountImplementation:implementation.address,jpyc:jpyc.address,usdc:usdc.address,enforcers,contracts:[],addresses:{relayer:accounts.relayer.address,agent:accounts.agent.address,merchant:accounts.merchantSigner.address,risk:accounts.riskSigner.address,human:accounts.humanSigner.address,price:accounts.priceSigner.address}}, null, 2) + '\n');
 console.log(JSON.stringify({ passed: evidence.passed.length, evidence: 'docs/evidence/local-chain.json', scope: evidence.scope }));
+if(process.env.PAYMENT_PIPELINE==='1'){
+ const {paymentIntegration}=await import('../../../services/api/scripts/payment-integration.mjs');
+ const manifest=JSON.parse(await readFile(root+'.local/local-chain.json','utf8'));
+ await paymentIntegration({root,client,wallet,accounts,manifest,jpyc});
+}

@@ -138,6 +138,36 @@ importers:
         specifier: ^4.20.5
         version: 4.23.15
 
+  services/worker:
+    dependencies:
+      '@hono/node-server':
+        specifier: 2.1.5
+        version: 2.1.5(hono@4.13.13)
+      '@yours/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@yours/signing':
+        specifier: workspace:*
+        version: link:../../packages/signing
+      '@yours/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
+      '@yours/ucp':
+        specifier: workspace:*
+        version: link:../../packages/ucp
+      '@yours/wallet-sdk':
+        specifier: workspace:*
+        version: link:../../packages/wallet-sdk
+      google-auth-library:
+        specifier: 10.9.1
+        version: 10.9.1
+      hono:
+        specifier: 4.13.13
+        version: 4.13.13
+      viem:
+        specifier: 2.56.9
+        version: 2.56.9(typescript@5.9.3)(zod@3.25.76)
+
 packages:
 
   '@adraffy/ens-normalize@1.11.1':

@@ -1,0 +1,21 @@
+{
+  "scope": "Local Anvil, official MetaMask contracts, test ERC20 and real PostgreSQL/AP2 HTTP authority. Production worker logic with random in-memory signing keys. No browser wallet or public Amoy purchase claim.",
+  "passed": [
+    "owner SIWE and real signed wallet delegation",
+    "fresh owner task consent issues AP2",
+    "signed UCP checkout and real AP2 presentation",
+    "atomic mandate consumption and budget reservation",
+    "idempotent complete",
+    "raw transaction persisted before broadcast",
+    "lost broadcast response recovered by same hash",
+    "five confirmations before order creation",
+    "idempotent chain reconciliation",
+    "inventory decremented exactly once",
+    "merchant receives 600 test JPYC",
+    "AI token balance stays zero",
+    "official UCP order schema",
+    "signed AP2 payment and checkout receipts"
+  ],
+  "transactionHash": "0x776cdd33f199bf322f82b0a05949ddc29a16c8fcbbd5fc1e761ae1dc2250284e",
+  "gate": "0x3d43acff25a755645c14506356d9f564b3ae4868"
+}

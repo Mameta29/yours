@@ -1,7 +1,7 @@
 import {randomUUID} from 'node:crypto';
 import {DomainError,digest} from '@yours/domain';
 import {keccak256,parseTransaction,recoverTransactionAddress,type Hex} from 'viem';
-import {transaction,audit,type Db} from './index.js';
+import {transaction,audit,type Db,type Tx} from './index.js';
 export interface TransactionClaim {id:string;intent_id:string;chain_id:number;signer:string;nonce:string;unsigned_payload:Record<string,unknown>;raw_transaction:string|null;transaction_hash:string|null;state:string;lease_token:string}
 export async function claimTransaction(db:Db,input:{intentId:string;chainId:number;signer:string;pendingNonce:number;unsigned:Record<string,unknown>;leaseSeconds?:number}):Promise<TransactionClaim>{
  if(!Number.isSafeInteger(input.pendingNonce)||input.pendingNonce<0||!/^0x[0-9a-f]{40}$/i.test(input.signer))throw new DomainError('invalid_transaction_claim',422);
@@ -54,8 +54,11 @@ export async function markBroadcast(db:Db,id:string):Promise<void>{
   await tx.query("UPDATE intents SET state='submitted',transaction_hash=$2,updated_at=now() WHERE id=$1 AND state IN ('signing','submitted')",[row.intent_id,row.transaction_hash]);
  });
 }
-export async function recordChainReceipt(db:Db,id:string,receipt:Record<string,unknown>,success:boolean):Promise<void>{
+export async function recordChainReceipt(db:Db,id:string,receipt:Record<string,unknown>,success:boolean,finalize?:(tx:Tx,intent:any)=>Promise<void>):Promise<void>{
  await transaction(db,async tx=>{
+  const {rows:[identity]}=await tx.query('SELECT i.account_id FROM signed_transactions t JOIN intents i ON i.id=t.intent_id WHERE t.id=$1',[id]);
+  if(!identity)throw new DomainError('transaction_not_found',404);
+  await tx.query('SELECT id FROM accounts WHERE id=$1 FOR UPDATE',[identity.account_id]);
   const {rows:[row]}=await tx.query('SELECT * FROM signed_transactions WHERE id=$1 FOR UPDATE',[id]);if(!row)throw new DomainError('transaction_not_found',404);
   if(['confirmed','reverted'].includes(row.state)){
    if(digest(row.receipt)!==digest(receipt))throw new DomainError('receipt_conflict',409);return;
@@ -63,6 +66,7 @@ export async function recordChainReceipt(db:Db,id:string,receipt:Record<string,u
   if(!['signed','broadcast'].includes(row.state))throw new DomainError('transaction_not_signed',409);
   await tx.query('UPDATE signed_transactions SET state=$2,receipt=$3,updated_at=now() WHERE id=$1',[id,success?'confirmed':'reverted',JSON.stringify(receipt)]);
   const {rows:[intent]}=await tx.query('UPDATE intents SET state=$2,transaction_hash=$3,updated_at=now() WHERE id=$1 RETURNING *',[row.intent_id,success?'confirmed':'failed',row.transaction_hash]);
+  if(finalize)await finalize(tx,intent);
   await audit(tx,intent.account_id,'worker','transaction.'+(success?'confirmed':'reverted'),id,{intentId:row.intent_id,transactionHash:row.transaction_hash});
  });
 }
