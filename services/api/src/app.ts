@@ -22,6 +22,9 @@ import {demoRoutes} from './demo.js';
 import {publicRoutes} from './public.js';
 import {runRoutes} from './runs.js';
 import type {ChainRuntime} from './chain.js';
+import {lineOwnerRoutes,lineWebhookRoutes} from './line.js';
+import {lineOrderRoutes} from './line-orders.js';
+import {chatJobRoutes} from './chat-jobs.js';
 
 export function createApp(db:Db,config:Config,signer:P256Signer,chain?:ChainRuntime){
  const app=new Hono<Env>();
@@ -50,6 +53,9 @@ export function createApp(db:Db,config:Config,signer:P256Signer,chain?:ChainRunt
  });
  app.route('/',publicRoutes());
  app.route('/',webhookRoutes(db,config,signer));
+ app.route('/',lineWebhookRoutes(db,config,signer));
+ app.route('/',lineOrderRoutes(db,config));
+ app.route('/',chatJobRoutes(db,config,signer));
  app.get('/health',c=>c.json({ok:true,service:'yours-api'}));
  app.get('/ready',async c=>{await db.query('SELECT 1');return c.json({ok:true});});
  app.get('/api/config',c=>c.json({name:'yours',origin:config.PUBLIC_ORIGIN,chainId:config.CHAIN_ID,network:config.CHAIN_ID===80002?'Polygon Amoy':'Local test chain',ucpVersion:UCP_VERSION,merchant:{id:config.MERCHANT_ID,name:config.MERCHANT_NAME},merchants:merchants(config),paymentsConfigured:Boolean(chain&&config.MANDATES_URL&&config.GATE_ADDRESS&&config.JPYC_ADDRESS&&config.MERCHANT_PAY_TO),gate:config.GATE_ADDRESS,token:config.JPYC_ADDRESS,geminiConfigured:Boolean(config.AGENT_URL)}));
@@ -66,6 +72,7 @@ export function createApp(db:Db,config:Config,signer:P256Signer,chain?:ChainRunt
  app.route('/api/owner/tasks',taskRoutes(db,config,signer));
  app.route('/api/owner/approvals',approvalRoutes(db,config));
  app.route('/api/owner/runs',runRoutes(db,config));
+ app.route('/api/owner/line',lineOwnerRoutes(db,config));
  if(chain)app.route('/api/owner/permissions',permissionRoutes(db,config,chain));
  app.get('/api/owner/me',async c=>{
   const actor=owner(c);

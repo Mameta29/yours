@@ -38,7 +38,7 @@ const refreshes = new WeakMap<
   Map<string, { expires: number; pending?: Promise<void> }>
 >();
 /** External stock is a search cache. Every purchase obtains a fresh real EC quote. */
-export async function syncEcCatalog(db: Db, config: Config) {
+export async function syncEcCatalog(db: Db, config: Config, force = false) {
   let cache = refreshes.get(db);
   if (!cache) {
     cache = new Map();
@@ -48,7 +48,7 @@ export async function syncEcCatalog(db: Db, config: Config) {
     ecMerchants(config).map(async (merchant) => {
       const previous = cache!.get(merchant.id);
       if (previous?.pending) return previous.pending;
-      if (previous && previous.expires > Date.now()) return;
+      if (!force && previous && previous.expires > Date.now()) return;
       const entry: { expires: number; pending?: Promise<void> } = {
         expires: Date.now() + 60000,
       };

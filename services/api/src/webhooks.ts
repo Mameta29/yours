@@ -8,15 +8,15 @@ import type {P256Signer} from '@yours/signing';
 import type {Config} from './config.js';
 const identity=new OAuth2Client();
 
-async function requireWorker(c:any,config:Config){
+export async function requireWorker(c:any,config:Config,expectedIdentity=config.WORKER_IDENTITY){
  if(config.NODE_ENV!=='production')return; // Local integration only; Cloud deployment always uses production.
- if(!config.WORKER_IDENTITY)throw new DomainError('worker_identity_not_configured',503);
+ if(!expectedIdentity)throw new DomainError('worker_identity_not_configured',503);
  const token=c.req.header('Authorization')?.match(/^Bearer (\S+)$/)?.[1];
  if(!token)throw new DomainError('service_identity_required',401);
  try{
   const ticket=await identity.verifyIdToken({idToken:token,audience:config.PUBLIC_ORIGIN});
   const claims=ticket.getPayload();
-  if(claims?.email!==config.WORKER_IDENTITY||claims.email_verified!==true)throw new Error('wrong_caller');
+  if(claims?.email!==expectedIdentity||claims.email_verified!==true)throw new Error('wrong_caller');
  }catch{throw new DomainError('service_identity_invalid',403);}
 }
 export function webhookRoutes(db:Db,config:Config,signer:P256Signer){

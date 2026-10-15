@@ -280,6 +280,7 @@ export async function authorizeEcCheckout(
   actor: Owner,
   consentId: string,
   signature?: string,
+  delegationProof?: string,
 ) {
   const {
     rows: [row],
@@ -289,11 +290,11 @@ export async function authorizeEcCheckout(
   );
   if (!row) return;
   if (row.authorized_at) return;
-  if (!signature) throw new DomainError("ec_owner_authorization_required", 422);
+  if (!signature && !delegationProof) throw new DomainError("ec_owner_authorization_required", 422);
   const merchant = ecMerchants(config).find((m) => m.id === row.merchant_id);
   if (!merchant) throw new DomainError("merchant_not_enrolled", 422);
   await permission(db, actor, row.connection_id);
-  await ecClient(config, merchant).authorize(row.quote as EcQuote, signature);
+  await ecClient(config, merchant).authorize(row.quote as EcQuote, signature, delegationProof);
   await transaction(db, async (tx) => {
     await tx.query("SELECT id FROM accounts WHERE id=$1 FOR UPDATE", [
       actor.accountId,
@@ -332,7 +333,7 @@ export async function authorizeEcCheckout(
     );
     await tx.query(
       "UPDATE ec_reservations SET authorized_at=now(),signature_hash=$2 WHERE id=$1",
-      [row.id, digest(signature)],
+      [row.id, digest(signature ?? delegationProof)],
     );
     await audit(
       tx,

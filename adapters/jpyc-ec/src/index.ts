@@ -324,15 +324,15 @@ export class JpycEcClient {
       })),
     };
   }
-  async authorize(quote: EcQuote, signature: string) {
-    z.string()
-      .regex(/^0x[0-9a-fA-F]{130}$/)
-      .parse(signature);
+  async authorize(quote: EcQuote, signature?: string, delegationProof?: string) {
+    if (Boolean(signature) === Boolean(delegationProof)) throw new DomainError('ec_exactly_one_proof_required', 422);
+    if (signature) z.string().regex(/^0x[0-9a-fA-F]{130}$/).parse(signature);
+    if (delegationProof) z.string().min(100).max(16384).parse(delegationProof);
     if (quote.expiresAt <= Date.now())
       throw new DomainError("ec_quote_expired", 409);
     const response = await this.request("/api/v1/checkout/authorize-transfer", {
       reservation_id: quote.reservationId,
-      signature,
+      ...(delegationProof ? { delegation_proof: delegationProof } : { signature }),
     });
     if (
       response.status !== 200 ||

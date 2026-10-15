@@ -17,6 +17,11 @@ export const configSchema=z.object({
  WORKER_IDENTITY:z.string().email().optional(),WORKER_URL:z.string().url().optional(),MANDATES_URL:z.string().url().optional(),AGENT_URL:z.string().url().optional(),
  TRUSTED_PROFILE_ORIGINS:z.string().default(''),
  EC_MERCHANTS_JSON:z.string().default('[]'),
+ LINE_CHANNEL_SECRET:z.string().optional(),LINE_CHANNEL_ACCESS_TOKEN:z.string().optional(),
+ LINE_BOT_ID:z.string().optional(),LINE_LEGACY_WEBHOOK:z.string().url().optional(),
+ CHAT_ENCRYPTION_KEY:z.string().optional(),CHAT_WORKER_URL:z.string().url().optional(),
+ CHAT_WORKER_IDENTITY:z.string().email().optional(),
+ LINE_BRIDGE_URL:z.string().url().optional(),
 });
 export type Config=z.infer<typeof configSchema>;
 export function readConfig(env:NodeJS.ProcessEnv=process.env):Config{

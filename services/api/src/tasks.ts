@@ -19,13 +19,10 @@ const taskRequest=z.object({
  maxAmount:z.number().int().positive().safe(),minutes:z.number().int().min(5).max(1440).default(60),
 }).strict();
 
-export function taskRoutes(db:Db,config:Config,signer:P256Signer){
- const router=new Hono<Env>();
- router.post('/prepare',async c=>{
-  const actor=owner(c),request=taskRequest.parse(await c.req.json());
+export async function prepareTask(db:Db,config:Config,signer:P256Signer,actor:Extract<import('./auth.js').Actor,{kind:'owner'}>,request:z.infer<typeof taskRequest>){
   if(!config.GATE_ADDRESS||!config.MANDATES_URL)throw new DomainError('payments_not_configured',503);
   const merchant=merchantFor(config,request.merchantId);
-  if(merchant.adapter==='jpyc-ec')return c.json(await prepareEcCheckout(db,config,signer,actor,request),201);
+  if(merchant.adapter==='jpyc-ec')return prepareEcCheckout(db,config,signer,actor,request);
   const ids=request.items.map(i=>i.id);
   if(new Set(ids).size!==ids.length)throw new DomainError('duplicate_line_item',422);
   const result=await transaction(db,async tx=>{
@@ -52,8 +49,12 @@ export function taskRoutes(db:Db,config:Config,signer:P256Signer){
    await audit(tx,actor.accountId,'owner:'+actor.accountId,'task.consent_requested',id,{taskHash:hash,connectionId:connection.id});
    return {id,task,typedData:{domain:consentDomain(config.CHAIN_ID,config.GATE_ADDRESS as Address),types:{TaskConsent:taskConsentTypes.TaskConsent},primaryType:'TaskConsent',message:{account:actor.address,connectionId:keccak256(stringToHex(connection.id)),taskHash:'0x'+hash,nonce,validUntil:String(validUntil)}}};
   });
-  return c.json(result,201);
- });
+  return result;
+}
+
+export function taskRoutes(db:Db,config:Config,signer:P256Signer){
+ const router=new Hono<Env>();
+ router.post('/prepare',async c=>c.json(await prepareTask(db,config,signer,owner(c),taskRequest.parse(await c.req.json())),201));
  router.post('/:id/approve',async c=>{
   const actor=owner(c),id=z.string().uuid().parse(c.req.param('id'));
   const request=z.object({signature:z.string().regex(/^0x[0-9a-fA-F]{130}$/),transferSignature:z.string().regex(/^0x[0-9a-fA-F]{130}$/).optional()}).strict().parse(await c.req.json());
