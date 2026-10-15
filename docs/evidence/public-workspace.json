@@ -1,0 +1,74 @@
+{
+  "checkedAt": "2026-10-15T11:34:42.584Z",
+  "origin": "https://yours-api-110852561536.asia-northeast1.run.app",
+  "source": "e9b57cd",
+  "imageTag": "workspace-20261015-v2",
+  "scope": "Public deployed console, real anonymous Google ADK/Vertex AI catalog call and actual Markdown rendering. Browser has no owner session; no signatures or purchases performed by this check. The owner purchase is independently recorded in public-owner-purchase.json.",
+  "assets": [
+    {
+      "path": "/assets/index-9oR0s_Ow.js",
+      "sha256": "89ab38e93894bdb93b9c301d5fb4ea0c2416f247d37bd78a8e612c8c0dbda7bf"
+    },
+    {
+      "path": "/assets/index-BNEct95f.css",
+      "sha256": "d32c6063d4269acf225ec0216cf21e5723aa8e1a2ec19f30e7203d50c5f4197e"
+    },
+    {
+      "path": "/assets/index-DQzjtZ4Q.js",
+      "sha256": "359a9f7deb7648943fa0f18bbd03925075c4a869b3b3d24673af5e263295626e"
+    },
+    {
+      "path": "/assets/react-C2KYkj3z.js",
+      "sha256": "cddf8aa418deea97471d51c7cdddcc5a5afeab92ae49ee272d87f0784ff75bc1"
+    },
+    {
+      "path": "/assets/wallet-DUkwcg3T.js",
+      "sha256": "10bcb8fd1d1e91054d00f8c747e0b4b59ea75296d92af4d390bcbdaed18b1b4d"
+    },
+    {
+      "path": "/assets/wallet-LayVxq18.js",
+      "sha256": "3245ad25925a947b262da3939c4385b2cad593034c78bc8deba0c7c145d523cc"
+    }
+  ],
+  "viewports": [
+    {
+      "width": 1440,
+      "overflow": false
+    },
+    {
+      "width": 1024,
+      "overflow": false
+    },
+    {
+      "width": 768,
+      "overflow": false
+    },
+    {
+      "width": 390,
+      "overflow": false
+    }
+  ],
+  "pageErrors": [],
+  "gemini": {
+    "id": "ae45af0c-d98d-49c2-aa70-51ae7e14884c",
+    "status": "completed",
+    "result": {
+      "text": "カタログの全商品一覧です。\n\n| 商品名 | ショップ | 価格 | 在庫状況 |\n| :--- | :--- | :--- | :--- |\n| お米 5kg / Rice 5 kg | CHEAP RICE SHOP | 400 JPY | 在庫切れ |\n| お米 10kg / Rice 10 kg | CHEAP RICE SHOP | 800 JPY | 在庫あり |\n| 新潟県産コシヒカリ 5kg / Koshihikari 5 kg | HIGH RICE SHOP | 1,200 JPY | 在庫あり |\n| 新潟県産コシヒカリ 10kg / Koshihikari 10 kg | HIGH RICE SHOP | 2,400 JPY | 在庫あり |\n| 個人プロジェクト計画キット | yours Market | 1,200 JPY | 在庫あり |\n| 旅の持ち物チェックリスト | yours Market | 600 JPY | 在庫あり |\n| 週次ふりかえりテンプレート | yours Market | 300 JPY | 在庫あり |",
+      "events": [
+        {
+          "type": "catalog.search",
+          "at": 1792064048,
+          "count": 6
+        },
+        {
+          "type": "catalog.search",
+          "at": 1792064062,
+          "count": 1
+        }
+      ],
+      "model": "gemini-3.8-flash",
+      "framework": "Google ADK",
+      "readOnly": true
+    }
+  }
+}

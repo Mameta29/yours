@@ -23,6 +23,7 @@ scriptはchain ID・Anvil・loopback URL・framework commitを検証し、生成
 | --- | --- |
 | [cloud-services.json](cloud-services.json) | 公開Cloud Run 4サービス・公開範囲・DB・HSM公開鍵 |
 | [public-console.json](public-console.json) | 公開画面の実Chrome表示・配備済みasset |
+| [public-workspace.json](public-workspace.json) | 新画面の公開配備、全6 asset一致、4画面幅、実Geminiの7商品検索とMarkdown表 |
 | [public-owner-permission.json](public-owner-permission.json) | 本人の実MetaMask登録完了報告、API有効化200、公開AmoyのGate/Registry有効状態と上限を照合。購入とは区別 |
 | [public-owner-purchase.json](public-owner-purchase.json) | 公開Amoyで本人の300 test JPYC購入。2 RPCでreceipt・Gate・正確なtoken移動を照合。公開Gemini/UCP/AP2/x402、download 200を確認 |
 | [workspace-browser.json](workspace-browser.json) | 新画面のMarkdown・状態更新・残高更新・PC/390px表示。ChromeとHTTP fixtureでのUI検証 |

@@ -50,7 +50,7 @@ Polygon Amoyにyours専用Gate `0x42eec579df8fb1f87ae3bddbb90c6a4a9f790504` とR
 
 | service | revision | image tag | source |
 | --- | --- | --- | --- |
-| API / Console | `yours-api-00010-jsk` | `wallet-permissions-20261014` | `c4d7287` |
+| API / Console | `yours-api-00011-7sb` | `workspace-20261015-v2` | `e9b57cd` |
 | worker | `yours-worker-00006-z4v` | `commerce-20261014` | `c785810` |
 | mandates | `yours-mandates-00006-cjn` | `commerce-20261014` | `c785810` |
 | Gemini agent | `yours-agent-00006-98c` | `catalog-20261014` | `55b074d` |
@@ -81,7 +81,7 @@ UCP RFC 9421署名、API keyとplatform profileの結び付け、DNSを固定し
 
 2026-10-15 19:54 JST、本人がyours Marketの「週次ふりかえりテンプレート」を購入。Cloud RunのGemini実行→UCP checkout→AP2提示→HTTP 402→x402受理を照合し、19:55のdelivery/download 200も確認。Amoyの2 RPCで成功receipt・canonical block・Gateの注文IDと、ownerからmerchantへの300 test JPYCのTransferを独立に照合した。[公開購入の証拠](evidence/public-owner-purchase.json)。本人の秘密鍵は取得していない。外部ECへの購入はこの証拠に含まない。
 
-管理画面を依頼・条件・予算が同時に見える配置へ整理。Markdownの表・リスト・強調を安全に表示し、実購入の状態と監査記録から4段階の進捗を表示。決済確定時にwallet残高も更新する。実行中の再照会は2秒間隔、検索tool記録は応答後に表示。過去の実行を再生・再送する機能は設けない。[設計](design/CONSOLE-EXPERIENCE.md)と[撮影手順](DEMO-SCRIPT.md)。consoleの安全性・状態表示12テスト、ChromeのUI 10項目、既存の決済68項目と登録22項目を確認。配備情報は上のrevision表で管理する。
+管理画面を依頼・条件・予算が同時に見える配置へ整理。Markdownの表・リスト・強調を安全に表示し、実購入の状態と監査記録から4段階の進捗を表示。決済確定時にwallet残高も更新する。実行中の再照会は2秒間隔、検索tool記録は応答後に表示。過去の実行を再生・再送する機能は設けない。[設計](design/CONSOLE-EXPERIENCE.md)と[撮影手順](DEMO-SCRIPT.md)。consoleの安全性・状態表示12テスト、ChromeのUI 10項目、既存の決済68項目と登録22項目を確認。Cloud Build `d073ff03-5c1c-47cb-b404-e718af2e97e2`でAPI/Consoleを配備し、`yours-api-00011-7sb`へ100%切替。公開4サービスの確認、全6 JS/CSSのbyte一致、1440/1024/768/390pxの実Chrome表示、実Geminiによる全7商品検索とMarkdown表を確認した。[公開UIとGemini](evidence/public-workspace.json)。署名鍵・IAM・DBの変更はない。アプリのsource `e9b57cd`を含む[GitHub CI 38727794909](https://github.com/Mameta29/yours/actions/runs/38727794909)も、追加したワークスペースのChrome検証まで全項目成功。
 
 ## 既存ECの接続（実装・配備済み）
 
