@@ -13,10 +13,9 @@ export function purchaseProgress(run, tasks, intents, audit = []) {
       )
     : [];
   const paid = state === "confirmed" && /^0x[0-9a-f]{64}$/i.test(hash ?? "");
-  const stopped =
-    ["failed", "canceled"].includes(state) ||
-    (!intent && Boolean(task.revoked_at || run.status === "failed"));
-  const needsCheck = !intent && run.status === "completed";
+  const stopped = ["failed", "canceled"].includes(state);
+  // A runner/network failure says nothing about an already-submitted payment.
+  const needsCheck = !intent && ["completed", "failed"].includes(run.status);
   const attention = state === "approval_required";
   const rulesPassed =
     ["authorized", "signing", "submitted", "confirmed"].includes(state) ||

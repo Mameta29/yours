@@ -73,4 +73,14 @@ describe("payment progress comes from authenticated records", () => {
     expect(p.steps[2].status).toBe("waiting");
     expect(p.received).toBe(false);
   });
+  it("treats a failed runner as unknown, not proof that no payment happened", () => {
+    const p = purchaseProgress(
+      { mandate_id: task.id, status: "failed" },
+      [task],
+      [],
+    );
+    expect(p.paid).toBe(false);
+    expect(p.stopped).toBe(false);
+    expect(p.needsCheck).toBe(true);
+  });
 });

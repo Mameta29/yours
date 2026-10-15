@@ -71,3 +71,13 @@ jobs:
       - name: Browser setup and interruption recovery
         run: |
           node services/api/scripts/browser-permissions.mjs
+      - name: Workspace presentation and payment-state polling
+        run: |
+          pnpm --filter @yours/console exec vite preview --host 127.0.0.1 --port 4178 --strictPort > .local/console-preview.log 2>&1 &
+          yours_console_pid=$!
+          trap 'kill "$yours_console_pid"' EXIT
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4178 > /dev/null; then break; fi
+            sleep 1
+          done
+          node services/api/scripts/workspace-browser.mjs
