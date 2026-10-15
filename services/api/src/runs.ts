@@ -19,7 +19,7 @@ export function runRoutes(db: Db, config: Config) {
   router.get("/", async (c) => {
     const a = owner(c);
     const { rows } = await db.query(
-      "SELECT id,message,status,result,created_at FROM agent_runs WHERE account_id=$1 ORDER BY created_at DESC LIMIT 20",
+      "SELECT id,client_request_id,connection_id,mandate_id,message,status,result,created_at FROM agent_runs WHERE account_id=$1 ORDER BY created_at DESC LIMIT 20",
       [a.accountId],
     );
     return c.json({ runs: rows });

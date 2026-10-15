@@ -144,6 +144,17 @@ it("issues an agent-only run credential and invalidates it on completion; retrie
   expect(calls).toBe(count);
   expect((await post({ ...body, message: "different" })).status).toBe(409);
   expect(JSON.stringify(result)).not.toContain(lastToken);
+  const history = await (
+    await app.request("/api/owner/runs", { headers })
+  ).json();
+  expect(history.runs.find((run: any) => run.id === result.id)).toMatchObject({
+    client_request_id: body.requestId,
+    connection_id: connection,
+    mandate_id: null,
+    status: "completed",
+  });
+  expect(JSON.stringify(history)).not.toContain(lastToken);
+  expect((await app.request("/api/owner/runs")).status).toBe(401);
 });
 it("invalidates the credential when the private runner fails", async () => {
   expect(
@@ -181,9 +192,35 @@ it("does not issue spending credentials for read-only conversations or foreign c
   ).toBe(403);
 });
 
-it('public trial cannot receive an agent credential and enforces same-origin requests',async()=>{
- const response=await app.request('/api/demo/runs',{method:'POST',headers:{'Content-Type':'application/json',Origin:'http://localhost:8080','X-Forwarded-For':randomUUID()},body:JSON.stringify({message:'商品を探して'})});
- expect(response.status).toBe(200);expect((await response.json()).result.readOnly).toBe(true);expect(lastToken).toBe(null);
- const foreign=await app.request('/api/demo/runs',{method:'POST',headers:{'Content-Type':'application/json',Origin:'https://evil.example'},body:JSON.stringify({message:'商品を探して'})});expect(foreign.status).toBe(403);
- const injected=await app.request('/api/demo/runs',{method:'POST',headers,body:JSON.stringify({message:'商品を探して',agent_token:'must-not-be-forwarded'})});expect(injected.status).toBe(422);
+it("public trial cannot receive an agent credential and enforces same-origin requests", async () => {
+  const response = await app.request("/api/demo/runs", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Origin: "http://localhost:8080",
+      "X-Forwarded-For": randomUUID(),
+    },
+    body: JSON.stringify({ message: "商品を探して" }),
+  });
+  expect(response.status).toBe(200);
+  expect((await response.json()).result.readOnly).toBe(true);
+  expect(lastToken).toBe(null);
+  const foreign = await app.request("/api/demo/runs", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Origin: "https://evil.example",
+    },
+    body: JSON.stringify({ message: "商品を探して" }),
+  });
+  expect(foreign.status).toBe(403);
+  const injected = await app.request("/api/demo/runs", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      message: "商品を探して",
+      agent_token: "must-not-be-forwarded",
+    }),
+  });
+  expect(injected.status).toBe(422);
 });
