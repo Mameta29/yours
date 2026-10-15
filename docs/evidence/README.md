@@ -24,6 +24,8 @@ scriptはchain ID・Anvil・loopback URL・framework commitを検証し、生成
 | [cloud-services.json](cloud-services.json) | 公開Cloud Run 4サービス・公開範囲・DB・HSM公開鍵 |
 | [public-console.json](public-console.json) | 公開画面の実Chrome表示・配備済みasset |
 | [public-owner-permission.json](public-owner-permission.json) | 本人の実MetaMask登録完了報告、API有効化200、公開AmoyのGate/Registry有効状態と上限を照合。購入とは区別 |
+| [public-owner-purchase.json](public-owner-purchase.json) | 公開Amoyで本人の300 test JPYC購入。2 RPCでreceipt・Gate・正確なtoken移動を照合。公開Gemini/UCP/AP2/x402、download 200を確認 |
+| [workspace-browser.json](workspace-browser.json) | 新画面のMarkdown・状態更新・残高更新・PC/390px表示。ChromeとHTTP fixtureでのUI検証 |
 | [gemini-cloud.json](gemini-cloud.json) | Google ADK / Vertex AIによる実カタログ検索 |
 | [gemini-ec-cloud.json](gemini-ec-cloud.json) | 公開Geminiが既存ECの2店舗を検索し、実価格・在庫を回答 |
 | [gemini-paginated-cloud.json](gemini-paginated-cloud.json) | 公開GeminiがUCP cursorで6件→1件を取得し、実商品7件を回答 |
@@ -35,4 +37,4 @@ scriptはchain ID・Anvil・loopback URL・framework commitを検証し、生成
 | [metamask-7715-compatibility.json](metamask-7715-compatibility.json) | SDKのERC-7715要求と公式MetaMask allowance builder/decoderの照合6項目。拡張UI・公開登録とは区別 |
 | [browser-permissions.json](browser-permissions.json) | EIP-7702・ERC-7715登録・中断再開・再接続22項目。raw owner委任を拒否する試験用providerとChrome |
 
-公開AmoyのGate配備は[manifest](../../deployments/amoy.json)で確認する。本人のスマートアカウント設定取引は成功receiptと現在の実装を照合済み。AI権限登録の完了もAPI・公開chainで照合済み。公開購入は別途確認が必要。
+公開AmoyのGate配備は[manifest](../../deployments/amoy.json)で確認する。本人のスマートアカウント設定取引は成功receiptと現在の実装を照合済み。AI権限登録の完了もAPI・公開chainで照合済み。yours Marketの公開300 test JPYC購入も確認済み。外部EC・外部AI client単体の公開購入は未確認。

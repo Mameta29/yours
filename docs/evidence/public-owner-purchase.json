@@ -1,0 +1,47 @@
+{
+  "checkedAt": "2026-10-15T11:05:17.552Z",
+  "chainId": 80002,
+  "scope": "Public Amoy, real owner consent in MetaMask, Cloud Run Gemini/UCP/AP2/x402, 300 test JPYC paid directly from the owner wallet to yours Market. Receipt and exact transfer independently checked at two RPCs. Delivery and download HTTP 200 observed in Cloud Run logs. Does not assert a public external-EC purchase or a real-currency payment.",
+  "amount": 300,
+  "asset": "test JPYC",
+  "transactionHash": "0x158888ac528cd1e78ccba9696e44fa54665ab9a1ac3efefeb99a7b66071f7ce9",
+  "checks": [
+    {
+      "rpc": "https://polygon-amoy-bor-rpc.publicnode.com",
+      "checks": {
+        "success": true,
+        "canonical": true,
+        "intentMatches": true,
+        "gate": true,
+        "exactAmount": true,
+        "ownerToMerchant": true,
+        "confirmations": 632
+      },
+      "block": 50239148,
+      "settledAt": "2026-10-15T10:54:44.000Z"
+    },
+    {
+      "rpc": "https://polygon-amoy.drpc.org",
+      "checks": {
+        "success": true,
+        "canonical": true,
+        "intentMatches": true,
+        "gate": true,
+        "exactAmount": true,
+        "ownerToMerchant": true,
+        "confirmations": 633
+      },
+      "block": 50239148,
+      "settledAt": "2026-10-15T10:54:44.000Z"
+    }
+  ],
+  "cloud": {
+    "search": "2026-10-15T10:52:34Z",
+    "agentRun": "2026-10-15T10:54:35Z",
+    "checkoutComplete": 202,
+    "x402Challenge": 402,
+    "x402Accept": 202,
+    "delivery": 200,
+    "download": 200
+  }
+}

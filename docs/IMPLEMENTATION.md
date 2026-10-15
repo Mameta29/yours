@@ -14,7 +14,7 @@
 - [x] PostgreSQLの永続状態・認証・API/SDK。
 - [x] UCP discovery/catalog/cart/checkout/order。
 - [x] 既存EC adapter、Google Cloud配備、実ECカタログの公開確認。
-- [ ] 公開Amoyでの本人購入確認。
+- [x] 公開Amoyでyours Marketの本人購入・300 test JPYC送金・商品downloadを確認。
 - [x] AP2実署名・制約・receiptとstablecoin handler。
 - [x] x402実行・journal・KMS署名・chain照合。
 - [x] Gemini ADKと外部agent接続。
@@ -27,7 +27,7 @@ Google Cloudの配備先はユーザー指定の `yours-511602`、regionは`asia
 
 `infra/bootstrap.sh`を実行済み。必要なAPI、Artifact Registry、サービス別アカウント、署名用途別のCloud KMS HSM鍵を作成。Cloud SQL `yours-db`（PostgreSQL 16）、専用DB利用者・Secret Managerを作成し、ユーザー承認済みの`infra/IAM.md`の権限を適用。`yours-migrate-9ngl8`でruntime DB利用者の管理者membership・CREATEDB・CREATEROLEを除去し、4項目ともfalseを実DBで検証。`yours-migrate-rrm4g`でmigration 001〜007と実際に配布するデジタル商品のcatalogを反映。
 
-Polygon Amoyにyours専用Gate `0x42eec579df8fb1f87ae3bddbb90c6a4a9f790504` とRegistry `0xa5524081a219422ee5247afDEda40791E953eF2B`を配備。Cloud HSM relayerの実署名を使用し、5 confirmationsとblock hashを検証。txは`0x7ffe2572d92c1b32b33ec16cead5156b1a9c7ec2a0381f9e5bc5048a121664b9`。公開情報・code hashは`deployments/amoy.json`。これは配備の証拠であり、公開Amoyでの購入成功はまだ確認していない。
+Polygon Amoyにyours専用Gate `0x42eec579df8fb1f87ae3bddbb90c6a4a9f790504` とRegistry `0xa5524081a219422ee5247afDEda40791E953eF2B`を配備。Cloud HSM relayerの実署名を使用し、5 confirmationsとblock hashを検証。txは`0x7ffe2572d92c1b32b33ec16cead5156b1a9c7ec2a0381f9e5bc5048a121664b9`。公開情報・code hashは`deployments/amoy.json`。配備の証拠と購入の証拠は分ける。公開Amoyの本人購入は後述の2026-10-15 19:54 JSTに確認済み。
 
 ## 変更と確認
 
@@ -79,6 +79,10 @@ UCP RFC 9421署名、API keyとplatform profileの結び付け、DNSを固定し
 
 本人限定の注文詳細ページと実ファイルのdownloadを実装・配備。受け取り操作は一つのdigital fulfillment eventと署名付きwebhookにまとめ、同時再試行でも重複しない。実Chromeで注文リンクから実ファイルを受け取る試験を68項目に含めた。source `c785810`のGitHub CI [38532719152](https://github.com/Mameta29/yours/actions/runs/38532719152)も全項目成功。提出用README・構成図・試用手順を公開済み。
 
+2026-10-15 19:54 JST、本人がyours Marketの「週次ふりかえりテンプレート」を購入。Cloud RunのGemini実行→UCP checkout→AP2提示→HTTP 402→x402受理を照合し、19:55のdelivery/download 200も確認。Amoyの2 RPCで成功receipt・canonical block・Gateの注文IDと、ownerからmerchantへの300 test JPYCのTransferを独立に照合した。[公開購入の証拠](evidence/public-owner-purchase.json)。本人の秘密鍵は取得していない。外部ECへの購入はこの証拠に含まない。
+
+管理画面を依頼・条件・予算が同時に見える配置へ整理。Markdownの表・リスト・強調を安全に表示し、実購入の状態と監査記録から4段階の進捗を表示。決済確定時にwallet残高も更新する。実行中の再照会は2秒間隔、検索tool記録は応答後に表示。過去の実行を再生・再送する機能は設けない。[設計](design/CONSOLE-EXPERIENCE.md)と[撮影手順](DEMO-SCRIPT.md)。consoleの安全性・状態表示12テスト、ChromeのUI 10項目、既存の決済68項目と登録22項目を確認。配備情報は上のrevision表で管理する。
+
 ## 既存ECの接続（実装・配備済み）
 
 `adapters/jpyc-ec`を新設。登録済みのorigin・店舗ID・送金先だけを使い、実ECの予約・personal_sign・transfer照合を接続する。migration 010で予約の冪等キーとcheckout/AP2の結び付きを永続化。本人の署名・同意を得るまではAP2を発行せず、メールの宛先をAIへ渡さない。workerは確定後に同じtx hashでEC注文を照合し、応答消失から復旧する。
@@ -89,7 +93,7 @@ adapter境界の12テスト、AP2 authorityの19テスト、実Chromeを含む68
 
 ## 次に完了する事項
 
-- 公開Amoyで本人の資産から実購入。外部AI client単体はローカルの実HTTP・実送金で確認済み、公開Amoyは未確認。
+- yours Marketの公開本人購入は完了。外部ECと外部AI client単体の公開購入は未確認。ローカルの実HTTP・実送金の確認とは区別する。
 - 返金処理は未実装。現在は対応capabilityとして公開しない。
 - 実処理のデモ動画とDashboard提出。
 

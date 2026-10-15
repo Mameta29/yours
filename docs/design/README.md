@@ -26,3 +26,7 @@ UCP stable 2026-08-25、AP2 v0.2。標準と独自stablecoin handlerの対応範
 ## 完成の検証
 
 実署名での商品購入、別merchant/clientとの相互運用、権限超過・改変・再利用の拒否、共有予算競合、worker再起動と通知重複、注文と返金の照合を試験する。モックでの単体試験と、実HTTP・DB・chain・cloudの通し検証を区別して記録する。
+
+## 管理画面と実行の見せ方
+
+[ワークスペースの設計](CONSOLE-EXPERIENCE.md)と[3分の撮影手順](../DEMO-SCRIPT.md)。画面上の進捗は実際の購入状態・監査記録に基づく。
