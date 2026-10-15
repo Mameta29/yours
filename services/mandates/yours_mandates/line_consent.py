@@ -9,7 +9,7 @@ from eth_account import Account
 from eth_account.messages import encode_typed_data
 from .consent import connection_hash, task_hash
 
-LINE_SCOPE = 'Execute explicit purchase requests from this LINE account under my active yours policy. Exceptions require my fresh LINE Login authentication and consent to that exact order.'
+LINE_SCOPE = 'Execute explicit purchase requests from this LINE account under my active yours policy. Exceptions require my explicit approval of that exact order from this LINE account.'
 
 
 def unseal(key: str, purpose: str, value: str) -> str:
@@ -74,28 +74,7 @@ def verify_event(db, event_id, consent_row, runtime):
     link = verify_link(db, event['link_id'], runtime)
     if link['account_id'] != consent_row['account_id'] or link['connection_id'] != consent_row['connection_id']:
         raise ValueError('line_task_owner_mismatch')
-    raw = unseal(runtime.chat_key, 'line-body:' + event['body_hash'], event['body_cipher'])
-    if hashlib.sha256(raw.encode()).hexdigest() != event['body_hash']:
-        raise ValueError('line_body_modified')
-    if runtime.line_secret:
-        expected = base64.b64encode(hmac.new(runtime.line_secret.encode(), raw.encode(), hashlib.sha256).digest()).decode()
-        if not hmac.compare_digest(expected, event['signature']):
-            raise ValueError('line_webhook_invalid')
-    else:
-        # The enrolled EC keeps its original channel secret. The private
-        # authority independently checks the original raw LINE signature there.
-        from urllib.request import Request, urlopen
-        from urllib.parse import urlparse
-        if urlparse(runtime.line_bridge).scheme != 'https':
-            raise ValueError('line_bridge_https_required')
-        req = Request(runtime.line_bridge, data=json.dumps({'operation': 'verify', 'raw': raw, 'signature': event['signature']}).encode(), headers={'Content-Type': 'application/json'})
-        with urlopen(req, timeout=8) as response:
-            if response.geturl() != runtime.line_bridge or json.loads(response.read(65536)).get('valid') is not True:
-                raise ValueError('line_webhook_invalid')
-    matches = [e for e in json.loads(raw).get('events', []) if e.get('webhookEventId') == event['event_id']]
-    if len(matches) != 1:
-        raise ValueError('line_event_invalid')
-    message = matches[0]
+    message, inbox = verified_channel_event(db, event['body_hash'], event['event_id'], runtime)
     if message.get('type') != 'message' or message.get('source', {}).get('type') != 'user' or message.get('message', {}).get('type') != 'text' or user_hash(message['source']['userId']) != link['user_hash']:
         raise ValueError('line_sender_mismatch')
     timestamp = message.get('timestamp', 0) / 1000
@@ -109,3 +88,31 @@ def verify_event(db, event_id, consent_row, runtime):
     if task['expires_at'] > min(link['consent']['validUntil'], link['permission']['validUntil'], link['policy']['validUntil']):
         raise ValueError('line_task_outlives_consent')
     return link, event
+
+
+def verified_channel_event(db, body_hash, event_id, runtime):
+    inbox = db.execute('SELECT * FROM line_inbox WHERE body_hash=%s', (body_hash,)).fetchone()
+    if not inbox:
+        raise ValueError('line_body_missing')
+    raw = unseal(runtime.chat_key, 'line-body:' + body_hash, inbox['body_cipher'])
+    if hashlib.sha256(raw.encode()).hexdigest() != body_hash:
+        raise ValueError('line_body_modified')
+    if runtime.line_secret:
+        expected = base64.b64encode(hmac.new(runtime.line_secret.encode(), raw.encode(), hashlib.sha256).digest()).decode()
+        if not hmac.compare_digest(expected, inbox['signature']):
+            raise ValueError('line_webhook_invalid')
+    else:
+        # The enrolled EC keeps its original channel secret. The private
+        # authority independently checks the original raw LINE signature there.
+        from urllib.request import Request, urlopen
+        from urllib.parse import urlparse
+        if urlparse(runtime.line_bridge).scheme != 'https':
+            raise ValueError('line_bridge_https_required')
+        req = Request(runtime.line_bridge, data=json.dumps({'operation': 'verify', 'raw': raw, 'signature': inbox['signature']}).encode(), headers={'Content-Type': 'application/json'})
+        with urlopen(req, timeout=8) as response:
+            if response.geturl() != runtime.line_bridge or json.loads(response.read(65536)).get('valid') is not True:
+                raise ValueError('line_webhook_invalid')
+    matches = [e for e in json.loads(raw).get('events', []) if e.get('webhookEventId') == event_id]
+    if len(matches) != 1:
+        raise ValueError('line_event_invalid')
+    return matches[0], inbox

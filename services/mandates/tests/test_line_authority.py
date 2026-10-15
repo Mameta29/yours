@@ -13,7 +13,6 @@ from fastapi.testclient import TestClient
 from psycopg.types.json import Jsonb
 from yours_mandates.crypto import LocalSigner
 from yours_mandates.line_consent import LINE_SCOPE, line_consent_data, user_hash, verify_link
-from yours_mandates.line_login import validate_claims
 from yours_mandates.service import Runtime, create_app
 from test_service import setup, GATE
 
@@ -100,11 +99,70 @@ def test_a_channel_event_cannot_be_attached_to_another_task(line):
     assert response.status_code == 403
 
 
-@pytest.mark.parametrize('claim', ['nonce', 'sub', 'aud', 'iss', 'auth_time', 'exp', 'amr'])
-def test_line_exception_requires_fresh_interactive_login_to_the_bound_account(claim):
-    now = 1800000000
-    claims = {'iss': 'https://access.line.me', 'aud': 'client', 'sub': 'user', 'nonce': 'order-nonce', 'iat': now, 'exp': now + 300, 'auth_time': now, 'amr': ['lineqr']}
-    validate_claims(claims, 'client', 'order-nonce', 'user', now - 20, now)
-    changed = {**claims, claim: {'auth_time': now - 121, 'exp': now - 1, 'amr': ['lineautologin', 'linesso']}.get(claim, 'wrong')}
-    with pytest.raises(ValueError):
-        validate_claims(changed, 'client', 'order-nonce', 'user', now - 20, now)
+def order_action(s, action='approve', mutation=None):
+    intent_id, action_id = uuid.uuid4(), uuid.uuid4()
+    token = base64.urlsafe_b64encode(os.urandom(32)).decode().rstrip('=')
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    snapshot_hash = 'ab' * 32
+    now = int(time.time())
+    postback = {'webhookEventId': 'action-' + str(action_id), 'timestamp': now * 1000,
+        'type': 'postback', 'source': {'type': 'user', 'userId': 'U' + 'a' * 32}, 'postback': {'data': 'yours:' + action + ':' + token}}
+    if mutation == 'sender': postback['source']['userId'] = 'U' + 'b' * 32
+    if mutation == 'token': postback['postback']['data'] += 'wrong'
+    if mutation == 'stale': postback['timestamp'] -= 121000
+    if mutation == 'chat': postback['type'] = 'message'
+    raw = json.dumps({'events': [postback]})
+    body_hash = hashlib.sha256(raw.encode()).hexdigest()
+    signature = base64.b64encode(hmac.new(s['runtime'].line_secret.encode(), raw.encode(), hashlib.sha256).digest()).decode()
+    with s['pool'].connection() as db:
+        db.execute('''INSERT INTO intents(id,account_id,connection_id,merchant_id,checkout_id,revision,currency,amount_minor,amount_atomic,period_index,state,snapshot,snapshot_hash,reasons,expires_at)
+            VALUES(%s,%s,%s,'test',%s,'1','JPY',1000,1000000000000000000000,0,'approval_required','{}',%s,%s,now()+interval '10 minutes')''',
+            (intent_id, s['owner'], s['connection'], str(intent_id), snapshot_hash, Jsonb(['expired'] if mutation == 'reason' else ['per_order', 'merchant'])))
+        db.execute('UPDATE line_events SET intent_id=%s WHERE id=%s', (intent_id, s['event_id']))
+        db.execute('INSERT INTO line_approval_links(token_hash,token_cipher,event_id,intent_id,snapshot_hash,expires_at) VALUES(%s,%s,%s,%s,%s,now()+interval \'10 minutes\')',
+            (token_hash, seal(s['key'], 'line-approval:' + str(intent_id), token), s['event_id'], intent_id, 'cd' * 32 if mutation == 'snapshot' else snapshot_hash))
+        db.execute('INSERT INTO line_inbox(body_hash,body_cipher,signature) VALUES(%s,%s,%s)',
+            (body_hash, seal(s['key'], 'line-body:' + body_hash, raw), 'tampered' if mutation == 'signature' else signature))
+        db.execute('INSERT INTO line_order_actions(id,event_id,body_hash,token_hash,link_id,intent_id,action) VALUES(%s,%s,%s,%s,%s,%s,%s)',
+            (action_id, postback['webhookEventId'], body_hash, token_hash, s['link_id'], intent_id, action))
+        db.execute("INSERT INTO payment_envelopes(intent_id,envelope,payload,payload_hash) VALUES(%s,%s,%s,'fixture')", (intent_id,
+            Jsonb({'risk': {'riskDigest': '0x' + '22' * 32}}), Jsonb({'extensions': {'yours.purchase': {'info': {'intentHash': '0x' + '11' * 32}}}})))
+        if mutation == 'revoked': db.execute('UPDATE line_links SET revoked_at=now() WHERE id=%s', (s['link_id'],))
+    return intent_id, action_id
+
+
+def test_exact_line_postback_approves_once_without_wallet_signature_or_login_claim(line):
+    intent, action = order_action(line)
+    def approve(): return line['client'].post('/v1/approve-line-action', json={'action_id': str(action)})
+    response = approve()
+    assert response.status_code == 200, response.text
+    assert response.json() == {'intentId': str(intent), 'status': 'authorized'}
+    assert approve().json() == response.json()
+    with line['pool'].connection() as db:
+        rows = db.execute('SELECT * FROM approvals WHERE intent_id=%s', (intent,)).fetchall()
+        assert len(rows) == 1
+        assert rows[0]['proof']['overrideMask'] == 5
+        assert rows[0]['owner_signature'] is None
+        assert rows[0]['line_action_id'] == action
+        assert rows[0]['line_login_attempt_id'] is None
+
+
+@pytest.mark.parametrize('mutation', ['sender', 'token', 'stale', 'chat', 'snapshot', 'signature', 'revoked', 'reason'])
+def test_line_button_never_overrides_identity_order_integrity_expiry_or_revocation(line, mutation):
+    intent, action = order_action(line, mutation=mutation)
+    response = line['client'].post('/v1/approve-line-action', json={'action_id': str(action)})
+    assert response.status_code in (403, 422), response.text
+    with line['pool'].connection() as db:
+        assert db.execute('SELECT state FROM intents WHERE id=%s', (intent,)).fetchone()['state'] == 'approval_required'
+        assert db.execute('SELECT count(*) AS n FROM approvals WHERE intent_id=%s', (intent,)).fetchone()['n'] == 0
+
+
+def test_line_cancel_cannot_be_reinterpreted_as_approval(line):
+    intent, action = order_action(line, action='cancel')
+    response = line['client'].post('/v1/approve-line-action', json={'action_id': str(action)})
+    assert response.status_code == 200, response.text
+    assert response.json()['status'] == 'canceled'
+    with line['pool'].connection() as db:
+        assert db.execute('SELECT count(*) AS n FROM approvals WHERE intent_id=%s', (intent,)).fetchone()['n'] == 0
+        db.execute("UPDATE line_order_actions SET action='approve' WHERE id=%s", (action,))
+    assert line['client'].post('/v1/approve-line-action', json={'action_id': str(action)}).status_code == 422

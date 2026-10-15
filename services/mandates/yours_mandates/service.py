@@ -41,7 +41,6 @@ class Runtime:
     human: Any = None
     chat_key: str | None = None
     line_secret: str | None = None
-    line_client_id: str | None = None
     ec_merchants: Any = None
     line_bridge: str | None = None
 
@@ -77,7 +76,7 @@ class OrderApprovalRequest(BaseModel):
 
 class LineApprovalRequest(BaseModel):
     model_config = ConfigDict(extra='forbid')
-    attempt_id: uuid.UUID
+    action_id: uuid.UUID
 
 
 def error(code: str, status=422):
@@ -313,41 +312,47 @@ def create_app(runtime: Runtime):
             audit(db, row["account_id"], "order.owner_approved", request.approval_id, {"intentId": str(row["intent_id"]), "overrideMask": row["proof"]["overrideMask"]})
             return {"intentId": str(row["intent_id"]), "status": "authorized"}
 
-    @app.post('/v1/approve-line-order')
-    def approve_line_order(request: LineApprovalRequest):
-        from .line_login import verify_order_login
-        from .line_consent import user_hash
+    @app.post('/v1/approve-line-action')
+    def approve_line_action(request: LineApprovalRequest):
+        from .line_actions import verify_order_action
         with runtime.db.connection() as db, db.transaction():
-            target = db.execute('SELECT account_id FROM line_login_attempts WHERE id=%s', (request.attempt_id,)).fetchone()
+            target = db.execute('SELECT l.account_id FROM line_order_actions a JOIN line_links l ON l.id=a.link_id WHERE a.id=%s', (request.action_id,)).fetchone()
             if not target:
-                error('line_login_not_found', 404)
+                error('line_action_not_found', 404)
             db.execute('SELECT id FROM accounts WHERE id=%s FOR UPDATE', (target['account_id'],))
-            attempt, link, claims = verify_order_login(db, request.attempt_id, runtime)
-            intent = db.execute('SELECT i.*,e.payload,e.envelope FROM intents i JOIN payment_envelopes e ON e.intent_id=i.id WHERE i.id=%s FOR UPDATE OF i', (attempt['intent_id'],)).fetchone()
-            previous = db.execute('SELECT * FROM approvals WHERE line_login_attempt_id=%s', (request.attempt_id,)).fetchone()
+            action, link, intent, confirmed_at = verify_order_action(db, request.action_id, runtime)
+            previous = db.execute('SELECT * FROM approvals WHERE line_action_id=%s', (request.action_id,)).fetchone()
             if previous:
-                approval_target(db, previous['id'])
                 return {'intentId': str(intent['id']), 'status': intent['state']}
-            if attempt['consumed_at'] or not intent or intent['state'] != 'approval_required':
+            if action['action'] == 'cancel' and intent['state'] == 'canceled':
+                return {'intentId': str(intent['id']), 'status': 'canceled'}
+            if intent['state'] != 'approval_required':
                 error('line_order_not_approvable', 409)
+            if action['action'] == 'cancel':
+                db.execute("UPDATE intents SET state='canceled',updated_at=now() WHERE id=%s", (intent['id'],))
+                db.execute("UPDATE line_events SET state='canceled',updated_at=now() WHERE intent_id=%s", (intent['id'],))
+                audit(db, link['account_id'], 'order.line_canceled', intent['id'], {})
+                return {'intentId': str(intent['id']), 'status': 'canceled'}
+            envelope = db.execute('SELECT payload,envelope FROM payment_envelopes WHERE intent_id=%s', (intent['id'],)).fetchone()
+            if not envelope:
+                error('payment_not_prepared', 503)
             now, mask = int(time.time()), 0
             for reason in intent['reasons']:
                 if reason not in ('per_order', 'period_budget', 'merchant'):
                     error('non_overridable_reason', 403)
                 mask |= {'per_order': 1, 'period_budget': 2, 'merchant': 4}[reason]
-            valid_until = min(now + 90, claims['auth_time'] + 120, int(intent['expires_at'].timestamp()), link['consent']['validUntil'])
+            valid_until = min(now + 90, confirmed_at + 120, int(intent['expires_at'].timestamp()), link['consent']['validUntil'])
             if not mask or valid_until <= now + 15:
                 error('line_order_expiring', 409)
             approval_id = uuid.uuid4()
             proof = {'nonce': '0x' + os.urandom(32).hex(), 'validUntil': valid_until, 'overrideMask': mask,
-                'intentHash': intent['payload']['extensions']['yours.purchase']['info']['intentHash'], 'riskDigest': intent['envelope']['risk']['riskDigest']}
-            db.execute('INSERT INTO approvals(id,intent_id,snapshot_hash,proof,expires_at,authenticated_at,line_login_attempt_id) VALUES(%s,%s,%s,%s,to_timestamp(%s),to_timestamp(%s),%s)',
-                (approval_id, intent['id'], intent['snapshot_hash'], Jsonb(proof), valid_until, claims['auth_time'], request.attempt_id))
+                'intentHash': envelope['payload']['extensions']['yours.purchase']['info']['intentHash'], 'riskDigest': envelope['envelope']['risk']['riskDigest']}
+            db.execute('INSERT INTO approvals(id,intent_id,snapshot_hash,proof,expires_at,authenticated_at,line_action_id) VALUES(%s,%s,%s,%s,to_timestamp(%s),to_timestamp(%s),%s)',
+                (approval_id, intent['id'], intent['snapshot_hash'], Jsonb(proof), valid_until, confirmed_at, request.action_id))
             approval_target(db, approval_id)
-            db.execute('UPDATE line_login_attempts SET consumed_at=now(),subject_hash=%s,authenticated_at=to_timestamp(%s) WHERE id=%s', (user_hash(claims['sub']), claims['auth_time'], request.attempt_id))
             db.execute("UPDATE intents SET state='authorized',updated_at=now() WHERE id=%s", (intent['id'],))
             db.execute("UPDATE outbox SET available_at=now() WHERE dedupe_key=%s AND completed_at IS NULL", ('payment:' + str(intent['id']),))
-            audit(db, link['account_id'], 'order.line_approved', approval_id, {'intentId': str(intent['id']), 'overrideMask': mask, 'authentication': 'LINE Login'})
+            audit(db, link['account_id'], 'order.line_approved', approval_id, {'intentId': str(intent['id']), 'overrideMask': mask, 'authentication': 'registered LINE account postback'})
             return {'intentId': str(intent['id']), 'status': 'authorized'}
 
     @app.post("/v1/endorse-order")
@@ -359,7 +364,7 @@ def create_app(runtime: Runtime):
         if not runtime.human:
             error("human_signer_unavailable", 503)
         with runtime.db.connection() as db, db.transaction():
-            candidate = db.execute("SELECT id FROM approvals WHERE intent_id=%s AND (owner_signature IS NOT NULL OR line_login_attempt_id IS NOT NULL) ORDER BY authenticated_at DESC LIMIT 1", (request.intent_id,)).fetchone()
+            candidate = db.execute("SELECT id FROM approvals WHERE intent_id=%s AND (owner_signature IS NOT NULL OR line_action_id IS NOT NULL) ORDER BY authenticated_at DESC LIMIT 1", (request.intent_id,)).fetchone()
             if not candidate:
                 error("owner_proof_required", 403)
             row = approval_target(db, candidate["id"])
@@ -367,10 +372,10 @@ def create_app(runtime: Runtime):
             if row["state"] != "authorized" or not row["authenticated_at"] or row["authenticated_at"].timestamp() < now - 120 or runtime.human.address.lower() != row["policy"]["chainPolicy"]["humanSigner"].lower():
                 error("owner_proof_expired_or_wrong_signer", 403)
             proof = row["proof"]
-            if row['line_login_attempt_id']:
-                from .line_login import verify_order_login
-                attempt, link, claims = verify_order_login(db, row['line_login_attempt_id'], runtime)
-                if attempt['intent_id'] != row['intent_id'] or not attempt['consumed_at'] or claims['auth_time'] != int(row['authenticated_at'].timestamp()):
+            if row['line_action_id']:
+                from .line_actions import verify_order_action
+                action, link, intent, confirmed_at = verify_order_action(db, row['line_action_id'], runtime)
+                if intent['id'] != row['intent_id'] or action['action'] != 'approve' or confirmed_at != int(row['authenticated_at'].timestamp()):
                     error('line_approval_binding_mismatch', 403)
             else:
                 recovered = Account.recover_message(encode_typed_data(full_message=order_consent_data(runtime.gate, runtime.chain_id, row["address"], proof)), signature=row["owner_signature"])
@@ -410,4 +415,4 @@ def from_environment():
     if not production and os.getenv("LOCAL_HUMAN_PRIVATE_KEY"):
         human = LocalEvmSigner(os.environ["LOCAL_HUMAN_PRIVATE_KEY"])
     return create_app(Runtime(pool, issuer, holder, merchant, chain_id, os.environ["GATE_ADDRESS"], os.environ["PUBLIC_ORIGIN"], human,
-        os.getenv('CHAT_ENCRYPTION_KEY'), os.getenv('LINE_CHANNEL_SECRET'), os.getenv('LINE_LOGIN_CHANNEL_ID'), json.loads(os.getenv('EC_MERCHANTS_JSON', '[]')), os.getenv('LINE_BRIDGE_URL')))
+        os.getenv('CHAT_ENCRYPTION_KEY'), os.getenv('LINE_CHANNEL_SECRET'), json.loads(os.getenv('EC_MERCHANTS_JSON', '[]')), os.getenv('LINE_BRIDGE_URL')))

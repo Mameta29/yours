@@ -2,7 +2,7 @@ import { createCipheriv, createDecipheriv, createHmac, randomBytes, timingSafeEq
 import { keccak256, stringToHex } from 'viem';
 import { DomainError, sha256 } from '@yours/domain';
 
-export const LINE_SCOPE = 'Execute explicit purchase requests from this LINE account under my active yours policy. Exceptions require my fresh LINE Login authentication and consent to that exact order.';
+export const LINE_SCOPE = 'Execute explicit purchase requests from this LINE account under my active yours policy. Exceptions require my explicit approval of that exact order from this LINE account.';
 export function seal(key: string, purpose: string, value: string): string {
   const bytes = Buffer.from(key, 'base64');
   if (bytes.length !== 32) throw new Error('chat_encryption_key_invalid');
