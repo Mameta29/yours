@@ -126,7 +126,7 @@ export function lineOwnerRoutes(db: Db, config: Config) {
       if (other) throw new DomainError('line_already_linked', 409);
       await tx.query('UPDATE line_links SET revoked_at=now() WHERE account_id=$1 AND id<>$2 AND revoked_at IS NULL', [actor.accountId, id]);
       await tx.query('UPDATE line_links SET owner_signature=$2,activated_at=coalesce(activated_at,now()) WHERE id=$1', [id, signature]);
-      await queueLine(tx, id, id + ':linked', lineText('yoursと連携しました。\n\n「お米10kg買っといて」のように依頼できます。設定した条件内で購入し、条件外なら支払い前に確認します。', [{ label: '権限を確認する', url: config.PUBLIC_ORIGIN + '/?view=line' }]));
+      await queueLine(tx, id, id + ':linked', lineText('yoursと連携しました。\n\n「5kg入りのお米を1袋買って」のように依頼できます。設定した条件内で購入し、条件外なら支払い前に確認します。', [{ label: '権限を確認する', url: config.PUBLIC_ORIGIN + '/?view=line' }]));
       await audit(tx, actor.accountId, 'owner:' + actor.accountId, 'line.activated', id, { connectionId: row.connection_id });
     });
     await wakeChat(config);

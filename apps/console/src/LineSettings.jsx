@@ -33,9 +33,9 @@ export default function LineSettings({ data, config, signConsent, onWallet, onPe
       : !connection ? <><p>先にGeminiの購入権限を設定してください。</p><button className="button primary" onClick={onPermission}>購入権限を設定する</button></>
       : active ? <>
         <div className="line-connected"><span><Check size={17} />LINEでの購入が有効</span><strong>{active.display_name}</strong><p>{connection.name} · {new Date(active.expires_at).toLocaleDateString('ja-JP')}まで</p></div>
-        <div className="line-example"><span>LINEに送ってみる</span><p>お米10kg買っといて</p></div>
+        <div className="line-example"><span>LINEに送ってみる</span><p>5kg入りのお米を1袋買って</p></div>
         <p>予算とお店の条件内なら、そのまま購入します。条件外では支払いを止め、この注文だけ許可するかを確認します。</p>
-        <div className="line-actions">{status.botId && <a className="button primary" href={'https://line.me/R/oaMessage/' + encodeURIComponent(status.botId) + '/?' + encodeURIComponent('お米10kg買っといて')} target="_blank" rel="noreferrer">LINEを開く <ArrowUpRight size={16} /></a>}
+        <div className="line-actions">{status.botId && <a className="button primary" href={'https://line.me/R/oaMessage/' + encodeURIComponent(status.botId) + '/?' + encodeURIComponent('5kg入りのお米を1袋買って')} target="_blank" rel="noreferrer">LINEを開く <ArrowUpRight size={16} /></a>}
           <button className="text-button danger" disabled={!!busy} onClick={() => act('LINEでの購入を停止しています', () => api('/api/owner/line/' + active.id + '/revoke', {}))}><Pause size={14} />連携を停止</button></div>
       </> : pending ? <>
         <div className="line-connected"><span><Check size={17} />LINEを確認しました</span><strong>{pending.display_name}</strong></div>

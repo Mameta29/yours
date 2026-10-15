@@ -8,7 +8,7 @@ from pathlib import Path
 project='yours-511602'
 token=subprocess.check_output(['gcloud','auth','print-identity-token','--project='+project],text=True).strip()
 results=[]
-for service in ('api','mandates','worker','agent'):
+for service in ('api','mandates','worker','agent','chat'):
     origin=f'https://yours-{service}-110852561536.asia-northeast1.run.app'
     try:
         urllib.request.urlopen(origin+'/health',timeout=60)
@@ -33,5 +33,5 @@ for service in ('api','mandates','worker','agent'):
                 assert data['keys']==[expected]
                 result['discoveryKeyMatchesDeployedHsm']=True
     results.append(result)
-Path('docs/evidence/cloud-services.json').write_text(json.dumps({'project':project,'scope':'Public API/console; private AP2, worker and Gemini health; live Cloud SQL access and discovery HSM key binding. Amoy purchase is separate evidence.','services':results},indent=2)+'\n')
+Path('docs/evidence/cloud-services.json').write_text(json.dumps({'project':project,'scope':'Public API/console; private AP2, settlement worker, LINE chat worker and Gemini health; live Cloud SQL access and discovery HSM key binding. Amoy purchase is separate evidence.','services':results},indent=2)+'\n')
 print(json.dumps({'passed':len(results),'evidence':'docs/evidence/cloud-services.json'}))
