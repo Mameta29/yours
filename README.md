@@ -14,13 +14,14 @@ yoursは、**本人のウォレットに資産を置いたまま、選んだAI�
 
 買い物をAIへ任せるには、商品検索に加え、支出の制御と責任の追跡が必要です。複数のAIへそれぞれ5,000円を許可した結果、本人が考えていた総予算を超えてしまうこともあります。
 
-yoursではAIごとの上限と、**すべてのAIが共有する予算**を同時に適用します。条件を超える注文は本人へ戻し、新しい本人署名がある場合だけ、その一件を許可します。AIを変更・追加しても使用済みの共有予算は引き継ぎます。
+yoursではAIごとの上限と、**すべてのAIが共有する予算**を同時に適用します。条件を超える注文は本人へ戻し、注文専用の追加同意がある場合だけ、その一件を許可します。AIを変更・追加しても使用済みの共有予算は引き継ぎます。
 
 本人は一画面で権限・支払い・監査履歴を確認できます。AIサービスの開発者はAPI/SDKから接続し、ownerの秘密鍵を受け取らずに購入を実行できます。
 
 ## 実際にできること
 
 - **Geminiに依頼** — Google ADKとVertex AIが実カタログを検索し、本人が署名した購入タスクをUCP/AP2/x402で実行します。
+- **LINEで購入** — 初回だけ本人walletとLINEの連携に署名。「お米10kg買っといて」で実ECの商品を選び、権限内なら購入。条件外では既存Botの「この一件だけ許可」で確認します。[LINEの使い方と検証範囲](docs/LINE-COMMERCE.md)
 - **自分のAIを接続** — 外部AIのEVM実行アドレスとAP2公開鍵を登録。外部AI自身が注文に束縛された署名を作り、yoursが検証・送信します。
 - **範囲を限定** — AI別・共有の1回上限と24時間予算、店舗、期限を設定。支出条件をLLMの判断だけに委ねません。
 - **停止と一件承認** — サービス上の即時停止とchain上の失効に対応。予算超過等は新しい注文専用同意で一件だけ許可し、失効・改変・再利用は解除しません。
@@ -40,6 +41,7 @@ yoursではAIごとの上限と、**すべてのAIが共有する予算**を同�
 | Cloud Run · Gemini agent | Google ADK + Vertex AI `gemini-3.8-flash`。実カタログと承認済みタスクのtoolだけを利用 |
 | Cloud Run · AP2 authority | 公式AP2 SDKで本人同意・制約・署名を独立検証し、mandateとreceiptを発行 |
 | Cloud Run · Payment worker | 条件検証、HSM署名、journal、送信・確定照合、outboxの処理 |
+| Cloud Run · Chat worker | LINEの依頼・一件承認・通知を永続queueから処理。支払いworkerとは別の非公開service |
 | Cloud SQL · PostgreSQL 16 | 権限、共有予算予約、同意、注文、transaction journal、監査履歴を永続化 |
 | Cloud KMS / HSM | 役割ごとの非export署名鍵。Geminiサービスには署名鍵やDB secretへのアクセスを与えない |
 | Cloud Scheduler | 非公開workerをIAM認証付きで定期実行し、処理中断から復旧 |
@@ -61,6 +63,8 @@ AP2は本人同意の証拠、x402はHTTP上の支払連携です。UCPの採用
 UCP公式schemaとAP2 v0.2 SDKでは、delegated SD-JWTの表現に上流の不一致があります。yoursはUCP本体のschema検証と、AP2 SDKの暗号・制約検証を分けています。**全仕様・全payment handlerへの互換性を主張するものではありません。** 対応範囲と再現方法は[相互運用記録](docs/design/INTEROPERABILITY.md)、独自handlerは[決済仕様](docs/design/PAYMENT-HANDLER.md)を参照してください。
 
 ## 試す
+
+主デモは **Webで権限設定 → LINEで依頼 → 実ECで購入 → 条件超過で停止 → LINEで一件承認** です。[初回のLINE連携手順](docs/LINE-COMMERCE.md)から始められます。LINEでの一件承認は、再ログインやWorld認証の証明ではありません。
 
 1. [公開アプリ](https://yours-api-110852561536.asia-northeast1.run.app)を開き、Geminiへ「カタログの商品と価格を教えて」と入力します。検索はwallet接続なしで試せます。
 2. 購入する場合はPC版MetaMaskでAmoyの本人walletを接続し、Geminiを追加します。
