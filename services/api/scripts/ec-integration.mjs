@@ -8,8 +8,12 @@ import {
   parseEther,
   erc20Abi,
   parseEventLogs,
+  recoverTypedDataAddress,
 } from "viem";
 import { encodeDelegations, delegationTypedData } from "@yours/wallet-sdk";
+import { importJWK, jwtVerify } from 'jose';
+import { createHash } from 'node:crypto';
+import { lineConsentData } from '../dist/chat-security.js';
 import { verifyCheckout, validateSchema } from "@yours/ucp";
 import { executePayment } from "../../worker/dist/settlement.js";
 import { settleEcOrder } from "../../worker/dist/ec-settlement.js";
@@ -22,7 +26,7 @@ export async function startEcFixture({ client, token, payTo }) {
     reservations = new Map();
   let merchant,
     loseResponse = true,
-    settleCalls = 0;
+    settleCalls = 0, issuerKey;
   const server = createServer(async (req, res) => {
     const reply = (status, body, headers = {}) => {
       res.writeHead(status, { "Content-Type": "application/json", ...headers });
@@ -64,7 +68,9 @@ export async function startEcFixture({ client, token, payTo }) {
         assert.equal(body.preferred_chain_id, 31337);
         assert.equal(body.customer_email, "buyer@example.test");
         assert.equal(body.transfer_authorization_version, "1");
-        assert.deepEqual(body.items, [{ product_id: productId, quantity: 1 }]);
+        const quantity=body.items?.[0]?.quantity;
+        assert.equal(body.items?.length,1);assert.equal(body.items[0].product_id,productId);
+        assert.ok(Number.isInteger(quantity)&&quantity>0&&quantity<=20);
         let r = reservations.get(body.idempotency_key);
         if (r) assert.deepEqual(r.request, body);
         else {
@@ -81,8 +87,8 @@ export async function startEcFixture({ client, token, payTo }) {
             "Chain ID: 31337",
             `Payer: ${body.payer_address}`,
             `Payee: ${payTo.toLowerCase()}`,
-            "Amount: 800 JPYC",
-            "Amount (atomic): 800000000000000000000",
+            `Amount: ${800*quantity} JPYC`,
+            `Amount (atomic): ${parseEther(String(800*quantity))}`,
             `Expires at (Unix ms): ${expires}`,
           ].join("\n");
           const accepted = {
@@ -90,7 +96,7 @@ export async function startEcFixture({ client, token, payTo }) {
             network: "eip155:31337",
             asset: token,
             payTo,
-            amount: parseEther("800").toString(),
+            amount: parseEther(String(800*quantity)).toString(),
             maxTimeoutSeconds: 60,
             extra: {
               assetTransferMethod: "erc20-transfer",
@@ -118,11 +124,11 @@ export async function startEcFixture({ client, token, payTo }) {
               reservation_id: r.id,
               expires_at_unix_ms: r.expires,
               summary: {
-                subtotal_jpyc: "800",
+                subtotal_jpyc: String(800*quantity),
                 discount_jpyc: "0",
                 shipping_jpyc: "0",
                 checkout_options_surcharge_jpyc: "0",
-                total_jpyc: "800",
+                total_jpyc: String(800*quantity),
               },
             },
           },
@@ -142,7 +148,16 @@ export async function startEcFixture({ client, token, payTo }) {
       );
       if (!r) return reply(404, { ok: false });
       if (req.url === "/api/v1/checkout/authorize-transfer") {
-        const valid = await client.verifyMessage({
+        let valid;
+        if (body.delegation_proof) {
+          assert.ok(issuerKey);
+          const {payload,protectedHeader}=await jwtVerify(body.delegation_proof,await importJWK(issuerKey,'ES256'),{algorithms:['ES256'],audience:merchant.origin+'/api/v1/checkout/authorize-transfer'});
+          assert.equal(protectedHeader.typ,'yours-ec-delegation+jwt');
+          assert.equal(payload.reservation_id,r.id);assert.equal(payload.sub,r.request.payer_address);
+          assert.equal(payload.message_sha256,createHash('sha256').update(r.message).digest('hex'));
+          const recovered=await recoverTypedDataAddress({...lineConsentData(payload.consent,payload.chain_id,payload.gate),signature:payload.owner_signature});
+          valid=recovered.toLowerCase()===r.request.payer_address;
+        } else valid = await client.verifyMessage({
           address: r.request.payer_address,
           message: r.message,
           signature: body.signature,
@@ -178,7 +193,7 @@ export async function startEcFixture({ client, token, payTo }) {
             (e) =>
               e.args.from.toLowerCase() === r.request.payer_address &&
               e.args.to.toLowerCase() === payTo.toLowerCase() &&
-              e.args.value === parseEther("800"),
+              e.args.value === BigInt(r.accepted.amount),
           ).length,
           1,
         );
@@ -189,7 +204,7 @@ export async function startEcFixture({ client, token, payTo }) {
             tx_hash: receipt.transactionHash,
             network: "eip155:31337",
             payer: r.request.payer_address,
-            amount_atomic: parseEther("800").toString(),
+            amount_atomic: r.accepted.amount,
             is_demo: false,
             fulfillment_status: "ready",
           };
@@ -219,6 +234,7 @@ export async function startEcFixture({ client, token, payTo }) {
     merchant,
     productId,
     reservations,
+    setIssuer(key) { issuerKey = key; },
     get settleCalls() {
       return settleCalls;
     },

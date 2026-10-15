@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-10-15T11:21:00.952Z",
+  "checkedAt": "2026-10-15T14:46:23.500Z",
   "scope": "Built console in real Chrome with local, explicit HTTP fixtures for owner, Gemini result and payment states. Tests presentation/polling only, not public payment or live model execution.",
   "checks": [
     "GFM table, emphasis and nested list render in actual Chrome",
@@ -10,6 +10,8 @@
     "purchase evidence opens the authenticated order dialog",
     "exception remains stopped at owner approval",
     "390px layout has no horizontal page overflow",
+    "LINE links to existing bot, displays current permissions, and fits a 390px screen",
+    "LINE order page displays exact amount and requires confirmation in the registered LINE account",
     "AI setup dialog opens and restores focus on Escape",
     "no browser JavaScript errors"
   ]

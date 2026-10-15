@@ -68,8 +68,13 @@
     "lost EC settlement response retries the same transaction and order",
     "EC acceptance does not falsely mark products delivered",
     "local and external merchants share the same onchain budget",
-    "browser distinguishes external order acceptance from digital downloads"
+    "browser distinguishes external order acceptance from digital downloads",
+    "LINE wallet-bound standing consent executes an actual external ERC20 purchase",
+    "duplicate LINE delivery and lost coordinator response produce one transfer",
+    "LINE exception waits without broadcasting and registered account postback approves exactly one order",
+    "real Gate enforces LINE-approved per-order and period-budget exceptions",
+    "LINE stop revokes future authority without falling back to legacy bot"
   ],
-  "transactionHash": "0x43e1f1d4c9ecce538fe93d43ee337614b1ac86d075dd474828b2952c88f2bd01",
-  "gate": "0xa51a6b3063a88fe1307ad6e6a017b931c15555fb"
+  "transactionHash": "0x6f0579e16d8bcea8cb65922741f4bc4b44dec973b202aa0a41ef737a87031490",
+  "gate": "0x413874dd7e650ab371fe99864b0ea978a67503e5"
 }

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {serve} from '@hono/node-server';
 import {serveStatic} from '@hono/node-server/serve-static';
 import {spawn} from 'node:child_process';
-import {randomUUID,generateKeyPairSync,sign} from 'node:crypto';
+import {randomBytes,randomUUID,generateKeyPairSync,sign} from 'node:crypto';
 import {writeFile,mkdir,rm} from 'node:fs/promises';
 import {privateKeyToAccount,generatePrivateKey} from 'viem/accounts';
 import {toHex,maxUint256,parseEther,encodePacked} from 'viem';
@@ -17,6 +17,7 @@ import {executePayment} from '../../worker/dist/settlement.js';
 import {processOrderWebhook} from '../../worker/dist/webhooks.js';
 import {externalAgentIntegration} from './external-agent-integration.mjs';
 import {startEcFixture,ecIntegration} from './ec-integration.mjs';
+import {lineIntegration} from './line-integration.mjs';
 
 export async function paymentIntegration({root,client,wallet,accounts,manifest,jpyc,humanKey}){
  const db=createDb('postgresql://localhost/yours_test');await migrate(db);
@@ -24,10 +25,11 @@ export async function paymentIntegration({root,client,wallet,accounts,manifest,j
  const keydir=root+'.local/payment-e2e-'+randomUUID();await mkdir(keydir,{recursive:true,mode:0o700});
  const pair=generateKeyPairSync('ec',{namedCurve:'prime256v1'});
  const signer={kid:'ucp-merchant',publicJwk:{...pair.publicKey.export({format:'jwk'}),kid:'ucp-merchant',alg:'ES256',use:'sig'},sign:async bytes=>new Uint8Array(sign('sha256',bytes,{key:pair.privateKey,dsaEncoding:'ieee-p1363'}))};
- const authority=spawn('uv',['run','uvicorn','yours_mandates.service:from_environment','--factory','--host','127.0.0.1','--port','18813','--no-access-log'],{cwd:root+'services/mandates',env:{...process.env,UV_CACHE_DIR:root+'.local/uv-cache',DATABASE_URL:'postgresql://localhost/yours_test',CHAIN_ID:'31337',GATE_ADDRESS:manifest.gate,PUBLIC_ORIGIN:'http://127.0.0.1:18815',MERCHANT_PUBLIC_JWK:JSON.stringify(signer.publicJwk),LOCAL_KEY_DIR:keydir,LOCAL_HUMAN_PRIVATE_KEY:humanKey,ENVIRONMENT:'test'},stdio:['ignore','ignore','pipe']});
- let stderr='';authority.stderr.on('data',chunk=>{stderr=(stderr+chunk.toString()).slice(-2000);});
  const fixture=await startEcFixture({client,token:manifest.jpyc,payTo:'0x0000000000000000000000000000000000000300'});
- const config=readConfig({EC_MERCHANTS_JSON:JSON.stringify([fixture.merchant]),NODE_ENV:'test',DATABASE_URL:'postgresql://localhost/yours_test',PUBLIC_ORIGIN:'http://127.0.0.1:18815',RPC_URL:'http://127.0.0.1:18812',CHAIN_ID:'31337',MERCHANT_PAY_TO:payTo,JPYC_ADDRESS:manifest.jpyc,GATE_ADDRESS:manifest.gate,AGENT_ADDRESS:accounts.agent.address,MANDATES_URL:'http://127.0.0.1:18813'});
+ const chatKey=randomBytes(32).toString('base64'),lineSecret='integration-only-channel';
+ const authority=spawn('uv',['run','uvicorn','yours_mandates.service:from_environment','--factory','--host','127.0.0.1','--port','18813','--no-access-log'],{cwd:root+'services/mandates',env:{...process.env,UV_CACHE_DIR:root+'.local/uv-cache',DATABASE_URL:'postgresql://localhost/yours_test',CHAIN_ID:'31337',GATE_ADDRESS:manifest.gate,PUBLIC_ORIGIN:'http://127.0.0.1:18815',MERCHANT_PUBLIC_JWK:JSON.stringify(signer.publicJwk),LOCAL_KEY_DIR:keydir,LOCAL_HUMAN_PRIVATE_KEY:humanKey,ENVIRONMENT:'test',CHAT_ENCRYPTION_KEY:chatKey,LINE_CHANNEL_SECRET:lineSecret,EC_MERCHANTS_JSON:JSON.stringify([fixture.merchant])},stdio:['ignore','ignore','pipe']});
+ let stderr='';authority.stderr.on('data',chunk=>{stderr=(stderr+chunk.toString()).slice(-2000);});
+ const config=readConfig({CHAT_ENCRYPTION_KEY:chatKey,LINE_CHANNEL_SECRET:lineSecret,EC_MERCHANTS_JSON:JSON.stringify([fixture.merchant]),NODE_ENV:'test',DATABASE_URL:'postgresql://localhost/yours_test',PUBLIC_ORIGIN:'http://127.0.0.1:18815',RPC_URL:'http://127.0.0.1:18812',CHAIN_ID:'31337',MERCHANT_PAY_TO:payTo,JPYC_ADDRESS:manifest.jpyc,GATE_ADDRESS:manifest.gate,AGENT_ADDRESS:accounts.agent.address,MANDATES_URL:'http://127.0.0.1:18813'});
  const app=createApp(db,config,signer,chainRuntime(config,manifest));
  app.use('/*',serveStatic({root:'apps/console/dist'}));app.get('*',serveStatic({path:'apps/console/dist/index.html'}));
  const apiServer=serve({fetch:app.fetch,port:18815,hostname:'127.0.0.1'});
@@ -195,6 +197,9 @@ export async function paymentIntegration({root,client,wallet,accounts,manifest,j
    await verifyEcPurchaseBrowser({origin:config.PUBLIC_ORIGIN,cookie,orderId:externalOrder});
    passed.push('browser distinguishes external order acceptance from digital downloads');
   }
+
+  await client.waitForTransactionReceipt({hash:await wallet.writeContract({...jpyc,functionName:'mint',args:[owner.address,parseEther('10000')]})});
+  await lineIntegration({db,app,config,signer,owner,connection,request,client,manifest,runtime:{...runtime,ecMerchants:[fixture.merchant]},fixture,passed});
 
   await writeFile(root+'docs/evidence/payment-pipeline.json',JSON.stringify({scope:'Local Anvil, official MetaMask contracts, test ERC20 and real PostgreSQL/AP2 HTTP authority. Production worker logic with random in-memory signing keys. Legacy EC uses a controlled HTTP fixture with real owner signatures and ERC20 receipt verification. No public MetaMask or public Amoy/EC purchase claim.',passed,transactionHash:settled.transactionHash,gate:manifest.gate},null,2)+'\n');
   console.log(JSON.stringify({passed:passed.length,evidence:'docs/evidence/payment-pipeline.json'}));

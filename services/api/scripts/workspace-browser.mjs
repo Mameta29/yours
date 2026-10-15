@@ -163,6 +163,8 @@ try {
       body = { balance: atomic(state === "confirmed" ? 3010680 : 3010980) };
     } else if (path === "/api/owner/tasks")
       body = { tasks: phase === "empty" ? [] : [task()] };
+    else if (path === "/api/owner/line") body={configured:true,botId:'@fixture',links:[{id:'line-fixture',connection_id:connection,display_name:'連携した本人',activated_at:stamp,expires_at:new Date(until*1000).toISOString()}],events:[]};
+    else if (path.startsWith('/api/line/approvals/')) body={id:intent,state:'approval_required',amount:2400,merchant:'HIGH RICE SHOP',items:[{id:'rice',item:{title:'お米10kg'},quantity:1}],reasons:['per_order'],available:true,botId:'@fixture'};
     else if (path === "/api/owner/runs") body = { runs: runs() };
     else if (path === "/api/owner/audit")
       body = {
@@ -315,6 +317,24 @@ try {
     fullPage: true,
   });
   checks.push("390px layout has no horizontal page overflow");
+  await page.locator('nav').getByRole('button',{name:'LINEで使う',exact:true}).click();
+  await expect(page.getByText('LINEでの購入が有効')).toBeVisible();
+  await expect(page.getByRole('link',{name:'LINEを開く'})).toHaveAttribute('href',/oaMessage/);
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+  await page.screenshot({path:'.local/line-settings-mobile.png',fullPage:true});
+  await page.setViewportSize({width:1440,height:1000});
+  await page.screenshot({path:'.local/line-settings-desktop.png',fullPage:true});
+  checks.push('LINE links to existing bot, displays current permissions, and fits a 390px screen');
+  await page.goto(origin+'/line/approve/'+'a'.repeat(43));
+  await expect(page.getByRole('heading',{name:'この買い物だけ、許可しますか。'})).toBeVisible();
+  await expect(page.getByText('¥2,400',{exact:false})).toBeVisible();
+  await expect(page.getByRole('link',{name:'LINEの注文確認に戻る'})).toBeVisible();
+  await expect(page.getByRole('button',{name:/認証/})).toHaveCount(0);
+  await page.setViewportSize({width:390,height:844});
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+  await page.screenshot({path:'.local/line-order-mobile.png',fullPage:true});
+  checks.push('LINE order page displays exact amount and requires confirmation in the registered LINE account');
+  await page.goto(origin);
   phase = "empty";
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.reload();
