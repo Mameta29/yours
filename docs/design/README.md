@@ -30,3 +30,5 @@ UCP stable 2026-08-25、AP2 v0.2。標準と独自stablecoin handlerの対応範
 ## 管理画面と実行の見せ方
 
 [ワークスペースの設計](CONSOLE-EXPERIENCE.md)と[3分の撮影手順](../DEMO-SCRIPT.md)。画面上の進捗は実際の購入状態・監査記録に基づく。
+
+LINEでの条件内自動購入と既存ETHGlobal資産の再利用は[構成評価](CHAT-COMMERCE-ASSESSMENT.md)。現実装との差分と概算を記録した提案で、LINE・Worldのyoursへの接続は未実装。
