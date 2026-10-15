@@ -34,6 +34,7 @@ import {
   fromAtomic,
 } from "./api";
 import OrderDetails from "./OrderDetails";
+import Markdown from "./Markdown";
 const walletAction =
   (name) =>
   (...args) =>
@@ -915,10 +916,12 @@ function App() {
                           <div className="model-message">
                             <Sparkles size={15} />
                             <div>
-                              {r.result?.text ??
-                                (r.status === "running"
-                                  ? "確認しています…"
-                                  : "結果を確認できませんでした。注文履歴をご確認ください。")}
+                              <Markdown>
+                                {r.result?.text ??
+                                  (r.status === "running"
+                                    ? "確認しています…"
+                                    : "結果を確認できませんでした。注文履歴をご確認ください。")}
+                              </Markdown>
                               {r.result?.events?.length > 0 && (
                                 <details>
                                   <summary>
