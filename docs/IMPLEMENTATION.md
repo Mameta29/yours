@@ -1,6 +1,6 @@
 # 実装の継続記録
 
-更新: 2026-10-15。repo: https://github.com/Mameta29/yours
+更新: 2026-10-16。repo: https://github.com/Mameta29/yours
 
 ## 確定した方向
 
@@ -19,6 +19,8 @@
 - [x] x402実行・journal・KMS署名・chain照合。
 - [x] Gemini ADKと外部agent接続。
 - [x] 管理画面・wallet承認・本人確認。
+- [x] 既存LINE Bot連携、Geminiによる実EC購入、注文専用の一件承認。
+- [x] 公開LINEでCHEAP・HIGHの購入、金額上限超過での停止・再開、実送金と元の上限維持を確認。
 - [x] Google Cloud構成、相互運用・障害試験、README・試用資料。
 
 ## 外部設定
@@ -118,17 +120,21 @@ EC source `16619bb1` は517パス保護scriptを通してstaging `cd22dad3b9b3c2
 
 その後、本人が1回上限1,000 JPYC・24時間5,000 JPYC・CHEAP/HIGH両店許可へ変更。LINE連携も有効。撮影シナリオは400 JPYCの通常購入→1,200 JPYCの金額上限超過→一件承認とする。[撮影台本](DEMO-SCRIPT.md)。現在の在庫からGoogle Cloudの実GeminiがHIGH 5kgを選択することも、注文を作らずに確認した。[実Geminiの選択](evidence/gemini-line-cloud.json)。
 
+00:42 JST、HIGH 5kg・1,200 test JPYCの購入も成立。1回上限1,000 JPYCによる `per_order` 停止、本人のLINE postbackによる一件承認一回、同じ注文の再開をCloud SQLで照合した。店舗注文番号は `ORD-20261015-BW4RUC9X`、通常在庫20→19。Amoyの2 RPCでcanonical receipt、Gateイベント、本人→HIGHの正確な1,200 test JPYC移動を確認。元の1回上限は1,000 JPYCを維持し、両注文のLINE通知14件はすべて配信済み、未処理queueは0件。[HIGHの公開購入](evidence/public-line-high-purchase.json)。
+
+00:44 JST、本人指定の撮影用にCHEAP 5kgの通常在庫だけ0→1へ補充。CHEAP 10kgは0、HIGH 5kgは19のまま。stagingの接続先fingerprintを再照合し、公開商品APIへの反映も確認。注文・送金・権限・使用済み予算は変更していない。[撮影用在庫](evidence/rice-demo-ready.json)。
+
 未連携のメッセージを旧Botへ戻していたため、旧経路の英語 `not_found` が表示されていた。EC source `c7718d31` / staging `6f0176aff95bb226d307c60736d355d29deb8ba2`で日本語の初回連携案内へ切り替え、旧wallet権限での購入を開始しないようにした。署名の改変拒否、連携済み経路、未連携の案内、配信失敗、productionの既存経路をテストし、型検査とVercel公開成功を確認。517保護文書は維持。
 
 Cloud Build `42a776d3-31f9-4337-9ca5-eb4cb83dcd15` / tag `line-20261016` / source `78687f5`で、承認待ちの注文期限を最大10分へ拡大し、署名した期限とDB期限を一致させた。LINE承認jobを優先する。元postbackの鮮度120秒と短命HSM承認は維持。5kgの依頼例も統一した。
 
 公開購入後、外部ECの注文通知が403で再試行する不具合を発見。受信側がyours Marketしか許可していなかった。source `094e6f8`で登録済みECも対象に追加し、元のHSM署名・送信元・既存注文・checkoutの照合を維持した。実HTTP署名・二重通知の単一保存を含む74項目の結合試験が成功。Cloud Build `88ea4263-6d29-4616-8aa7-b2d4749d11c7` / tag `line-webhooks-20261016`でAPIのみ更新し、`yours-api-00014-b48`へ100%切り替えた。全5サービスのhealth・公開範囲・実DBとHSM署名鍵、公開LINE画面の1440px/390px表示と配信asset一致を確認。[公開画面](evidence/public-line-console.json)。source `0c52079`の[CI 38761530400](https://github.com/Mameta29/yours/actions/runs/38761530400)も全項目成功。
 
-運用確認は `python3 infra/line-status.py`。既存Cloud Run job内のread-only transactionで連携・一件承認・注文・通知を確認し、資格情報・LINE識別子・メール・会話本文・署名を出力しない。
+公開API更新後の00:39 JST、再試行待ちだった外部EC注文通知2件が200で受理されたことも確認。運用確認は `python3 infra/line-status.py`。既存Cloud Run job内のread-only transactionで連携・一件承認・注文・通知を確認し、資格情報・LINE識別子・メール・会話本文・署名を出力しない。
 
 ## 次に完了する事項
 
-- yours Marketの公開本人購入、LINEでの外部EC購入と未許可店舗の一件承認は確認済み。撮影用のHIGH金額上限超過と、外部AI client単体の公開購入は別途確認する。
+- yours Marketの公開本人購入、LINEでの外部EC購入、未許可店舗と金額上限超過の一件承認は確認済み。外部AI client単体の公開購入は未確認。ローカルでは実署名・実送金を含めて検証済み。
 - 返金処理は未実装。現在は対応capabilityとして公開しない。
 - 実処理のデモ動画とDashboard提出。
 

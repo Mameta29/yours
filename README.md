@@ -80,12 +80,15 @@ UCP公式schemaとAP2 v0.2 SDKでは、delegated SD-JWTの表現に上流の不�
 | --- | --- |
 | 公開Google Cloud | 5サービスの稼働、公開範囲、Cloud SQL、実HSM鍵とdiscoveryの一致、Gemini→既存ECを含む実カタログ検索 |
 | 公開Amoy | yours専用Gate/Registryの配備、5 confirmations、code hash。本人walletのスマートアカウント設定とAI権限登録を確認。Geminiによる300 test JPYCの本人購入・owner→merchant送金・商品downloadを確認 |
+| 公開LINE + 実EC | CHEAP 5kg・400 test JPYCとHIGH 5kg・1,200 test JPYCの購入。未許可店舗・1回上限超過のそれぞれをLINEで一件承認し、実EC注文・在庫減少・本人→店舗の送金を確認。元の1,000円上限を維持 |
 | ローカルAnvil + PostgreSQL | 本人同意→公式AP2→UCP→x402→実ERC-7710送金→order/receipt、応答消失復旧、外部AI自身の署名、複数AI共有予算・外部client・本人限定の注文ページ・既存EC接続・LINE購入と一件承認を含む74項目 |
 | 実Chrome + 試験用EIP-1193 provider | 通常EOAの実EIP-7702設定、ERC-7715権限要求、承認後の通信失敗・部分登録・ウォレット再接続の復旧など22項目。実MetaMask拡張とは区別 |
 
 [公開購入の証拠](docs/evidence/public-owner-purchase.json) · [検証の証拠](docs/evidence/README.md) · [配備・実装記録](docs/IMPLEMENTATION.md) · [再現手順](docs/DEVELOPMENT.md)
 
-独立したyours Marketに加え、既存ECの2店舗を接続するadapterを実装・配備しています。外部ECの対象は配送・variant・必須追加optionのないAmoy商品で、本人が予約へ同意したcheckoutを使います。公開Google CloudでGeminiによる実ECの検索、ローカルでHTTP fixtureと実Anvil送金を使った注文復旧を確認済みです。実LINEからCHEAPの5kgを400 test JPYCで購入し、実ECの注文受付と在庫1→0を確認しました。[LINE購入の証拠](docs/evidence/public-line-cheap-purchase.json)。この注文では未許可店舗への一件承認も実行済みです。1,000円上限でHIGHの1,200円が停止する撮影シナリオは別途確認中、返金処理は未実装です。[接続の範囲](docs/design/EC-ADAPTER.md)
+独立したyours Marketに加え、既存ECの2店舗を接続するadapterを実装・配備しています。外部ECの対象は配送・variant・必須追加optionのないAmoy商品で、本人が予約へ同意したcheckoutを使います。公開Google CloudでGeminiによる実ECの検索、ローカルでHTTP fixtureと実Anvil送金を使った注文復旧を確認済みです。
+
+実LINEからCHEAPの5kgを400 test JPYCで購入し、実ECの注文受付と在庫1→0を確認しました。この注文では未許可店舗への一件承認を実行しています。[CHEAP購入の証拠](docs/evidence/public-line-cheap-purchase.json)。さらに、1,000円の上限でHIGHの1,200円の注文が停止し、LINEでその一件だけ承認すると購入が完了することも公開環境で確認済みです。元の上限は1,000円のままです。[HIGH購入と上限維持の証拠](docs/evidence/public-line-high-purchase.json)。返金処理は未実装です。[接続の範囲](docs/design/EC-ADAPTER.md)
 
 ## 開発
 

@@ -24,7 +24,11 @@ LINEへ **5kg入りのお米を1袋買って** と送信する。購入完了後
 
 ## 公開検証
 
-2026-10-16 00:19 JST、実LINE依頼からCHEAP 5kg・400 test JPYCの購入が成立。ECの注文番号 `ORD-20261015-DTCBWEP7`、通常在庫1→0、LINEへの結果通知を確認。実Amoyのreceipt・本人から店舗への正確な移動を2 RPCで照合した。[証拠](evidence/public-line-cheap-purchase.json)。再撮影前の在庫補充は購入や使用済み予算を巻き戻す処理ではない。
+2026-10-16 00:19 JST、実LINE依頼からCHEAP 5kg・400 test JPYCの購入が成立。ECの注文番号 `ORD-20261015-DTCBWEP7`、通常在庫1→0、LINEへの結果通知を確認。実Amoyのreceipt・本人から店舗への正確な移動を2 RPCで照合した。この注文時はCHEAPが未許可店舗だったため、一件承認を使っている。[CHEAPの証拠](evidence/public-line-cheap-purchase.json)。
+
+同日00:42 JST、HIGH 5kg・1,200 test JPYCの注文 `ORD-20261015-BW4RUC9X` も成立。1回上限1,000円で停止し、本人のLINEによる一件承認後に支払った。通常在庫20→19、2 RPCでの送金照合、元の1,000円上限の維持を確認。[HIGHの証拠](evidence/public-line-high-purchase.json)。
+
+同日00:44 JST、撮影用にCHEAP 5kgの在庫だけ0→1へ補充した。CHEAP 10kgは0、HIGH 5kgは19。公開ECの商品APIでも反映を確認した。[在庫の証拠](evidence/rice-demo-ready.json)。在庫補充は購入や使用済み予算を巻き戻す処理ではない。
 
 ## Web画面だけで試す場合
 

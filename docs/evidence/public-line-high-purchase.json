@@ -1,0 +1,55 @@
+{
+  "checkedAt": "2026-10-15T15:44:27.780Z",
+  "scope": "Public Polygon Amoy and actual registered LINE account: HIGH 5kg order stopped at the owner 1000 JPYC limit; one LINE postback approved this exact 1200 JPYC order. Exact owner-to-store transfer verified independently at two RPCs.",
+  "chainId": 80002,
+  "merchant": "HIGH RICE SHOP",
+  "amount": 1200,
+  "asset": "test JPYC",
+  "transactionHash": "0x476e17acd95e96f5db72a586ea8a43f7a835e20ad0e0e51214cd8ab6c046dab6",
+  "approval": {
+    "reason": [
+      "per_order"
+    ],
+    "perOrderBefore": 1000,
+    "perOrderAfter": 1000,
+    "lineApprovalCount": 1
+  },
+  "cloud": {
+    "lineRequestReceivedAt": "2026-10-15T15:40:17.953Z",
+    "purchaseCompletedAt": "2026-10-15T15:42:06.903Z",
+    "merchantOrderNumber": "ORD-20261015-BW4RUC9X",
+    "allLineNotifications": 14,
+    "deliveredLineNotifications": 14,
+    "pendingWork": 0
+  },
+  "checks": [
+    {
+      "rpc": "https://polygon-amoy-bor-rpc.publicnode.com",
+      "checks": {
+        "success": true,
+        "chainId": true,
+        "canonical": true,
+        "gate": true,
+        "ownerToMerchant": true,
+        "purchaseEvent": true,
+        "confirmations": 208
+      },
+      "block": 50256323,
+      "settledAt": "2026-10-15T15:40:59.000Z"
+    },
+    {
+      "rpc": "https://polygon-amoy.drpc.org",
+      "checks": {
+        "success": true,
+        "chainId": true,
+        "canonical": true,
+        "gate": true,
+        "ownerToMerchant": true,
+        "purchaseEvent": true,
+        "confirmations": 208
+      },
+      "block": 50256323,
+      "settledAt": "2026-10-15T15:40:59.000Z"
+    }
+  ]
+}

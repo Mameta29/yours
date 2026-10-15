@@ -28,6 +28,8 @@ scriptはchain ID・Anvil・loopback URL・framework commitを検証し、生成
 | [public-owner-permission.json](public-owner-permission.json) | 本人の実MetaMask登録完了報告、API有効化200、公開AmoyのGate/Registry有効状態と上限を照合。購入とは区別 |
 | [public-owner-purchase.json](public-owner-purchase.json) | 公開Amoyで本人の300 test JPYC購入。2 RPCでreceipt・Gate・正確なtoken移動を照合。公開Gemini/UCP/AP2/x402、download 200を確認 |
 | [public-line-cheap-purchase.json](public-line-cheap-purchase.json) | 実LINEの400 test JPYC購入と未許可店舗への一件承認。実EC注文、在庫1→0、通知、2 RPCの送金照合 |
+| [public-line-high-purchase.json](public-line-high-purchase.json) | 実LINEの1,000円上限で停止後、その一件だけ承認した1,200 test JPYC購入。実EC注文、2 RPCの送金照合、元の上限維持、LINE通知14件の配信と未処理queue 0件 |
+| [rice-demo-ready.json](rice-demo-ready.json) | 公開購入後、撮影用にCHEAP 5kgの通常在庫だけ0→1へ補充。HIGH 5kgは19。公開ECの商品APIでも照合。注文・送金・使用済み予算は変更しない |
 | [gemini-line-cloud.json](gemini-line-cloud.json) | Google Cloudの実Geminiが最新の公開UCPから在庫のあるHIGH 5kgを選択。注文や送金を伴わない読み取り試験 |
 | [workspace-browser.json](workspace-browser.json) | 新画面のMarkdown・状態更新・残高更新・PC/390px表示。ChromeとHTTP fixtureでのUI検証 |
 | [gemini-cloud.json](gemini-cloud.json) | Google ADK / Vertex AIによる実カタログ検索 |
@@ -42,4 +44,4 @@ scriptはchain ID・Anvil・loopback URL・framework commitを検証し、生成
 | [metamask-7715-compatibility.json](metamask-7715-compatibility.json) | SDKのERC-7715要求と公式MetaMask allowance builder/decoderの照合6項目。拡張UI・公開登録とは区別 |
 | [browser-permissions.json](browser-permissions.json) | EIP-7702・ERC-7715登録・中断再開・再接続22項目。raw owner委任を拒否する試験用providerとChrome |
 
-公開AmoyのGate配備は[manifest](../../deployments/amoy.json)で確認する。本人のスマートアカウント設定取引は成功receiptと現在の実装を照合済み。AI権限登録の完了もAPI・公開chainで照合済み。yours Marketの公開300 test JPYC購入も確認済み。実LINEから外部ECのCHEAP購入と一件承認も確認済み。外部AI client単体の公開購入は未確認。
+公開AmoyのGate配備は[manifest](../../deployments/amoy.json)で確認する。本人のスマートアカウント設定取引は成功receiptと現在の実装を照合済み。AI権限登録の完了もAPI・公開chainで照合済み。yours Marketの公開300 test JPYC購入、実LINEから外部ECのCHEAP・HIGH購入、未許可店舗と金額上限超過の一件承認を確認済み。外部AI client単体の公開購入は未確認。

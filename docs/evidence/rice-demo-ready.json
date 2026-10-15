@@ -1,0 +1,66 @@
+{
+  "checkedAt": "2026-10-15T15:44:26.440Z",
+  "scope": "Staging normal EC stock prepared for the requested screen recording after actual LINE purchases. Only CHEAP 5kg stock changed from zero to one. No orders, transfers, permissions, or spent budget changed.",
+  "stagingTargetVerified": true,
+  "before": {
+    "id": "63d28592-d2d6-4bc5-ad96-75466a96805f",
+    "shop_id": "feb3c557-27d9-45ab-970d-b65f8b440cf8",
+    "name": "お米 5kg / Rice 5 kg",
+    "stock": 0
+  },
+  "after": [
+    {
+      "id": "63d28592-d2d6-4bc5-ad96-75466a96805f",
+      "name": "お米 5kg / Rice 5 kg",
+      "stock": 1,
+      "price_jpyc": "400.000000000000000000"
+    },
+    {
+      "id": "6c8f9561-2aeb-4007-b0d4-7bea961a013d",
+      "name": "新潟県産コシヒカリ 5kg / Koshihikari 5 kg",
+      "stock": 19,
+      "price_jpyc": "1200.000000000000000000"
+    },
+    {
+      "id": "8671cbaa-471c-4ea5-a527-c2dc8073b23e",
+      "name": "お米 10kg / Rice 10 kg",
+      "stock": 0,
+      "price_jpyc": "800.000000000000000000"
+    }
+  ],
+  "publicCatalogVerification": {
+    "scope": "Read-only public REST API response after the stock update; no purchase triggered.",
+    "shops": [
+      {
+        "url": "https://stg-ec.jpyc-service.com/api/v1/shops/cheap-rice-shop/products",
+        "serverTime": "2026-10-15T15:47:27.551Z",
+        "products": [
+          {
+            "id": "63d28592-d2d6-4bc5-ad96-75466a96805f",
+            "stock": 1,
+            "priceJpyc": 400,
+            "onlinePurchaseAvailable": true
+          },
+          {
+            "id": "8671cbaa-471c-4ea5-a527-c2dc8073b23e",
+            "stock": 0,
+            "priceJpyc": 800,
+            "onlinePurchaseAvailable": false
+          }
+        ]
+      },
+      {
+        "url": "https://stg-ec.jpyc-service.com/api/v1/shops/high-rice-shop/products",
+        "serverTime": "2026-10-15T15:47:27.698Z",
+        "products": [
+          {
+            "id": "6c8f9561-2aeb-4007-b0d4-7bea961a013d",
+            "stock": 19,
+            "priceJpyc": 1200,
+            "onlinePurchaseAvailable": true
+          }
+        ]
+      }
+    ]
+  }
+}
