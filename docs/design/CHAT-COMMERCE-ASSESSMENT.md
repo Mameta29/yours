@@ -11,6 +11,12 @@
 - 旧`ShoppingService`はECのDB・`agent_inventory`・旧Gate/Facilitatorに結合している。コピーして配備先だけ変更すると、現在のyoursの権限・UCP/AP2・通常EC在庫を使う動作にはならない。
 - 公開ステージング`/api/agent/setup-status`で、80002、commerce/chat/LINE/World/selectorの設定有効とmanifest一致を確認。設定確認は今回のLINE実購入の通し検証ではない。
 
+### 7702/7715基盤の追加比較
+
+ユーザーの指摘を受け、両実装を直接比較した。yoursの`packages/wallet-sdk/src/permissions.ts`と旧ECの`packages/agent-commerce/src/permissions.ts`はbyte単位で一致する。両Amoy manifestのDelegationManager、7702 accountImplementation、7種のenforcerも一致。`YoursPurchaseGate`は既存`PurchaseGateV1`を継承し、AI接続別の制限を`AgentPermissionRegistry`で追加している。権限制御の中核を作り直す必要はなく、既存の自動購入フローを再利用する前提で接続差分を絞る。
+
+一方、公開Gateアドレスは旧ECとyoursで異なり、署名済みgrantはagent・redeemer等に束縛される。旧grantを無条件に流用することと、共通コードを現在のyoursのgrant/Gateへ接続することは別。毎回の購入同意は7702/7715の制約ではなく、現在のyoursのAP2発行・EC予約確認に設けた条件。自動購入へ寄せる際は、事前委任の証拠を両境界で検証する。
+
 参照した実装:
 
 - yours: `services/api/src/tasks.ts`、`ec-checkout.ts`、`approvals.ts`、`services/agent/yours_agent/service.py`。
@@ -46,6 +52,8 @@ CHEAP 10kgの通常在庫は先の補充で20個。1回で売り切れる実演�
 ## 概算
 
 コードを読んだ段階の開発作業量で、完了時刻の約束ではない。
+
+以下の合計見積もりはチャネル・AP2・EC受付・World・通し試験を含む広い範囲。上記の共通基盤の再実装を含めない。再利用できる接続差分を特定する前に、Gemini/GCPへの置換自体に3〜5日かかるという説明には使わない。
 
 - LINE受付・連携・進捗を現在の購入同意画面につなぐ段階: 半日〜1日。条件内でも都度署名が残る。
 - 事前委任、ECの委任受付、Gemini再選定、World一件例外、再送/復旧と公開実機検証まで: 合計3〜5日程度が初期見積もり。外部認証・wallet・EC受付で追加修正が出れば延びる。
