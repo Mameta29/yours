@@ -85,6 +85,8 @@ UCP RFC 9421署名、API keyとplatform profileの結び付け、DNSを固定し
 
 ## 既存ECの接続（実装・配備済み）
 
+2026-10-15の本人依頼で、主デモをステージングECのRICE購入に変更。[具体的な手順](EC-RICE-DEMO.md)と[撮影台本](DEMO-SCRIPT.md)を更新した。既存のstaging DB fingerprintと本番との差異を照合し、CHEAP通常商品5kgを0→20、10kgを1→20へ補充。公開EC APIとyours UCPの4商品が購入可能として返ることを確認した。[証拠](evidence/ec-rice-restock.json)。この在庫操作は運用作業であり、yoursアプリがECのDBへ接続するわけではない。アプリの接続は公開REST API経由、対象は明示登録した2店舗。MCPと全店舗の自動登録は使っていない。以前のAI専用在庫・価格・本人権限は変更していない。公開ECでの本人購入は次の実機確認に残る。
+
 `adapters/jpyc-ec`を新設。登録済みのorigin・店舗ID・送金先だけを使い、実ECの予約・personal_sign・transfer照合を接続する。migration 010で予約の冪等キーとcheckout/AP2の結び付きを永続化。本人の署名・同意を得るまではAP2を発行せず、メールの宛先をAIへ渡さない。workerは確定後に同じtx hashでEC注文を照合し、応答消失から復旧する。
 
 adapter境界の12テスト、AP2 authorityの19テスト、実Chromeを含む68項目のpipeline、権限API14項目、wallet登録18項目が通過。ECのHTTP境界はfixtureで、本人署名と実ERC20 receiptを検証している。実ECの[公開catalogの読み取り](evidence/ec-public-catalog.json)とは区別する。公開ECでの本人購入は未確認。
