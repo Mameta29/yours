@@ -16,6 +16,14 @@ export async function api(path, body, options = {}) {
   return data;
 }
 const messages = {
+  line_not_configured: 'LINEとの接続を準備中です。少し時間をおいてお試しください。',
+  line_bridge_unavailable: 'LINEとの接続を確認できませんでした。時間をおいて再度お試しください。',
+  line_login_not_configured: 'LINE認証の設定を準備中です。支払いは停止したままです。',
+  line_link_not_ready: 'LINEから連携コードを送信してから、もう一度お試しください。',
+  line_already_linked: 'このLINEは別のウォレットと連携しています。先にそちらの連携を停止してください。',
+  line_approval_not_found: 'この注文の確認リンクが見つかりません。LINEに届いたリンクを開いてください。',
+  line_order_not_approvable: '注文の状態または期限が変わりました。表示を更新して確認してください。',
+  line_login_rate_limit: '認証の試行が続いています。少し時間をおいてお試しください。',
   purchase_not_found:
     "このウォレットの注文が見つかりません。購入したアカウントでログインしてください。",
   download_unavailable:

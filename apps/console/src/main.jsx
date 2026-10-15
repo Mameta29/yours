@@ -22,6 +22,7 @@ import {
   AlertCircle,
   LogOut,
   Copy,
+  MessageCircle,
 } from "lucide-react";
 import {
   api,
@@ -33,6 +34,8 @@ import {
 } from "./api";
 import OrderDetails from "./OrderDetails";
 import HomeWorkspace from "./HomeWorkspace";
+import LineSettings from './LineSettings';
+import LineApproval from './LineApproval';
 import { auditLabels } from "./run-progress";
 const walletAction =
   (name) =>
@@ -90,7 +93,7 @@ function App() {
     [data, setData] = useState(null),
     [providers, setProviders] = useState([]),
     [provider, setProvider] = useState(null),
-    [tab, setTab] = useState("home"),
+    [tab, setTab] = useState(new URLSearchParams(window.location.search).get('view') === 'line' ? 'line' : 'home'),
     [modal, setModal] = useState(
       linkedOrder ? { kind: "order", orderId: linkedOrder } : null,
     ),
@@ -507,6 +510,7 @@ function App() {
           {[
             ["home", LayoutDashboard, "ホーム"],
             ["agents", Layers, "AIと権限"],
+            ["line", MessageCircle, "LINEで使う"],
             ["activity", Activity, "アクティビティ"],
             ["guide", Code2, "接続ガイド"],
           ].map(([key, Icon, label]) => (
@@ -546,7 +550,7 @@ function App() {
                 ? "ホーム"
                 : tab === "agents"
                   ? "AIと権限"
-                  : tab === "activity"
+                  : tab === 'line' ? 'LINEで使う' : tab === "activity"
                     ? "アクティビティ"
                     : "接続ガイド"}
             </span>
@@ -596,7 +600,7 @@ function App() {
                   ? "買い物を、あなたの条件で。"
                   : tab === "agents"
                     ? "誰に、どこまで任せますか。"
-                    : tab === "activity"
+                    : tab === 'line' ? '買い物は、いつものトークで。' : tab === "activity"
                       ? "AIの行動を、ひとつずつ。"
                       : "あなたのAIを、yoursにつなぐ。"}
               </h1>
@@ -605,11 +609,12 @@ function App() {
                   ? "資産はあなたの手に。選んだAIに、必要な範囲だけを任せる。"
                   : tab === "agents"
                     ? "予算・お店・期限を設定。権限はいつでも停止できます。"
-                    : tab === "activity"
+                    : tab === 'line' ? 'あなたが決めた条件を、LINEからの依頼にも。' : tab === "activity"
                       ? "同意、購入、支払いの根拠を確認できます。"
                       : "UCPで商品を選び、AP2で同意を証明し、x402で支払います。"}
               </p>
             </div>
+            {tab === 'home' && <button className="button" onClick={() => setTab('line')}><MessageCircle size={16} />LINEで使う <ArrowUpRight size={14} /></button>}
             {tab === "agents" && (
               <button
                 className="button primary"
@@ -694,6 +699,10 @@ function App() {
               }
             />
           )}
+          {tab === 'line' && <LineSettings data={data} config={config} onRefresh={refresh}
+            onWallet={() => setModal({ kind: 'wallet' })}
+            onPermission={() => { const c = chosen ?? connections.find(c => c.provider === 'gemini' && c.status !== 'revoked'); setModal(c ? { kind: 'permission', connection: c } : { kind: 'add' }); }}
+            signConsent={async (typedData) => { if (!needProvider()) return null; return typed(provider, address, config.chainId, typedData); }} />}
           {tab === "agents" && (
             <>
               <div className="agent-grid">
@@ -1618,4 +1627,5 @@ function ModalContent({
       </>
     );
 }
-createRoot(document.getElementById("root")).render(<App />);
+const lineApprovalToken = window.location.pathname.match(/^\/line\/approve\/([A-Za-z0-9_-]{43})\/?$/)?.[1];
+createRoot(document.getElementById("root")).render(lineApprovalToken ? <LineApproval token={lineApprovalToken} /> : <App />);

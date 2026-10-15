@@ -1900,3 +1900,31 @@ footer a:hover {
   font-size: 10px;
   font-weight: 400;
 }
+/* The channel setup and one-order confirmation use the same quiet workspace. */
+.line-settings{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(260px,1fr);gap:24px;align-items:start}
+.line-setup-card,.line-rules-card,.line-approval-card{background:#fff;border:1px solid #e3e7e0;border-radius:16px;padding:32px}
+.line-card-title{display:flex;gap:14px;align-items:flex-start;margin-bottom:28px;color:#244637}
+.line-card-title h2,.line-rules-card h2{font-size:19px;font-weight:600;letter-spacing:-.02em;margin:0 0 8px}
+.line-card-title p,.line-setup-card p,.line-rules-card p{color:#737d75;font-size:14px;line-height:1.8}
+.line-card-title p{margin:0}.line-actions{display:flex;gap:18px;align-items:center;margin-top:24px;flex-wrap:wrap}
+.line-connected{padding:20px 0;border-top:1px solid #edf0e9;border-bottom:1px solid #edf0e9;margin:20px 0}
+.line-connected>span{display:flex;align-items:center;gap:8px;color:#47734e;font-size:13px;margin-bottom:14px}
+.line-connected>strong{display:block;font-size:22px;letter-spacing:-.03em}.line-connected p{margin:4px 0 0}
+.line-example{border-radius:12px;background:#f5f7f1;padding:18px 22px;margin-top:24px}.line-example span{font-size:11px;color:#788771;letter-spacing:.04em}.line-example p{font-size:20px;font-weight:500;color:#263a2e;margin:12px 0 2px}
+.line-email{display:grid;gap:10px;font-size:13px;margin-top:22px}.line-email input{width:100%;min-height:46px;border:1px solid #d9dfd5;border-radius:8px;padding:12px 14px;background:white;color:#233a2e;font:inherit;font-size:16px}
+.line-consent{display:flex;align-items:flex-start;gap:12px;margin:24px 0;color:#344139;font-size:14px;line-height:1.8}.line-consent input{width:18px;height:18px;margin-top:4px;flex-shrink:0;accent-color:#234b36}
+.line-link-code{display:flex;align-items:center;gap:10px;margin:22px 0 12px;padding:12px;border:1px solid #e2e7dd;border-radius:8px;overflow-wrap:anywhere}.line-link-code code{font-size:13px;line-height:1.6;flex:1;min-width:0}
+.line-instructions{padding-left:22px;font-size:14px;line-height:2;color:#4b574d;margin-bottom:24px}
+.line-rules-card>svg{color:#748b67;margin-bottom:14px}.line-rules-card dl{margin:24px 0}.line-rules-card dl>div{display:flex;justify-content:space-between;gap:20px;margin:20px 0;font-size:13px}.line-rules-card dt{color:#7d857b;white-space:nowrap}.line-rules-card dd{margin:0;text-align:right;font-weight:500;line-height:1.7}
+.line-rule-note{margin-top:26px;padding-top:20px;border-top:1px solid #edf0e9;color:#7b8577;font-size:12px;line-height:1.9}
+.line-busy{display:flex;align-items:center;gap:10px;color:#687d59;font-size:14px;line-height:1.7}
+.line-approval-page{max-width:660px;margin:0 auto;padding:42px 24px;min-height:100vh}.line-approval-page>.wordmark{display:inline-block;margin:0 0 32px;text-decoration:none}
+.line-approval-card{padding:34px}.line-approval-icon{display:grid;place-items:center;width:46px;height:46px;background:#eff4e8;color:#758e57;border-radius:12px;margin-bottom:24px}
+.line-approval-card .eyebrow{font-size:11px;letter-spacing:.06em;color:#7f8d72}.line-approval-card h1{font-size:25px;line-height:1.5;letter-spacing:-.04em;font-weight:600;margin:12px 0 26px}.line-approval-card p{font-size:14px;line-height:1.9;color:#747e71}
+.line-order-summary{margin:20px 0;padding:20px 0;border-top:1px solid #e6eadf;border-bottom:1px solid #e6eadf}.line-order-summary>p{margin:0 0 18px;font-size:12px}.line-order-item{display:grid;gap:6px;margin:10px 0 22px}.line-order-item strong{font-size:17px;font-weight:500}.line-order-item>span{font-size:12px;color:#7d8777}
+.line-order-total{display:flex;justify-content:space-between;align-items:baseline;gap:20px}.line-order-total>strong{font-size:30px;letter-spacing:-.04em;font-weight:600}.line-order-total small{font-size:11px;font-weight:400;letter-spacing:0;color:#7b8675}.line-order-total>span{font-size:13px;color:#7b8675}
+.line-order-reasons{padding:16px 16px 16px 32px;border-radius:8px;background:#f5f1e7;color:#806b38;font-size:13px;line-height:1.9}
+.line-login-button{background:#06c755;color:#fff;border-color:#06c755;font-size:14px;min-height:48px}.line-login-button:hover{background:#05b64d}.line-login-button:disabled{opacity:.45}
+.line-approval-card>.text-button.full{margin-top:18px;justify-content:center}.line-approval-footnote{text-align:center;font-size:11px;color:#8d9686;margin-top:24px}
+@media(max-width:1000px){.line-settings{grid-template-columns:1fr}.line-setup-card,.line-rules-card{padding:24px}}
+@media(max-width:560px){.line-approval-page{padding:26px 16px}.line-approval-card{padding:24px 20px}.line-approval-card h1{font-size:22px}.line-login-button{font-size:13px}.line-setup-card,.line-rules-card{padding:22px 20px}}
