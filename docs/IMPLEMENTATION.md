@@ -93,6 +93,24 @@ adapter境界の12テスト、AP2 authorityの19テスト、実Chromeを含む68
 
 注文の受付を配達完了とは扱わない。外部ECの商品は本人が準備・同意したcheckoutを使用し、yours Marketのcart/create-checkoutを直接流用しない。配送先・variant・必須追加optionのある商品、返金処理は対象外。
 
+## 既存LINE Bot接続（2026-10-16 00:00 JST）
+
+ユーザー指定により、既存の `JPYC EC (Staging) / @922eatwh` を使用する。追加のLINE Login設定・World認証は不要。初回に本人がウォレットでLINE連携へ署名し、以後は通常購入をLINEから依頼できる。条件外では同じLINEへ届く「この一件だけ許可」の署名付きpostbackを、非公開authorityが元の注文と照合する。[接続・撮影手順](LINE-COMMERCE.md)。
+
+Cloud Build `c1cc2caf-7eaa-427c-9bf8-9d97d491d7ae` / tag `line-20261015` / runtime source `dfc3bb2` を配備。migration 011–012、専用chatサービス、毎分Scheduler、暗号化secretと最小権限SAを設定済み。APIの公開health、5サービスのready revisionと100% trafficを確認した。
+
+| service | revision |
+| --- | --- |
+| API / Console | `yours-api-00012-pxm` |
+| worker | `yours-worker-00007-rrl` |
+| mandates | `yours-mandates-00007-zst` |
+| Gemini agent | `yours-agent-00007-xz5` |
+| chat | `yours-chat-00001-qrs` |
+
+EC source `16619bb1` は517パス保護scriptを通してstaging `cd22dad3b9b3c277829a81bad558b8a75bbc80e3`へ反映。Vercel storefront成功と公開bridgeの既存Bot設定を確認した。LINE資格情報はコピーしていない。ローカルでは実DB・公式MetaMask contracts・実ERC20送金・AP2 HTTPを使う73項目、LINE画面を含むChrome 12項目を確認済み。LINE/Gemini外部通信はfixtureであり、公開LINEでの本人購入はまだ未確認。
+
+撮影用の在庫はCHEAP通常5kgを1、10kgを一時0（ともに変更前20）へ変更。HIGH通常5kgは20。価格・本人の権限は変更していない。本人によるCHEAP許可・HIGH未許可の設定とLINE連携署名が必要。公開済みimageの注文承認期限は2分。後続 `d902b14` の注文確認期限10分化・承認job優先処理は73項目で検証済みだが、今回の公開imageには含まれない。
+
 ## 次に完了する事項
 
 - yours Marketの公開本人購入は完了。外部ECと外部AI client単体の公開購入は未確認。ローカルの実HTTP・実送金の確認とは区別する。
