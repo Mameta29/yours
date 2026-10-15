@@ -1,0 +1,234 @@
+{
+  "checkedAt": "2026-10-15T11:54:05.697Z",
+  "environment": "JPYC EC staging / Polygon Amoy 80002",
+  "scope": "User-requested restock of two existing regular EC rice products for the yours external-store demo. Only stock and updated_at changed. No purchase, signature or payment performed.",
+  "databaseTargetFingerprint": "6687dbec78d9b337439f4e6ce902c8e7903d85c5cb2a58d8062e9d34b29fa214",
+  "productionTargetDifferent": true,
+  "matchesOriginalStagingPlan": true,
+  "shop": "cheap-rice-shop",
+  "before": [
+    {
+      "id": "63d28592-d2d6-4bc5-ad96-75466a96805f",
+      "shop_id": "feb3c557-27d9-45ab-970d-b65f8b440cf8",
+      "name": "お米 5kg / Rice 5 kg",
+      "stock": 0,
+      "price_jpyc": "400.000000000000000000",
+      "agent_only": false,
+      "is_pos_only": false,
+      "requires_shipping": false,
+      "variants": null
+    },
+    {
+      "id": "8671cbaa-471c-4ea5-a527-c2dc8073b23e",
+      "shop_id": "feb3c557-27d9-45ab-970d-b65f8b440cf8",
+      "name": "お米 10kg / Rice 10 kg",
+      "stock": 1,
+      "price_jpyc": "800.000000000000000000",
+      "agent_only": false,
+      "is_pos_only": false,
+      "requires_shipping": false,
+      "variants": null
+    }
+  ],
+  "after": [
+    {
+      "id": "63d28592-d2d6-4bc5-ad96-75466a96805f",
+      "shop_id": "feb3c557-27d9-45ab-970d-b65f8b440cf8",
+      "name": "お米 5kg / Rice 5 kg",
+      "stock": 20,
+      "price_jpyc": "400.000000000000000000"
+    },
+    {
+      "id": "8671cbaa-471c-4ea5-a527-c2dc8073b23e",
+      "shop_id": "feb3c557-27d9-45ab-970d-b65f8b440cf8",
+      "name": "お米 10kg / Rice 10 kg",
+      "stock": 20,
+      "price_jpyc": "800.000000000000000000"
+    }
+  ],
+  "unchanged": "Other products, all legacy agent_inventory rows, prices, merchant payees and owner permissions.",
+  "committed": true,
+  "publicVerification": {
+    "checkedAt": "2026-10-15T11:54:27.704Z",
+    "catalog": [
+      {
+        "url": "https://stg-ec.jpyc-service.com/api/v1/shops/cheap-rice-shop/products",
+        "shop": "cheap-rice-shop",
+        "chainIds": [
+          80002
+        ],
+        "products": [
+          {
+            "id": "63d28592-d2d6-4bc5-ad96-75466a96805f",
+            "title": "お米 5kg / Rice 5 kg",
+            "price": "400.000000000000000000",
+            "stock": 20,
+            "available": true
+          },
+          {
+            "id": "8671cbaa-471c-4ea5-a527-c2dc8073b23e",
+            "title": "お米 10kg / Rice 10 kg",
+            "price": "800.000000000000000000",
+            "stock": 20,
+            "available": true
+          }
+        ]
+      },
+      {
+        "url": "https://stg-ec.jpyc-service.com/api/v1/shops/high-rice-shop/products",
+        "shop": "high-rice-shop",
+        "chainIds": [
+          80002
+        ],
+        "products": [
+          {
+            "id": "6c8f9561-2aeb-4007-b0d4-7bea961a013d",
+            "title": "新潟県産コシヒカリ 5kg / Koshihikari 5 kg",
+            "price": "1200.000000000000000000",
+            "stock": 20,
+            "available": true
+          },
+          {
+            "id": "820cc7f7-47e8-4240-9388-0f4015d2ea64",
+            "title": "新潟県産コシヒカリ 10kg / Koshihikari 10 kg",
+            "price": "2400.000000000000000000",
+            "stock": 20,
+            "available": true
+          }
+        ]
+      }
+    ],
+    "ucp": {
+      "origin": "https://yours-api-110852561536.asia-northeast1.run.app",
+      "products": [
+        {
+          "id": "ec:cheap-rice-shop/63d28592-d2d6-4bc5-ad96-75466a96805f",
+          "title": "お米 5kg / Rice 5 kg",
+          "price": {
+            "amount": 400,
+            "currency": "JPY"
+          },
+          "availability": {
+            "available": true,
+            "status": "in_stock"
+          },
+          "metadata": {
+            "requires_shipping": false,
+            "merchant_id": "ec:cheap-rice-shop",
+            "merchant_name": "CHEAP RICE SHOP",
+            "external": true
+          }
+        },
+        {
+          "id": "ec:cheap-rice-shop/8671cbaa-471c-4ea5-a527-c2dc8073b23e",
+          "title": "お米 10kg / Rice 10 kg",
+          "price": {
+            "amount": 800,
+            "currency": "JPY"
+          },
+          "availability": {
+            "available": true,
+            "status": "in_stock"
+          },
+          "metadata": {
+            "requires_shipping": false,
+            "merchant_id": "ec:cheap-rice-shop",
+            "merchant_name": "CHEAP RICE SHOP",
+            "external": true
+          }
+        },
+        {
+          "id": "ec:high-rice-shop/6c8f9561-2aeb-4007-b0d4-7bea961a013d",
+          "title": "新潟県産コシヒカリ 5kg / Koshihikari 5 kg",
+          "price": {
+            "amount": 1200,
+            "currency": "JPY"
+          },
+          "availability": {
+            "available": true,
+            "status": "in_stock"
+          },
+          "metadata": {
+            "requires_shipping": false,
+            "merchant_id": "ec:high-rice-shop",
+            "merchant_name": "HIGH RICE SHOP",
+            "external": true
+          }
+        },
+        {
+          "id": "ec:high-rice-shop/820cc7f7-47e8-4240-9388-0f4015d2ea64",
+          "title": "新潟県産コシヒカリ 10kg / Koshihikari 10 kg",
+          "price": {
+            "amount": 2400,
+            "currency": "JPY"
+          },
+          "availability": {
+            "available": true,
+            "status": "in_stock"
+          },
+          "metadata": {
+            "requires_shipping": false,
+            "merchant_id": "ec:high-rice-shop",
+            "merchant_name": "HIGH RICE SHOP",
+            "external": true
+          }
+        }
+      ]
+    },
+    "scope": "Public REST catalog and deployed UCP catalog read only; no checkout or purchase."
+  },
+  "storePage": {
+    "status": 200,
+    "containsShopAndProduct": true
+  },
+  "publicGemini": {
+    "checkedAt": "2026-10-15T11:59:42.595Z",
+    "prompt": "カタログの全商品を最後のページまで取得し、お米・コシヒカリの5kg商品を店名・価格・在庫の有無で表にして比較してください。1,000円以内で買える商品をおすすめしてください。",
+    "response": {
+      "id": "67fca4b0-361c-4329-b7a8-0e68f63cef6a",
+      "status": "completed",
+      "result": {
+        "text": "カタログ全件の取得が完了しました。\nお米・コシヒカリの5kg商品の比較は以下の通りです。\n\n| 商品名 | 店名 | 価格 | 在庫 |\n| :--- | :--- | :--- | :--- |\n| **お米 5kg / Rice 5 kg** | CHEAP RICE SHOP | 400 JPY | あり（販売中） |\n| **新潟県産コシヒカリ 5kg / Koshihikari 5 kg** | HIGH RICE SHOP | 1,200 JPY | あり（販売中） |\n\n---\n\n### おすすめの商品\n- **おすすめ：** 「お米 5kg / Rice 5 kg」（CHEAP RICE SHOP）\n- **理由：** 価格が**400 JPY**で、ご指定の1,000円以内の予算を満たしています。\n  ※「新潟県産コシヒカリ 5kg」は1,200 JPYのため予算超過となります。\n\n購入を進める場合は、画面の「この購入を任せる」から本人同意を行ってください。",
+        "events": [
+          {
+            "type": "catalog.search",
+            "at": 1792065536,
+            "count": 6
+          },
+          {
+            "type": "catalog.search",
+            "at": 1792065547,
+            "count": 1
+          }
+        ],
+        "model": "gemini-3.8-flash",
+        "framework": "Google ADK",
+        "readOnly": true
+      }
+    },
+    "scope": "Real public Gemini comparison of both connected EC shops after restocking, with all catalog pages fetched. Read-only; no owner wallet, reservation or purchase."
+  },
+  "publicGeminiNarrowQuery": {
+    "checkedAt": "2026-10-15T11:56:20.184Z",
+    "prompt": "お米5kgを1袋探しています。接続済み店舗の商品を検索して、5kg商品の店名・価格・在庫の有無を比較してください。1,000円以内で買える商品をおすすめしてください。",
+    "response": {
+      "id": "13fd8438-60e7-48dc-bc9a-ac9a62a132a7",
+      "status": "completed",
+      "result": {
+        "text": "接続済み店舗で検索した結果、対象となる「お米5kg」の商品は以下の1点のみ見つかりました。\n\n### 検索結果\n\n| 商品名 | 店名 | 価格 | 在庫 |\n| :--- | :--- | :--- | :--- |\n| **お米 5kg / Rice 5 kg** | CHEAP RICE SHOP | 400円 (JPY) | あり（購入可能） |\n\n---\n\n### おすすめの商品\n- **商品名:** お米 5kg / Rice 5 kg\n- **店名:** CHEAP RICE SHOP\n- **価格:** 400円（ご予算の1,000円以内です）\n\n※こちらの商品は「ETHGlobal Tokyoのテストネット購入デモ用商品（会場受取想定）」として登録されています。\n\n購入をご希望の場合は、商品を選び、画面上の**「この購入を任せる」**ボタンからご本人の承認手続きを行ってください。",
+        "events": [
+          {
+            "type": "catalog.search",
+            "at": 1792065363,
+            "count": 1
+          }
+        ],
+        "model": "gemini-3.8-flash",
+        "framework": "Google ADK",
+        "readOnly": true
+      }
+    },
+    "scope": "Real public Gemini catalog comparison after restocking. Read-only; no owner wallet, reservation or purchase.",
+    "observedLimitation": "The initial narrow name query returned only CHEAP. Catalog matching is literal title/description substring search; it is not semantic product discovery. Use full-catalog pagination for this comparison."
+  }
+}

@@ -32,6 +32,7 @@ scriptはchain ID・Anvil・loopback URL・framework commitを検証し、生成
 | [gemini-paginated-cloud.json](gemini-paginated-cloud.json) | 公開GeminiがUCP cursorで6件→1件を取得し、実商品7件を回答 |
 | [ucp-ec-cloud.json](ucp-ec-cloud.json) | 公開yoursの実ECカタログ、店舗の固定送金先、UCP cursorの照合 |
 | [ec-public-catalog.json](ec-public-catalog.json) | 実ECの2店舗・4商品を読み取り。注文・送金なし |
+| [ec-rice-restock.json](ec-rice-restock.json) | 本人依頼でCHEAPの通常在庫2件を各20個へ補充。stagingの接続先照合、公開EC・UCPへの反映、実Geminiの全件取得と両店舗比較。注文・送金とは区別 |
 | [payment-pipeline.json](payment-pipeline.json) | 68項目。実Anvil・PostgreSQL・AP2 HTTP・外部client・Chrome。外部EC境界はfixture |
 | [permissions-api.json](permissions-api.json) | 権限の登録・停止・失効・復旧14項目 |
 | [metamask-send-calls-schema.json](metamask-send-calls-schema.json) | MetaMask公式runtime structで旧要求の拒否と修正後の受理を確認。拡張UI・公開取引とは区別 |
