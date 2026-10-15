@@ -6,6 +6,7 @@ import {acceptWebhook,type Db} from '@yours/storage';
 import {profile,parseAgentHeader,fetchProfile,signHttp,verifyHttp,safeRequest,validateSchema,UCP_VERSION} from '@yours/ucp';
 import type {P256Signer} from '@yours/signing';
 import type {Config} from './config.js';
+import {merchants} from './merchants.js';
 const identity=new OAuth2Client();
 
 export async function requireWorker(c:any,config:Config,expectedIdentity=config.WORKER_IDENTITY){
@@ -34,7 +35,10 @@ export function webhookRoutes(db:Db,config:Config,signer:P256Signer){
   const document=JSON.parse(Buffer.from(raw).toString('utf8'));validateSchema('shopping/order.json',document);
   const orderId=z.string().uuid().parse(document.id);
   const {rows:[order]}=await db.query('SELECT o.id,o.session_id,s.merchant_id,i.id AS intent_id FROM merchant_orders o JOIN merchant_sessions s ON s.id=o.session_id JOIN intents i ON i.checkout_id=s.id::text WHERE o.id=$1',[orderId]);
-  if(!order||order.merchant_id!==config.MERCHANT_ID||document.checkout_id!==order.session_id)throw new DomainError('order_business_mismatch',403);
+  // The adapter emits orders for enrolled EC merchants using this service's
+  // signed UCP profile too. Keep the source/key and existing-order checks, and
+  // include those merchants instead of accepting only the local yours Market.
+  if(!order||!merchants(config).some(m=>m.id===order.merchant_id)||document.checkout_id!==order.session_id)throw new DomainError('order_business_mismatch',403);
   const accepted=await acceptWebhook(db,source,id,document,order.intent_id);
   return c.json({ucp:{version:UCP_VERSION,status:'success'},received:true,duplicate:!accepted});
  });

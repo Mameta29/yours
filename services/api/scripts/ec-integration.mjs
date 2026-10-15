@@ -14,6 +14,7 @@ import { encodeDelegations, delegationTypedData } from "@yours/wallet-sdk";
 import { importJWK, jwtVerify } from 'jose';
 import { createHash } from 'node:crypto';
 import { lineConsentData } from '../dist/chat-security.js';
+import { claimWork, finishWork } from '@yours/storage';
 import { verifyCheckout, validateSchema } from "@yours/ucp";
 import { executePayment } from "../../worker/dist/settlement.js";
 import { settleEcOrder } from "../../worker/dist/ec-settlement.js";
@@ -540,6 +541,17 @@ export async function ecIntegration({
   assert.equal(detail.order.line_items[0].status, "processing");
   assert.equal(detail.order.fulfillment.events.length, 0);
   validateSchema("shopping/order.json", detail.order);
+  // Both the chain-confirmed order and the EC-accepted update are real signed
+  // webhook deliveries. The receiver must accept enrolled external merchants.
+  let delivered = 0;
+  for (let work; (work = await claimWork(db, ['order.webhook'], 60, id)); ) {
+    const body = { workId: work.id, leaseToken: work.lease_token };
+    assert.equal((await request('/internal/webhooks/deliver', body)).json.delivered, true);
+    assert.equal((await request('/internal/webhooks/deliver', body)).json.delivered, true);
+    assert.equal((await db.query('SELECT count(*)::int AS n FROM webhook_inbox WHERE event_id=$1', [work.payload.eventId])).rows[0].n, 1);
+    await finishWork(db, work); delivered++;
+  }
+  assert.equal(delivered, 2);
   await request("/api/owner/purchases/" + id + "/download", undefined, {
     status: 409,
   });
@@ -576,6 +588,7 @@ export async function ecIntegration({
     "real 800 JPYC transfer to the separate external payee",
     "lost EC settlement response retries the same transaction and order",
     "EC acceptance does not falsely mark products delivered",
+    "signed external EC order notifications are accepted and duplicates persist once",
     "local and external merchants share the same onchain budget",
   );
   return detail.order.id;

@@ -67,6 +67,7 @@
     "real 800 JPYC transfer to the separate external payee",
     "lost EC settlement response retries the same transaction and order",
     "EC acceptance does not falsely mark products delivered",
+    "signed external EC order notifications are accepted and duplicates persist once",
     "local and external merchants share the same onchain budget",
     "browser distinguishes external order acceptance from digital downloads",
     "LINE wallet-bound standing consent executes an actual external ERC20 purchase",
@@ -75,6 +76,6 @@
     "real Gate enforces LINE-approved per-order and period-budget exceptions",
     "LINE stop revokes future authority without falling back to legacy bot"
   ],
-  "transactionHash": "0x6f0579e16d8bcea8cb65922741f4bc4b44dec973b202aa0a41ef737a87031490",
-  "gate": "0x413874dd7e650ab371fe99864b0ea978a67503e5"
+  "transactionHash": "0x24f7006b7a7582024fae1a6ea5eea97d8f186c51ab04e1e6a9c6dddee3f8986c",
+  "gate": "0xf0cdecebe90ad70d45978465cd74eb2ef0cb0e78"
 }

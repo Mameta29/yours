@@ -9,8 +9,12 @@ export async function verifyPurchaseBrowser({origin,cookie,orderId}){
   const context=await browser.newContext({viewport:{width:1440,height:1100},acceptDownloads:true});
   const at=cookie.indexOf('=');
   await context.addCookies([{name:cookie.slice(0,at),value:cookie.slice(at+1),url:origin,httpOnly:true,sameSite:'Strict'}]);
+  const session=await context.request.get(origin+'/api/owner/me');
+  assert.equal(session.status(),200,'Browser context must have the real owner session');
   const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+  const ownerLoaded=page.waitForResponse(r=>r.url()===origin+'/api/owner/me');
   await page.goto(origin+'/orders/'+orderId);
+  assert.equal((await ownerLoaded).status(),200,'Order page must load its owner session');
   await expect(page.getByRole('dialog')).toContainText('yours integration item').catch(async error=>{await page.screenshot({path:'.local/order-browser-failure.png'});throw new Error(errors.join('; ')||error.message);});
   await expect(page.getByRole('dialog')).toContainText('支払済み');
   await page.screenshot({path:'.local/console-order.png'});
