@@ -15,7 +15,8 @@ app.post('/run', async c => {
   const deadline = Date.now() + 150000;
   let processed = 0, pending = 0;
   for (let i = 0; i < 16 && Date.now() < deadline; i++) {
-    const work = await claimWork(db, ['line.approval', 'line.purchase', 'line.message', 'line.forward'], 180);
+    const work = await claimWork(db, ['line.approval'], 180)
+      ?? await claimWork(db, ['line.purchase', 'line.message', 'line.forward'], 180);
     if (!work) break;
     try {
       const client = await auth.getIdTokenClient(origin);

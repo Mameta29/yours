@@ -38,7 +38,9 @@ async function prepareEnvelope(db:Db,id:string,r:SettlementRuntime){
  }
  if(checkout.merchant.id!==row.merchant_id||checkout.yours.pay_to.toLowerCase()!==payTo.toLowerCase()||checkout.yours.asset.toLowerCase()!==r.token.toLowerCase()||hosted&&row.agent_address!==r.signers.agent.address.toLowerCase())throw new DomainError('unsupported_payment_binding',422);
  for(const [role,field] of [['merchant','merchantSigner'],['risk','riskSigner']] as const)if(policy[field].toLowerCase()!==r.signers[role].address.toLowerCase())throw new DomainError('signer_binding_changed',409);
- const expiry=BigInt(Math.min(now+120,verified.expires_at,Math.floor(new Date(row.expires_at).getTime()/1000)));
+ // Allow time to read an exception before approving it. The later human
+ // endorsement is still fresh for at most 120 seconds and binds this order.
+ const expiry=BigInt(Math.min(now+(row.state==='approval_required'?600:120),verified.expires_at,Math.floor(new Date(row.expires_at).getTime()/1000)));
  const e={...row.grant.expectation,expiry:BigInt(row.grant.expectation.expiry),startTime:BigInt(row.grant.expectation.startTime)};
  const {parents}=validateParents(row.context,e);await verifyParentSignatures(r.client,parents,e);
  const leaf=buildPaymentLeaf(parents,{agent,gate:r.gate,token:r.token,enforcers:r.enforcers},amount,payTo,expiry,BigInt('0x'+randomBytes(32).toString('hex')));
@@ -86,7 +88,12 @@ export async function executePayment(db:Db,id:string,r:SettlementRuntime){
   if(!prepared){
    const envelope=await prepareEnvelope(db,id,r);
    const payload=paymentPayload(envelope,r.chainId,r.gate,r.manager,r.origin+'/api/agent/payments/'+id,keccak256(stringToHex(id)));
-   await db.query('INSERT INTO payment_envelopes(intent_id,envelope,payload,payload_hash,signing_challenge) VALUES($1,$2,$3,$4,$4) ON CONFLICT(intent_id) DO NOTHING',[id,JSON.stringify(safe(envelope)),JSON.stringify(payload),snapshotDigest(payload)]);
+   await transaction(db,async tx=>{
+    const inserted=await tx.query('INSERT INTO payment_envelopes(intent_id,envelope,payload,payload_hash,signing_challenge) VALUES($1,$2,$3,$4,$4) ON CONFLICT(intent_id) DO NOTHING RETURNING intent_id',[id,JSON.stringify(safe(envelope)),JSON.stringify(payload),snapshotDigest(payload)]);
+    // Reconciliation and the confirmation UI share the actual signed deadline;
+    // an expired envelope must not keep reserving budget or retrying forever.
+    if(inserted.rowCount)await tx.query('UPDATE intents SET expires_at=LEAST(expires_at,to_timestamp($2)) WHERE id=$1',[id,Number(envelope.order.validUntil)]);
+   });
    ({rows:[prepared]}=await db.query('SELECT * FROM payment_envelopes WHERE intent_id=$1',[id]));
   }
   if(row.state==='approval_required')return {state:'approval_required'};
