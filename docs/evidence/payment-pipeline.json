@@ -70,6 +70,6 @@
     "local and external merchants share the same onchain budget",
     "browser distinguishes external order acceptance from digital downloads"
   ],
-  "transactionHash": "0xda258e872be51ac1435bcc192aed8fe8416bb71e8fbb8df7081fb58f53d211fc",
-  "gate": "0x8c1106124cafc1064666730359b575baaee93f58"
+  "transactionHash": "0x43e1f1d4c9ecce538fe93d43ee337614b1ac86d075dd474828b2952c88f2bd01",
+  "gate": "0xa51a6b3063a88fe1307ad6e6a017b931c15555fb"
 }

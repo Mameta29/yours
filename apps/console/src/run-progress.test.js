@@ -57,4 +57,20 @@ describe("payment progress comes from authenticated records", () => {
     expect(p.needsCheck).toBe(true);
     expect(p.steps[1].status).toBe("attention");
   });
+  it("does not match unrelated audit records before an intent exists", () => {
+    const p = purchaseProgress(
+      { mandate_id: task.id, status: "running" },
+      [{ ...task, intent_id: undefined }],
+      [],
+      [
+        { action: "purchase.authorized", resource_id: "previous-purchase" },
+        {
+          action: "order.digital_access_granted",
+          resource_id: "previous-order",
+        },
+      ],
+    );
+    expect(p.steps[2].status).toBe("waiting");
+    expect(p.received).toBe(false);
+  });
 });

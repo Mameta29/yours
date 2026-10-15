@@ -1,0 +1,16 @@
+{
+  "checkedAt": "2026-10-15T11:21:00.952Z",
+  "scope": "Built console in real Chrome with local, explicit HTTP fixtures for owner, Gemini result and payment states. Tests presentation/polling only, not public payment or live model execution.",
+  "checks": [
+    "GFM table, emphasis and nested list render in actual Chrome",
+    "catalog defaults to allowed shops and permits viewing all shops",
+    "polling displays submitted as pending, not paid",
+    "actual confirmed state updates progress, shared budget and wallet balance",
+    "purchase requests show the product and agent instead of internal UUIDs",
+    "purchase evidence opens the authenticated order dialog",
+    "exception remains stopped at owner approval",
+    "390px layout has no horizontal page overflow",
+    "AI setup dialog opens and restores focus on Escape",
+    "no browser JavaScript errors"
+  ]
+}

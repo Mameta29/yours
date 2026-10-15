@@ -13,10 +13,8 @@ import {
   Layers,
   Activity,
   Code2,
-  Send,
   X,
   LoaderCircle,
-  Sparkles,
   FileText,
   LockKeyhole,
   ExternalLink,
@@ -34,7 +32,8 @@ import {
   fromAtomic,
 } from "./api";
 import OrderDetails from "./OrderDetails";
-import Markdown from "./Markdown";
+import HomeWorkspace from "./HomeWorkspace";
+import { auditLabels } from "./run-progress";
 const walletAction =
   (name) =>
   (...args) =>
@@ -64,7 +63,7 @@ const linkedOrder = window.location.pathname.match(
 )?.[1];
 const Logo = () => (
   <span className="wordmark">
-    yours<span className="brand-star">✳</span>
+    yours<span className="brand-period">.</span>
   </span>
 );
 const Status = ({ state }) => (
@@ -100,6 +99,7 @@ function App() {
     [products, setProducts] = useState([]),
     [tasks, setTasks] = useState([]),
     [runs, setRuns] = useState([]),
+    [pendingRun, setPendingRun] = useState(null),
     [audit, setAudit] = useState([]),
     [chat, setChat] = useState(""),
     [selected, setSelected] = useState(""),
@@ -179,15 +179,36 @@ function App() {
   }, [config]);
   useEffect(() => {
     if (!data) return;
-    const timer = setInterval(() => refresh().catch(() => {}), 8000);
+    const timer = setInterval(
+      () => refresh().catch(() => {}),
+      pendingRun ||
+        runs.some((r) => r.status === "running") ||
+        data.intents?.some((i) =>
+          ["authorized", "signing", "submitted"].includes(i.state),
+        )
+        ? 2000
+        : 8000,
+    );
     return () => clearInterval(timer);
-  }, [data?.account.id, refresh]);
+  }, [
+    data?.account.id,
+    refresh,
+    !!pendingRun,
+    runs.some((r) => r.status === "running"),
+    data?.intents?.some((i) =>
+      ["authorized", "signing", "submitted"].includes(i.state),
+    ),
+  ]);
   useEffect(() => {
     if (!data) return;
     api("/api/owner/permissions/wallet")
       .then(setWallet)
       .catch(() => {});
-  }, [data?.account.id, data?.policy?.activation_tx]);
+  }, [
+    data?.account.id,
+    data?.policy?.activation_tx,
+    data?.intents?.find((i) => i.state === "confirmed")?.transaction_hash,
+  ]);
   useEffect(() => {
     if (data) return;
     setTasks([]);
@@ -327,20 +348,45 @@ function App() {
     }
     return true;
   };
+  async function runAgent({
+    requestId = crypto.randomUUID(),
+    message,
+    connectionId,
+    mandateId,
+    displayMessage,
+  }) {
+    setPendingRun({
+      requestId,
+      message,
+      connectionId,
+      mandateId,
+      displayMessage,
+    });
+    try {
+      return await api("/api/owner/runs", {
+        requestId,
+        message,
+        ...(connectionId ? { connectionId } : {}),
+        ...(mandateId ? { mandateId } : {}),
+      });
+    } finally {
+      setPendingRun(null);
+    }
+  }
   async function ask(message = chat, mandateId) {
     if (!message.trim()) return;
     setChat("");
     await action("Geminiが確認しています", async () => {
       if (!data) {
-        const response = await api("/api/demo/runs", { message });
-        setRuns((old) => [{ ...response, message }, ...old].slice(0, 10));
+        setPendingRun({ requestId: crypto.randomUUID(), message });
+        try {
+          const response = await api("/api/demo/runs", { message });
+          setRuns((old) => [{ ...response, message }, ...old].slice(0, 10));
+        } finally {
+          setPendingRun(null);
+        }
       } else {
-        await api("/api/owner/runs", {
-          requestId: crypto.randomUUID(),
-          message,
-          ...(chosen ? { connectionId: chosen.id } : {}),
-          ...(mandateId ? { mandateId } : {}),
-        });
+        await runAgent({ message, connectionId: chosen?.id, mandateId });
       }
     });
   }
@@ -361,7 +407,7 @@ function App() {
             "agent-icon " + (c.provider === "gemini" ? "gemini" : "external")
           }
         >
-          <Sparkles size={23} />
+          {c.provider === "gemini" ? "G" : c.name.slice(0, 1).toUpperCase()}
         </span>
         <div>
           <h3>{c.name}</h3>
@@ -456,12 +502,7 @@ function App() {
         <a href="/" className="logo-link" aria-label="yours ホーム">
           <Logo />
         </a>
-        <div className="workspace-tag">
-          <span className="workspace-icon">Y</span>
-          <div>
-            あなたのワークスペース<small>Personal account</small>
-          </div>
-        </div>
+        <div className="workspace-tag">Personal workspace</div>
         <nav>
           {[
             ["home", LayoutDashboard, "ホーム"],
@@ -483,14 +524,6 @@ function App() {
           ))}
         </nav>
         <div className="sidebar-bottom">
-          <div className="security-note">
-            <ShieldCheck size={18} />
-            <span>
-              資産の持ち主は、
-              <br />
-              <strong>いつもあなたです。</strong>
-            </span>
-          </div>
           <a
             href="https://github.com/Mameta29/yours"
             target="_blank"
@@ -498,7 +531,7 @@ function App() {
           >
             GitHub <ArrowUpRight size={14} />
           </a>
-          <span className="small muted">Google Cloud Hackathon · 2026</span>
+          <span className="small muted">Your AI. Your rules.</span>
         </div>
       </aside>
       <div className="workspace">
@@ -550,7 +583,7 @@ function App() {
               </button>
             </div>
           )}
-          {busy && (
+          {busy && !pendingRun && (
             <div className="busy" role="status">
               <LoaderCircle size={17} className="spin" />
               {busy}
@@ -558,10 +591,9 @@ function App() {
           )}
           <div className="page-heading">
             <div>
-              <span className="eyebrow">YOUR AI. YOUR RULES.</span>
               <h1>
                 {tab === "home"
-                  ? "任せる範囲を、あなたが決める。"
+                  ? "買い物を、あなたの条件で。"
                   : tab === "agents"
                     ? "誰に、どこまで任せますか。"
                     : tab === "activity"
@@ -570,7 +602,7 @@ function App() {
               </h1>
               <p>
                 {tab === "home"
-                  ? "AIに買い物を任せても、資産と決定権はあなたの手に。"
+                  ? "資産はあなたの手に。選んだAIに、必要な範囲だけを任せる。"
                   : tab === "agents"
                     ? "予算・お店・期限を設定。権限はいつでも停止できます。"
                     : tab === "activity"
@@ -590,395 +622,77 @@ function App() {
             )}
           </div>
           {tab === "home" && (
-            <>
-              <section className="summary-grid">
-                <div className="summary-card balance">
-                  <div className="summary-label">
-                    共有予算の残り <span className="badge">24時間ごと</span>
-                  </div>
-                  <div className="big-number">
-                    {budget ? "¥" + yen(remaining) : "—"}
-                    <span>
-                      {budget ? "/ ¥" + yen(limit) : "予算を設定してください"}
-                    </span>
-                  </div>
-                  <div className="budget-bar">
-                    <i
-                      style={{
-                        width: limit
-                          ? Math.min(100, ((spent + reserved) / limit) * 100) +
-                            "%"
-                          : "0%",
-                      }}
-                    />
-                  </div>
-                  <div className="small muted">
-                    {budget
-                      ? `支払済み ¥${yen(spent)} · 確定待ち ¥${yen(reserved)}`
-                      : "複数のAIでも、使える総額はひとつ。"}
-                  </div>
-                </div>
-                <div className="summary-card">
-                  <span className="summary-label">
-                    購入を任せているAI <Layers size={18} />
-                  </span>
-                  <div className="big-number">
-                    {active.length}
-                    <span>サービス</span>
-                  </div>
-                  <button
-                    className="text-button"
-                    onClick={() => setTab("agents")}
-                  >
-                    権限を確認する <ArrowUpRight size={15} />
-                  </button>
-                </div>
-                <div className="summary-card">
-                  <span className="summary-label">
-                    本人ウォレット <ShieldCheck size={18} />
-                  </span>
-                  <div className="big-number">
-                    {wallet ? "¥" + yen(fromAtomic(wallet.balance)) : "—"}
-                    <span>JPYC</span>
-                  </div>
-                  <span className="small muted">
-                    AIへの事前送金は不要です。
-                  </span>
-                </div>
-              </section>
-              <div className="home-grid">
-                <div className="main-column">
-                  <section>
-                    <div className="section-heading">
-                      <h2>あなたのAI</h2>
-                      <button
-                        className="text-button"
-                        disabled={!data}
-                        onClick={() => setModal({ kind: "add" })}
-                      >
-                        <Plus size={15} />
-                        追加する
-                      </button>
-                    </div>
-                    {connections.length ? (
-                      <div className="agent-grid">
-                        {connections.map(connectionCard)}
-                      </div>
-                    ) : (
-                      <div className="empty-card">
-                        <span className="empty-mark">
-                          <Sparkles size={27} />
-                        </span>
-                        <h3>最初のAIに、役割を。</h3>
-                        <p>
-                          ウォレットを接続し、Geminiに任せる
-                          <br />
-                          買い物の範囲を設定しましょう。
-                        </p>
-                        <button
-                          className="button primary"
-                          disabled={!config || !!busy}
-                          onClick={() =>
-                            setModal({ kind: data ? "add" : "wallet" })
-                          }
-                        >
-                          {data ? "AIを追加する" : "ウォレットを接続"}
-                          <ArrowRight size={16} />
-                        </button>
-                      </div>
-                    )}
-                  </section>
-                  <section>
-                    <div className="section-heading">
-                      <h2>購入を依頼する</h2>
-                      <span className="small muted">
-                        Amoy検証ストア · テスト商品
-                      </span>
-                    </div>
-                    <div className="products">
-                      {products.map((p) => (
-                        <button
-                          key={p.id}
-                          className="product"
-                          disabled={!p.variants[0].availability.available}
-                          onClick={() =>
-                            data && active.length
-                              ? setModal({ kind: "purchase", product: p })
-                              : setNotice({
-                                  text: "先にウォレットを接続し、AIの権限を設定してください。",
-                                })
-                          }
-                        >
-                          <span className="product-art">
-                            <FileText size={33} />
-                            <span>
-                              {p.metadata?.external
-                                ? "CONNECTED / EC"
-                                : "YOURS / DIGITAL"}
-                            </span>
-                          </span>
-                          <div>
-                            <h3>{p.title}</h3>
-                            <small>
-                              {p.metadata?.merchant_name ?? "yours Market"}
-                              {!p.variants[0].availability.available
-                                ? " · 現在は購入できません"
-                                : ""}
-                            </small>
-                            <p>{p.description.plain}</p>
-                            <strong>
-                              ¥{yen(p.price_range.min.amount)} <span>JPYC</span>
-                            </strong>
-                            <ArrowUpRight size={17} />
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                    {!products.length && (
-                      <div className="empty-line">
-                        商品カタログを準備しています。
-                      </div>
-                    )}
-                  </section>
-                  {tasks.some(
-                    (t) =>
-                      !t.intent_id &&
-                      !t.revoked_at &&
-                      new Date(t.expires_at).getTime() > Date.now(),
-                  ) && (
-                    <section>
-                      <div className="section-heading">
-                        <h2>承認済みの依頼</h2>
-                      </div>
-                      <div className="approved-tasks">
-                        {tasks
-                          .filter(
-                            (t) =>
-                              !t.intent_id &&
-                              !t.revoked_at &&
-                              new Date(t.expires_at).getTime() > Date.now(),
-                          )
-                          .map((t) => {
-                            const agent = connections.find(
-                              (c) => c.id === t.connection_id,
-                            );
-                            return (
-                              <article className="approved-task" key={t.id}>
-                                <div>
-                                  <strong>
-                                    {t.task.items
-                                      .map((i) => i.title)
-                                      .join("、")}
-                                  </strong>
-                                  <p className="small muted">
-                                    {agent?.name} · 上限 ¥
-                                    {yen(t.task.max_amount)} ·{" "}
-                                    {new Date(t.expires_at).toLocaleTimeString(
-                                      "ja-JP",
-                                      { hour: "2-digit", minute: "2-digit" },
-                                    )}
-                                    まで
-                                  </p>
-                                </div>
-                                <div className="card-actions">
-                                  {agent?.provider === "gemini" ? (
-                                    <button
-                                      className="text-button"
-                                      disabled={
-                                        !!busy || agent.status !== "active"
-                                      }
-                                      onClick={() =>
-                                        action(
-                                          "Geminiが依頼を確認しています",
-                                          () =>
-                                            api("/api/owner/runs", {
-                                              requestId: crypto.randomUUID(),
-                                              connectionId: agent.id,
-                                              mandateId: t.id,
-                                              message: `承認した依頼 ${t.id} を実行してください。`,
-                                            }),
-                                        )
-                                      }
-                                    >
-                                      AIで実行 <ArrowRight size={14} />
-                                    </button>
-                                  ) : (
-                                    <button
-                                      className="text-button"
-                                      onClick={() =>
-                                        action(
-                                          "依頼IDをコピーしています",
-                                          async () => {
-                                            await navigator.clipboard.writeText(
-                                              t.id,
-                                            );
-                                            setNotice({
-                                              text: "依頼IDをコピーしました。接続した外部AIから実行できます。",
-                                            });
-                                          },
-                                        )
-                                      }
-                                    >
-                                      依頼IDをコピー <Copy size={14} />
-                                    </button>
-                                  )}
-                                  <button
-                                    className="text-button danger"
-                                    disabled={!!busy}
-                                    onClick={() =>
-                                      action("依頼を取り消しています", () =>
-                                        api(
-                                          `/api/owner/tasks/${t.id}/revoke`,
-                                          {},
-                                        ),
-                                      )
-                                    }
-                                  >
-                                    依頼を取り消す
-                                  </button>
-                                </div>
-                              </article>
-                            );
-                          })}
-                      </div>
-                    </section>
-                  )}
-                  <section>
-                    <div className="section-heading">
-                      <h2>最近の購入</h2>
-                      <button
-                        className="text-button"
-                        onClick={() => setTab("activity")}
-                      >
-                        すべて見る <ArrowUpRight size={14} />
-                      </button>
-                    </div>
-                    <IntentList
-                      intents={data?.intents.slice(0, 5) ?? []}
-                      onApprove={approveOrder}
-                      onOpen={(intent) =>
-                        setModal({ kind: "order", intentId: intent.id })
-                      }
-                    />
-                  </section>
-                </div>
-                <aside className="assistant-panel">
-                  <div className="assistant-header">
-                    <span className="agent-icon gemini">
-                      <Sparkles size={22} />
-                    </span>
-                    <div>
-                      <h2>あなたのアシスタント</h2>
-                      <span className="small muted">Gemini · Google Cloud</span>
-                    </div>
-                  </div>
-                  {active.filter((c) => c.provider === "gemini").length > 1 && (
-                    <select
-                      aria-label="会話するAI"
-                      value={chosen?.id ?? ""}
-                      onChange={(e) => setSelected(e.target.value)}
-                    >
-                      {active
-                        .filter((c) => c.provider === "gemini")
-                        .map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name}
-                          </option>
-                        ))}
-                    </select>
-                  )}
-                  <div className="chat-messages">
-                    {runs.length === 0 ? (
-                      <div className="assistant-intro">
-                        <span className="mini-star">✳</span>
-                        <h3>
-                          次のひと仕事、
-                          <br />
-                          任せてみませんか。
-                        </h3>
-                        <p>
-                          カタログを調べて、購入候補をご案内します。支払いは、あなたが署名した依頼の範囲だけ。
-                        </p>
-                        <button
-                          onClick={() =>
-                            setChat("カタログの商品と価格を教えて")
-                          }
-                          className="prompt"
-                        >
-                          カタログの商品と価格を教えて{" "}
-                          <ArrowUpRight size={14} />
-                        </button>
-                      </div>
-                    ) : (
-                      [...runs].reverse().map((r) => (
-                        <div key={r.id} className="chat-turn">
-                          <div className="user-message">{r.message}</div>
-                          <div className="model-message">
-                            <Sparkles size={15} />
-                            <div>
-                              <Markdown>
-                                {r.result?.text ??
-                                  (r.status === "running"
-                                    ? "確認しています…"
-                                    : "結果を確認できませんでした。注文履歴をご確認ください。")}
-                              </Markdown>
-                              {r.result?.events?.length > 0 && (
-                                <details>
-                                  <summary>
-                                    実行記録 · {r.result.events.length}件
-                                  </summary>
-                                  {r.result.events.map((e, i) => (
-                                    <div key={i} className="trace">
-                                      <Check size={12} />
-                                      {e.type}
-                                    </div>
-                                  ))}
-                                </details>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                  <form
-                    className="chat-input"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      ask();
-                    }}
-                  >
-                    <textarea
-                      rows={2}
-                      aria-label="Geminiへのメッセージ"
-                      placeholder={
-                        data
-                          ? "調べてほしいこと、任せたいこと…"
-                          : "商品について聞いてみてください"
-                      }
-                      maxLength={data ? 2000 : 500}
-                      value={chat}
-                      onChange={(e) => setChat(e.target.value)}
-                      disabled={!config?.geminiConfigured || !!busy}
-                    />
-                    <div>
-                      <span>
-                        <LockKeyhole size={12} />
-                        決済は本人の同意が必要
-                      </span>
-                      <button
-                        aria-label="送信"
-                        disabled={
-                          !config?.geminiConfigured || !chat.trim() || !!busy
-                        }
-                      >
-                        <Send size={16} />
-                      </button>
-                    </div>
-                  </form>
-                </aside>
-              </div>
-            </>
+            <HomeWorkspace
+              {...{
+                config,
+                data,
+                wallet,
+                budget,
+                remaining,
+                limit,
+                spent,
+                reserved,
+                connections,
+                active,
+                chosen,
+                selected,
+                setSelected,
+                runs,
+                pendingRun,
+                tasks,
+                audit,
+                products,
+                busy,
+                chat,
+                setChat,
+                ask,
+              }}
+              onAdd={() => setModal({ kind: "add" })}
+              onWallet={() => setModal({ kind: "wallet" })}
+              onPermission={(connection) =>
+                setModal({ kind: "permission", connection })
+              }
+              onPause={(connection) =>
+                action("新しい購入を停止しています", () =>
+                  api(`/api/owner/connections/${connection.id}/pause`, {}),
+                )
+              }
+              onPurchase={(product) =>
+                data && active.length
+                  ? setModal({ kind: "purchase", product })
+                  : setNotice({
+                      text: "先にウォレットを接続し、AIの権限を設定してください。",
+                    })
+              }
+              onOpen={(intent) =>
+                setModal({ kind: "order", intentId: intent.id })
+              }
+              onApprove={approveOrder}
+              onAgents={() => setTab("agents")}
+              onActivity={() => setTab("activity")}
+              onRunTask={(task, agent) =>
+                action("Geminiが依頼を確認しています", () =>
+                  runAgent({
+                    connectionId: agent.id,
+                    mandateId: task.id,
+                    message: `承認した依頼 ${task.id} を実行してください。`,
+                  }),
+                )
+              }
+              onRevokeTask={(task) =>
+                action("依頼を取り消しています", () =>
+                  api(`/api/owner/tasks/${task.id}/revoke`, {}),
+                )
+              }
+              onCopyTask={(task) =>
+                action("依頼IDをコピーしています", async () => {
+                  await navigator.clipboard.writeText(task.id);
+                  setNotice({
+                    text: "依頼IDをコピーしました。接続した外部AIから実行できます。",
+                  });
+                })
+              }
+            />
           )}
           {tab === "agents" && (
             <>
@@ -1044,7 +758,7 @@ function App() {
                     <div key={e.sequence}>
                       <span className="audit-dot" />
                       <div>
-                        <strong>{e.action}</strong>
+                        <strong>{auditLabels[e.action] ?? e.action}</strong>
                         <small>
                           {e.actor.startsWith("owner:")
                             ? "本人"
@@ -1115,9 +829,7 @@ function App() {
             </div>
           )}
           <footer>
-            <span>
-              <Logo /> AI works for you.
-            </span>
+            <span>AI works for you.</span>
             <div>
               <a href="/privacy">プライバシー</a>
               <a href="/terms">利用条件</a>
@@ -1148,6 +860,8 @@ function App() {
               chosen,
               needProvider,
               ask,
+              runAgent,
+              tasks,
               setNotice,
             }}
           />
@@ -1313,6 +1027,8 @@ function ModalContent({
   chosen,
   needProvider,
   ask,
+  runAgent,
+  tasks,
   setNotice,
 }) {
   const [name, setName] = useState("My Gemini"),
@@ -1444,7 +1160,7 @@ function ModalContent({
         }}
       >
         <span className="modal-symbol">
-          <Sparkles />
+          <Layers />
         </span>
         <h2 id="modal-title">AIを追加する</h2>
         <p>実行するAIを選び、あとから購入の範囲を指定します。</p>
@@ -1737,8 +1453,8 @@ function ModalContent({
               });
               return;
             }
-            await api("/api/owner/runs", {
-              requestId: crypto.randomUUID(),
+            await runAgent({
+              displayMessage: `「${p.title}」の購入を${buyer.name}に依頼`,
               connectionId: buyer.id,
               mandateId: approved.id,
               message:

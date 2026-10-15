@@ -24,15 +24,15 @@
     "account change closes the pending form and logs out without sending",
     "no JavaScript errors"
   ],
-  "upgradeTransaction": "0x7cdd7d45410b7c637357bbcb92ee23416f50118c0fdc0a63d58b7d229f43ac58",
+  "upgradeTransaction": "0x2d821ba4b0010d6f3ff69e4c168ec76f792349806a8ccd2baff258d30fe9577c",
   "transactions": [
     {
-      "to": "0x8c1106124cafc1064666730359b575baaee93f58",
-      "hash": "0x89c2294eab30425c6ba1201607701faaf7c80f2312dbc23b1f17bdf9da0603b1"
+      "to": "0xa51a6b3063a88fe1307ad6e6a017b931c15555fb",
+      "hash": "0x405e48b8ec404fad6aa122b01758e5f9bb9b20c9c01bec146da4980f2bd1607c"
     },
     {
-      "to": "0x3241eE5772e7bDf3F0232A20C665D517342aD080",
-      "hash": "0x33593c3baca8c24d6e6b36d250a9d4ffa1f20ccf6d5b8ea33f008a48487dbfbe"
+      "to": "0x05ED423cEeE25D37bB1281feB0C35B449058fd43",
+      "hash": "0xcf4dc21d6b7d471e88d562e26013b87c94831c570752b133fcb10e009b7379a6"
     }
   ]
 }

@@ -5,10 +5,13 @@ export function purchaseProgress(run, tasks, intents, audit = []) {
   const intent = intents.find((i) => i.id === task.intent_id);
   const state = intent?.state ?? task.state;
   const hash = intent?.transaction_hash ?? task.transaction_hash;
-  const evidence = audit.filter(
-    (e) =>
-      e.resource_id === task.intent_id || e.data?.intentId === task.intent_id,
-  );
+  const evidence = task.intent_id
+    ? audit.filter(
+        (e) =>
+          e.resource_id === task.intent_id ||
+          e.data?.intentId === task.intent_id,
+      )
+    : [];
   const paid = state === "confirmed" && /^0x[0-9a-f]{64}$/i.test(hash ?? "");
   const stopped =
     ["failed", "canceled"].includes(state) ||
