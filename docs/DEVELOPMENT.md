@@ -59,7 +59,8 @@ node services/api/scripts/browser-permissions.mjs
 - `infra/cloudbuild.yaml`: API/worker/console、AP2 authority、Gemini agentのimageをbuild。
 - `infra/deploy.py`: migrationを先に適用し、固定service identity・Secret Manager参照でCloud Runを配備。
 - `infra/scheduler.py`: private workerの定期実行。
-- `infra/smoke.py`: 公開範囲、health、DB、discovery署名鍵をread-onlyで検証。
+- `infra/smoke.py`: 5サービスの公開範囲、health、DB、discovery署名鍵をread-onlyで検証。
+- `infra/line-status.py`: 既存のCloud Run job内でLINE連携・注文・一件承認・通知queueを読み取り確認。資格情報、LINE ID、メール、会話、署名は出力しない。
 
 既存projectでの反映例。tagは変更ごとに一意にする。
 

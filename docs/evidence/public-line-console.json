@@ -1,0 +1,25 @@
+{
+  "checkedAt": "2026-10-15T15:39:47.130Z",
+  "scope": "Live public LINE setup entry in real Chrome, without wallet or LINE authentication; no purchase. Local architecture SVG rendered for layout review.",
+  "results": [
+    {
+      "width": 1440,
+      "lineEntry": true,
+      "walletConnectionRequired": true,
+      "noHorizontalOverflow": true
+    },
+    {
+      "width": 390,
+      "lineEntry": true,
+      "walletConnectionRequired": true,
+      "noHorizontalOverflow": true
+    }
+  ],
+  "errors": [],
+  "entryAssetsMatch": [
+    "/assets/index-euj2a90T.js",
+    "/assets/react-C2KYkj3z.js",
+    "/assets/wallet-DUkwcg3T.js",
+    "/assets/index-D6QuT5AW.css"
+  ]
+}

@@ -50,10 +50,11 @@ Polygon Amoyにyours専用Gate `0x42eec579df8fb1f87ae3bddbb90c6a4a9f790504` とR
 
 | service | revision | image tag | source |
 | --- | --- | --- | --- |
-| API / Console | `yours-api-00011-7sb` | `workspace-20261015-v2` | `e9b57cd` |
-| worker | `yours-worker-00006-z4v` | `commerce-20261014` | `c785810` |
-| mandates | `yours-mandates-00006-cjn` | `commerce-20261014` | `c785810` |
-| Gemini agent | `yours-agent-00006-98c` | `catalog-20261014` | `55b074d` |
+| API / Console | `yours-api-00014-b48` | `line-webhooks-20261016` | `094e6f8` |
+| worker | `yours-worker-00008-lk5` | `line-20261016` | `78687f5` |
+| mandates | `yours-mandates-00008-jzh` | `line-20261016` | `78687f5` |
+| Gemini agent | `yours-agent-00008-clm` | `line-20261016` | `78687f5` |
+| LINE chat | `yours-chat-00002-wbn` | `line-20261016` | `78687f5` |
 
 Cloud SQL接続、HSM公開鍵とdiscoveryの一致、4サービスのhealthと公開範囲を確認（[証拠](evidence/cloud-services.json)）。再接続修正の反映後も4件成功。公開Chromeの1440px・390px表示、JavaScriptエラーなし、検証したbuild assetの配信を確認。後続commitは再配備するまで公開環境の成果に含めない。
 
@@ -107,13 +108,27 @@ Cloud Build `c1cc2caf-7eaa-427c-9bf8-9d97d491d7ae` / tag `line-20261015` / runti
 | Gemini agent | `yours-agent-00007-xz5` |
 | chat | `yours-chat-00001-qrs` |
 
-EC source `16619bb1` は517パス保護scriptを通してstaging `cd22dad3b9b3c277829a81bad558b8a75bbc80e3`へ反映。Vercel storefront成功と公開bridgeの既存Bot設定を確認した。LINE資格情報はコピーしていない。ローカルでは実DB・公式MetaMask contracts・実ERC20送金・AP2 HTTPを使う73項目、LINE画面を含むChrome 12項目を確認済み。LINE/Gemini外部通信はfixtureであり、公開LINEでの本人購入はまだ未確認。
+EC source `16619bb1` は517パス保護scriptを通してstaging `cd22dad3b9b3c277829a81bad558b8a75bbc80e3`へ反映。Vercel storefront成功と公開bridgeの既存Bot設定を確認した。LINE資格情報はコピーしていない。ローカルでは実DB・公式MetaMask contracts・実ERC20送金・AP2 HTTPを使う73項目、LINE画面を含むChrome 12項目を確認済み。LINE/Gemini外部通信はfixtureであり、この配備時点では公開LINEでの本人購入は未確認だった。
 
 撮影用の在庫はCHEAP通常5kgを1、10kgを一時0（ともに変更前20）へ変更。HIGH通常5kgは20。価格・本人の権限は変更していない。本人によるCHEAP許可・HIGH未許可の設定とLINE連携署名が必要。公開済みimageの注文承認期限は2分。後続 `d902b14` の注文確認期限10分化・承認job優先処理は73項目で検証済みだが、今回の公開imageには含まれない。
 
+## 公開LINEでの実購入と一件承認（2026-10-16）
+
+00:19 JST、本人の実LINE依頼でCHEAPの5kg・400 test JPYCが購入成立。店舗注文番号 `ORD-20261015-DTCBWEP7`、通常在庫1→0、結果通知8件の配信を照合した。Amoyの2 RPCでcanonical receipt、Gateイベント、本人→CHEAPの正確な400 test JPYC移動を確認。[証拠](evidence/public-line-cheap-purchase.json)。この注文時にはCHEAPが未許可店舗だったため、LINEの「この一件だけ許可」のpostbackにより再開している。通常条件内購入の公開証拠とは区別する。
+
+その後、本人が1回上限1,000 JPYC・24時間5,000 JPYC・CHEAP/HIGH両店許可へ変更。LINE連携も有効。撮影シナリオは400 JPYCの通常購入→1,200 JPYCの金額上限超過→一件承認とする。[撮影台本](DEMO-SCRIPT.md)。現在の在庫からGoogle Cloudの実GeminiがHIGH 5kgを選択することも、注文を作らずに確認した。[実Geminiの選択](evidence/gemini-line-cloud.json)。
+
+未連携のメッセージを旧Botへ戻していたため、旧経路の英語 `not_found` が表示されていた。EC source `c7718d31` / staging `6f0176aff95bb226d307c60736d355d29deb8ba2`で日本語の初回連携案内へ切り替え、旧wallet権限での購入を開始しないようにした。署名の改変拒否、連携済み経路、未連携の案内、配信失敗、productionの既存経路をテストし、型検査とVercel公開成功を確認。517保護文書は維持。
+
+Cloud Build `42a776d3-31f9-4337-9ca5-eb4cb83dcd15` / tag `line-20261016` / source `78687f5`で、承認待ちの注文期限を最大10分へ拡大し、署名した期限とDB期限を一致させた。LINE承認jobを優先する。元postbackの鮮度120秒と短命HSM承認は維持。5kgの依頼例も統一した。
+
+公開購入後、外部ECの注文通知が403で再試行する不具合を発見。受信側がyours Marketしか許可していなかった。source `094e6f8`で登録済みECも対象に追加し、元のHSM署名・送信元・既存注文・checkoutの照合を維持した。実HTTP署名・二重通知の単一保存を含む74項目の結合試験が成功。Cloud Build `88ea4263-6d29-4616-8aa7-b2d4749d11c7` / tag `line-webhooks-20261016`でAPIのみ更新し、`yours-api-00014-b48`へ100%切り替えた。全5サービスのhealth・公開範囲・実DBとHSM署名鍵、公開LINE画面の1440px/390px表示と配信asset一致を確認。[公開画面](evidence/public-line-console.json)。source `0c52079`の[CI 38761530400](https://github.com/Mameta29/yours/actions/runs/38761530400)も全項目成功。
+
+運用確認は `python3 infra/line-status.py`。既存Cloud Run job内のread-only transactionで連携・一件承認・注文・通知を確認し、資格情報・LINE識別子・メール・会話本文・署名を出力しない。
+
 ## 次に完了する事項
 
-- yours Marketの公開本人購入は完了。外部ECと外部AI client単体の公開購入は未確認。ローカルの実HTTP・実送金の確認とは区別する。
+- yours Marketの公開本人購入、LINEでの外部EC購入と未許可店舗の一件承認は確認済み。撮影用のHIGH金額上限超過と、外部AI client単体の公開購入は別途確認する。
 - 返金処理は未実装。現在は対応capabilityとして公開しない。
 - 実処理のデモ動画とDashboard提出。
 

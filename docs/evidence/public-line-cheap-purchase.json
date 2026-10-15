@@ -1,0 +1,60 @@
+{
+  "checkedAt": "2026-10-15T15:24:10.636Z",
+  "scope": "Public Polygon Amoy: real LINE purchase of CHEAP 5kg; exact owner-to-store 400 test JPYC transfer independently verified at two RPCs. EC order and LINE delivery verified separately in Cloud SQL.",
+  "chainId": 80002,
+  "merchant": "CHEAP RICE SHOP",
+  "amount": 400,
+  "asset": "test JPYC",
+  "transactionHash": "0xb5d12adddcfd0aea58f41755a67607c5af305dd995f1007a22e3d566f0a8800e",
+  "checks": [
+    {
+      "rpc": "https://polygon-amoy-bor-rpc.publicnode.com",
+      "checks": {
+        "success": true,
+        "chainId": true,
+        "canonical": true,
+        "gate": true,
+        "ownerToMerchant": true,
+        "purchaseEvent": true,
+        "confirmations": 325
+      },
+      "block": 50254988,
+      "settledAt": "2026-10-15T15:18:44.000Z"
+    },
+    {
+      "rpc": "https://polygon-amoy.drpc.org",
+      "checks": {
+        "success": true,
+        "chainId": true,
+        "canonical": true,
+        "gate": true,
+        "ownerToMerchant": true,
+        "purchaseEvent": true,
+        "confirmations": 325
+      },
+      "block": 50254988,
+      "settledAt": "2026-10-15T15:18:44.000Z"
+    }
+  ],
+  "cloud": {
+    "lineLinkActive": true,
+    "lineRequestReceivedAt": "2026-10-15T15:17:54.295Z",
+    "lineConfirmationAcceptedAt": "2026-10-15T15:18:40.738Z",
+    "purchaseCompletedAt": "2026-10-15T15:19:06.658Z",
+    "merchantOrderNumber": "ORD-20261015-DTCBWEP7",
+    "lineNotificationsDelivered": 8,
+    "lineNotificationsPending": 0
+  },
+  "approval": {
+    "reason": [
+      "merchant"
+    ],
+    "explanation": "CHEAP was not yet in the owner allowlist at the time of this order. One authenticated LINE postback approved this exact order. This is an exception purchase, not the normal-budget demo.",
+    "lineApprovalCount": 1
+  },
+  "ecStock": {
+    "product": "63d28592-d2d6-4bc5-ad96-75466a96805f",
+    "before": 1,
+    "after": 0
+  }
+}

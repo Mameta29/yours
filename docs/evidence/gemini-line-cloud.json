@@ -1,0 +1,21 @@
+{
+  "scope": "Read-only actual Vertex AI/Google ADK selection from live public UCP catalog. Availability projected to one unit. No order or payment was created.",
+  "message": "5kg入りのお米を1袋買って",
+  "selected": {
+    "id": "ec:high-rice-shop/6c8f9561-2aeb-4007-b0d4-7bea961a013d",
+    "title": "新潟県産コシヒカリ 5kg / Koshihikari 5 kg",
+    "merchantId": "ec:high-rice-shop",
+    "merchant": "HIGH RICE SHOP",
+    "amount": 1200,
+    "stock": 1,
+    "maxQuantity": 1
+  },
+  "decision": {
+    "action": "purchase",
+    "product_id": "ec:high-rice-shop/6c8f9561-2aeb-4007-b0d4-7bea961a013d",
+    "quantity": 1,
+    "explanation": "ご指定の5kg入りのお米について、CHEAP RICE SHOPの商品は在庫切れのため、現在在庫があるHIGH RICE SHOPの「新潟県産コシヒカリ 5kg」（1,200円）を1点選択しました。",
+    "model": "gemini-3.8-flash",
+    "framework": "Google ADK"
+  }
+}
