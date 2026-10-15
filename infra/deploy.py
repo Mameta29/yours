@@ -50,6 +50,8 @@ services = {
         'AP2_AGENT_KEY': key + 'ap2-agent/cryptoKeyVersions/1',
         'HUMAN_KEY': key + 'human/cryptoKeyVersions/1',
         'MERCHANT_PUBLIC_JWK': json.dumps(manifest['merchantPublicJwk']),
+        'EC_MERCHANTS_JSON': ec_merchants,
+        'LINE_BRIDGE_URL': 'https://stg-ec.jpyc-service.com/api/agent/yours/line',
     },
     'agent': {
         'ENVIRONMENT': 'production', 'GOOGLE_GENAI_USE_VERTEXAI': 'true',
@@ -67,6 +69,9 @@ services = {
         'WORKER_URL': f'https://yours-worker-{number}.{region}.run.app',
         'WORKER_IDENTITY': f'yours-worker@{project}.iam.gserviceaccount.com',
         'UCP_SIGNING_KEY': key + 'ucp-merchant/cryptoKeyVersions/1', 'MANDATES_URL': mandates_url,
+        'LINE_BRIDGE_URL': 'https://stg-ec.jpyc-service.com/api/agent/yours/line',
+        'CHAT_WORKER_URL': f'https://yours-chat-{number}.{region}.run.app',
+        'CHAT_WORKER_IDENTITY': f'yours-chat@{project}.iam.gserviceaccount.com',
     },
     'worker': {
         'NODE_ENV': 'production', **common,
@@ -76,6 +81,7 @@ services = {
         'MANDATES_URL': mandates_url,
         **{role.upper() + '_KEY': key + role + '/cryptoKeyVersions/1' for role in ('relayer', 'agent', 'merchant', 'risk')},
     },
+    'chat': {'NODE_ENV': 'production', 'PUBLIC_ORIGIN': origin},
 }
 for service, values in services.items():
     env = env_file(values)
@@ -87,14 +93,27 @@ for service, values in services.items():
             '--min-instances=0', '--max-instances=2' if service=='api' else '--max-instances=1', '--concurrency=40' if service=='api' else '--concurrency=4' if service=='agent' else '--concurrency=1',
             '--cpu=1', '--memory=1Gi' if service=='agent' else '--memory=512Mi', '--timeout=180', '--quiet']
         if service != 'agent':
-            arguments += ['--add-cloudsql-instances=' + project + ':' + region + ':yours-db', '--set-secrets=DATABASE_URL=yours-db-runtime:latest']
+            secrets = 'DATABASE_URL=yours-db-runtime:latest'
+            if service in ('api', 'mandates'):
+                secrets += ',CHAT_ENCRYPTION_KEY=yours-chat-encryption-key:latest'
+            arguments += ['--add-cloudsql-instances=' + project + ':' + region + ':yours-db', '--set-secrets=' + secrets]
         if service == 'worker':
             arguments += ['--command=node', '--args=services/worker/dist/server.js']
+        if service == 'chat':
+            arguments += ['--command=node', '--args=services/api/dist/chat-worker.js']
         gcloud(*arguments)
     finally:
         env.unlink()
     print(json.dumps({'service': service, 'url': gcloud('run', 'services', 'describe', 'yours-' + service, '--format=value(status.url)', capture=True)}))
 
-for source, target in [('api','mandates'), ('api','agent'), ('api','worker'), ('worker','mandates'), ('scheduler','worker')]:
+for source, target in [('api','mandates'), ('api','agent'), ('api','worker'), ('worker','mandates'), ('scheduler','worker'), ('api','chat'), ('chat','api'), ('scheduler','chat')]:
     gcloud('run', 'services', 'add-iam-policy-binding', 'yours-' + target,
         '--member=serviceAccount:yours-' + source + '@' + project + '.iam.gserviceaccount.com', '--role=roles/run.invoker', '--quiet')
+
+job = 'yours-chat-outbox'
+exists = subprocess.run(['gcloud', 'scheduler', 'jobs', 'describe', job, '--project=' + project, '--location=' + region], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+subprocess.run(['gcloud', 'scheduler', 'jobs', 'update' if exists else 'create', 'http', job,
+    '--project=' + project, '--location=' + region, '--schedule=* * * * *', '--time-zone=Asia/Tokyo',
+    '--uri=https://yours-chat-' + number + '.' + region + '.run.app/run', '--http-method=POST', '--message-body={}',
+    '--oidc-service-account-email=yours-scheduler@' + project + '.iam.gserviceaccount.com',
+    '--oidc-token-audience=https://yours-chat-' + number + '.' + region + '.run.app', '--attempt-deadline=180s', '--quiet'], check=True)
